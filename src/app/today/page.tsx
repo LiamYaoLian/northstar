@@ -127,6 +127,20 @@ export default function TodayPage() {
     }
   }
 
+  async function reorderSubtasks(taskId: string, orderedIds: string[]) {
+    try {
+      await apiFetch(`/api/tasks/${taskId}/subtasks/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "子任务排序失败");
+      throw err;
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -153,6 +167,7 @@ export default function TodayPage() {
             onBreakdown={breakdownTask}
             onAddSubtask={addSubtask}
             onDeleteSubtask={(id) => void deleteSubtask(id)}
+            onReorderSubtasks={reorderSubtasks}
             onToggleSubtask={toggleSubtask}
             onPin={(id, pinned) => void patchTask(id, { isPinned: pinned })}
             onComplete={(id) => void patchTask(id, { status: "done" })}

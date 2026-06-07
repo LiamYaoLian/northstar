@@ -9,7 +9,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") ?? undefined;
-    return NextResponse.json({ tasks: listTasksWithSubtasks(status) });
+    const sort = searchParams.get("sort") === "manual" ? "manual" : "priority";
+    return NextResponse.json({ tasks: listTasksWithSubtasks(status, sort) });
   } catch (err) {
     console.error("GET /api/tasks", err);
     return NextResponse.json(

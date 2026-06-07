@@ -1,0 +1,153 @@
+"use client";
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { Subtask } from "@/lib/db/schema";
+
+function SortableSubtaskRow({
+  subtask,
+  onToggle,
+  onDelete,
+}: {
+  subtask: Subtask;
+  onToggle?: (id: string, isDone: boolean) => void;
+  onDelete?: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: subtask.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="group flex items-start gap-2 text-sm"
+    >
+      <button
+        type="button"
+        className="mt-0.5 cursor-grab touch-none text-muted hover:text-foreground active:cursor-grabbing"
+        aria-label="拖拽排序"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <input
+        type="checkbox"
+        checked={subtask.isDone}
+        onChange={(e) => onToggle?.(subtask.id, e.target.checked)}
+        className="mt-0.5"
+      />
+      <span
+        className={
+          subtask.isDone
+            ? "flex-1 text-muted line-through"
+            : subtask.isEntryPoint
+              ? "flex-1 font-medium text-accent"
+              : "flex-1"
+        }
+      >
+        {subtask.isEntryPoint && !subtask.isDone && (
+          <span className="mr-1 text-xs text-accent">入口 ·</span>
+        )}
+        {subtask.title}
+      </span>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(subtask.id)}
+          className="text-xs text-muted opacity-0 hover:text-red-600 group-hover:opacity-100"
+          title="删除子任务"
+        >
+          删除
+        </button>
+      )}
+    </li>
+  );
+}
+
+export function SortableSubtasks({
+  taskId,
+  subtasks,
+  onReorder,
+  onToggle,
+  onDelete,
+}: {
+  taskId: string;
+  subtasks: Subtask[];
+  onReorder: (taskId: string, orderedIds: string[]) => Promise<void>;
+  onToggle?: (id: string, isDone: boolean) => void;
+  onDelete?: (id: string) => void;
+}) {
+  const [items, setItems] = useState(subtasks);
+
+  useEffect(() => {
+    setItems(subtasks);
+  }, [subtasks]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = items.findIndex((s) => s.id === active.id);
+    const newIndex = items.findIndex((s) => s.id === over.id);
+    const next = arrayMove(items, oldIndex, newIndex);
+    setItems(next);
+    await onReorder(
+      taskId,
+      next.map((s) => s.id),
+    );
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={items.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-1.5 border-l-2 border-neutral-200 pl-1">
+          {items.map((st) => (
+            <SortableSubtaskRow
+              key={st.id}
+              subtask={st}
+              onToggle={onToggle}
+              onDelete={onDelete}
+            />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
+  );
+}

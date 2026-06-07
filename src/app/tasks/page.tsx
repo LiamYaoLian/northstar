@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { TaskCard } from "@/components/task-card";
+import { SortableTaskList } from "@/components/sortable-task-list";
 import { apiFetch } from "@/lib/api-client";
 import type { Task, Subtask } from "@/lib/db/schema";
 
@@ -21,7 +22,7 @@ export default function TasksPage() {
     try {
       setError(null);
       const [tasksData, strategyData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
+        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
         apiFetch<{ strategy: { pillars: { id: string; name: string; color: string }[] } | null }>(
           "/api/strategy",
         ),
@@ -90,13 +91,13 @@ export default function TasksPage() {
     }
   }
 
-  async function addSubtask(taskId: string, title: string, isEntryPoint: boolean) {
+  async function addSubtask(taskId: string, stTitle: string, isEntryPoint: boolean) {
     try {
       setError(null);
       await apiFetch(`/api/tasks/${taskId}/subtasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, isEntryPoint }),
+        body: JSON.stringify({ title: stTitle, isEntryPoint }),
       });
       await load();
     } catch (err) {
@@ -114,6 +115,34 @@ export default function TasksPage() {
     }
   }
 
+  async function reorderTasks(orderedIds: string[]) {
+    try {
+      await apiFetch("/api/tasks/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "任务排序失败");
+      throw err;
+    }
+  }
+
+  async function reorderSubtasks(taskId: string, orderedIds: string[]) {
+    try {
+      await apiFetch(`/api/tasks/${taskId}/subtasks/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "子任务排序失败");
+      throw err;
+    }
+  }
+
   async function patchTask(id: string, body: Record<string, unknown>) {
     try {
       await apiFetch(`/api/tasks/${id}`, {
@@ -126,6 +155,8 @@ export default function TasksPage() {
       setError(err instanceof Error ? err.message : "更新任务失败");
     }
   }
+
+  const taskMap = new Map(tasks.map((t) => [t.id, t]));
 
   return (
     <div className="space-y-4">
@@ -160,35 +191,42 @@ export default function TasksPage() {
       </form>
 
       <p className="text-xs text-muted">
-        点「手动拆解」逐步添加子任务，或点「AI 拆解」自动生成
+        拖拽左侧把手排序任务与子任务 · 手动拆解或 AI 拆解
         {pillars.length > 0 && ` · 归类：${pillars.map((p) => p.name).join(" · ")}`}
       </p>
 
-      <div className="space-y-3">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onBreakdown={breakdownTask}
-            onAddSubtask={addSubtask}
-            onDeleteSubtask={(id) => void deleteSubtask(id)}
-            onToggleSubtask={toggleSubtask}
-            onPin={(id, pinned) => void patchTask(id, { isPinned: pinned })}
-            onComplete={(id) => void patchTask(id, { status: "done" })}
-            onLogTime={(id, minutes) =>
-              void apiFetch("/api/time-entries", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ taskId: id, durationMin: minutes }),
-              })
-                .then(() => load())
-                .catch((err) =>
-                  setError(err instanceof Error ? err.message : "记时失败"),
-                )
-            }
-          />
-        ))}
-      </div>
+      <SortableTaskList
+        taskIds={tasks.map((t) => t.id)}
+        onReorder={reorderTasks}
+      >
+        {(taskId) => {
+          const task = taskMap.get(taskId);
+          if (!task) return null;
+          return (
+            <TaskCard
+              task={task}
+              onBreakdown={breakdownTask}
+              onAddSubtask={addSubtask}
+              onDeleteSubtask={(id) => void deleteSubtask(id)}
+              onReorderSubtasks={reorderSubtasks}
+              onToggleSubtask={toggleSubtask}
+              onPin={(id, pinned) => void patchTask(id, { isPinned: pinned })}
+              onComplete={(id) => void patchTask(id, { status: "done" })}
+              onLogTime={(id, minutes) =>
+                void apiFetch("/api/time-entries", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ taskId: id, durationMin: minutes }),
+                })
+                  .then(() => load())
+                  .catch((err) =>
+                    setError(err instanceof Error ? err.message : "记时失败"),
+                  )
+              }
+            />
+          );
+        }}
+      </SortableTaskList>
     </div>
   );
 }

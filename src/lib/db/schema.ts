@@ -51,6 +51,7 @@ export const tasks = sqliteTable("tasks", {
   estimatedMin: integer("estimated_min"),
   dueAt: text("due_at"),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
+  manualSortOrder: integer("manual_sort_order").notNull().default(0),
   postponedCount: integer("postponed_count").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),

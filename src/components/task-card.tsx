@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
 import { parseJson } from "@/lib/utils";
 import type { Task, Subtask, PriorityFactors } from "@/lib/db/schema";
@@ -21,6 +22,7 @@ export function TaskCard({
   onToggleSubtask,
   onAddSubtask,
   onDeleteSubtask,
+  onReorderSubtasks,
 }: {
   task: TaskWithMeta;
   rank?: number;
@@ -35,6 +37,10 @@ export function TaskCard({
     isEntryPoint: boolean,
   ) => Promise<void>;
   onDeleteSubtask?: (subtaskId: string) => void;
+  onReorderSubtasks?: (
+    taskId: string,
+    orderedIds: string[],
+  ) => Promise<void>;
 }) {
   const [showWhy, setShowWhy] = useState(false);
   const [breaking, setBreaking] = useState(false);
@@ -114,45 +120,14 @@ export function TaskCard({
         </div>
       </div>
 
-      {subtaskList.length > 0 && (
-        <ul className="space-y-1.5 border-l-2 border-neutral-200 pl-3">
-          {subtaskList.map((st) => (
-            <li key={st.id} className="group flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={st.isDone}
-                onChange={(e) =>
-                  onToggleSubtask?.(st.id, e.target.checked)
-                }
-                className="mt-0.5"
-              />
-              <span
-                className={
-                  st.isDone
-                    ? "flex-1 text-muted line-through"
-                    : st.isEntryPoint
-                      ? "flex-1 font-medium text-accent"
-                      : "flex-1"
-                }
-              >
-                {st.isEntryPoint && !st.isDone && (
-                  <span className="mr-1 text-xs text-accent">入口 ·</span>
-                )}
-                {st.title}
-              </span>
-              {onDeleteSubtask && (
-                <button
-                  type="button"
-                  onClick={() => onDeleteSubtask(st.id)}
-                  className="text-xs text-muted opacity-0 hover:text-red-600 group-hover:opacity-100"
-                  title="删除子任务"
-                >
-                  删除
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+      {subtaskList.length > 0 && onReorderSubtasks && (
+        <SortableSubtasks
+          taskId={task.id}
+          subtasks={subtaskList}
+          onReorder={onReorderSubtasks}
+          onToggle={onToggleSubtask}
+          onDelete={onDeleteSubtask}
+        />
       )}
 
       {showManual && onAddSubtask && (

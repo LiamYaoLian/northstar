@@ -70,6 +70,7 @@ function initSchema(database: Database.Database) {
       estimated_min INTEGER,
       due_at TEXT,
       is_pinned INTEGER NOT NULL DEFAULT 0,
+      manual_sort_order INTEGER NOT NULL DEFAULT 0,
       postponed_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -110,6 +111,17 @@ function initSchema(database: Database.Database) {
   `);
 }
 
+function migrateSchema(database: Database.Database) {
+  const cols = database
+    .prepare("PRAGMA table_info(tasks)")
+    .all() as { name: string }[];
+  if (!cols.some((c) => c.name === "manual_sort_order")) {
+    database.exec(
+      "ALTER TABLE tasks ADD COLUMN manual_sort_order INTEGER NOT NULL DEFAULT 0",
+    );
+  }
+}
+
 export function getDb() {
   if (!orm) {
     ensureDataDir();
@@ -118,6 +130,7 @@ export function getDb() {
     sqlite.pragma("foreign_keys = ON");
     if (!initialized) {
       initSchema(sqlite);
+      migrateSchema(sqlite);
       initialized = true;
     }
     orm = drizzle(sqlite, { schema });

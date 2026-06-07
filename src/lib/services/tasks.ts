@@ -40,16 +40,29 @@ function persistPriorities() {
   }
 }
 
-export function listTasks(status?: string) {
+export type TaskSortMode = "priority" | "manual";
+
+export function listTasks(status?: string, sort: TaskSortMode = "priority") {
   const db = getDb();
   const all = db.select().from(tasks).all();
   const filtered = status ? all.filter((t) => t.status === status) : all;
+  if (sort === "manual") {
+    return filtered.sort((a, b) => {
+      if (a.manualSortOrder !== b.manualSortOrder) {
+        return a.manualSortOrder - b.manualSortOrder;
+      }
+      return b.priorityScore - a.priorityScore;
+    });
+  }
   return filtered.sort((a, b) => b.priorityScore - a.priorityScore);
 }
 
-export function listTasksWithSubtasks(status?: string) {
+export function listTasksWithSubtasks(
+  status?: string,
+  sort: TaskSortMode = "priority",
+) {
   const db = getDb();
-  const taskList = listTasks(status);
+  const taskList = listTasks(status, sort);
   const allSubtasks = db.select().from(subtasks).all();
   const byParent = new Map<string, Subtask[]>();
   for (const s of allSubtasks) {
@@ -104,6 +117,12 @@ export async function createTask(input: {
   }
 
   const taskId = id();
+  const maxOrder = db
+    .select()
+    .from(tasks)
+    .all()
+    .reduce((max, t) => Math.max(max, t.manualSortOrder ?? 0), 0);
+
   db.insert(tasks)
     .values({
       id: taskId,
@@ -117,6 +136,7 @@ export async function createTask(input: {
       estimatedMin: input.estimatedMin ?? null,
       dueAt: input.dueAt ?? null,
       isPinned: false,
+      manualSortOrder: maxOrder + 1,
       postponedCount: 0,
       createdAt: ts,
       updatedAt: ts,
@@ -319,4 +339,37 @@ export function deleteSubtask(subtaskId: string) {
   });
 
   return true;
+}
+
+export function reorderTasks(orderedIds: string[]) {
+  const db = getDb();
+  const ts = nowIso();
+  orderedIds.forEach((taskId, index) => {
+    db.update(tasks)
+      .set({ manualSortOrder: index, updatedAt: ts })
+      .where(eq(tasks.id, taskId))
+      .run();
+  });
+  return listTasks(undefined, "manual");
+}
+
+export function reorderSubtasks(taskId: string, orderedIds: string[]) {
+  const db = getDb();
+  const existing = listSubtasks(taskId);
+  const idSet = new Set(existing.map((s) => s.id));
+  if (
+    orderedIds.length !== existing.length ||
+    !orderedIds.every((id) => idSet.has(id))
+  ) {
+    return null;
+  }
+
+  orderedIds.forEach((subtaskId, index) => {
+    db.update(subtasks)
+      .set({ sortOrder: index })
+      .where(eq(subtasks.id, subtaskId))
+      .run();
+  });
+
+  return listSubtasks(taskId);
 }
