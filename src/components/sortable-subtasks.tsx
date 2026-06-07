@@ -120,12 +120,19 @@ export function SortableSubtasks({
 
     const oldIndex = items.findIndex((s) => s.id === active.id);
     const newIndex = items.findIndex((s) => s.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const previous = items;
     const next = arrayMove(items, oldIndex, newIndex);
     setItems(next);
-    await onReorder(
-      taskId,
-      next.map((s) => s.id),
-    );
+    try {
+      await onReorder(
+        taskId,
+        next.map((s) => s.id),
+      );
+    } catch {
+      setItems(previous);
+    }
   }
 
   if (items.length === 0) return null;
@@ -134,7 +141,7 @@ export function SortableSubtasks({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
+      onDragEnd={(event) => void handleDragEnd(event)}
     >
       <SortableContext items={items.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <ul className="space-y-1.5 border-l-2 border-neutral-200 pl-1">

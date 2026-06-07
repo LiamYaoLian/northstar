@@ -102,7 +102,6 @@ export default function TasksPage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "添加子任务失败");
-      throw err;
     }
   }
 
@@ -211,6 +210,9 @@ export default function TasksPage() {
               onReorderSubtasks={reorderSubtasks}
               onToggleSubtask={toggleSubtask}
               onPin={(id, pinned) => void patchTask(id, { isPinned: pinned })}
+              onToggleIntimidating={(id, intimidating) =>
+                void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
+              }
               onComplete={(id) => void patchTask(id, { status: "done" })}
               onLogTime={(id, minutes) =>
                 void apiFetch("/api/time-entries", {

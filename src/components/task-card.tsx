@@ -23,10 +23,12 @@ export function TaskCard({
   onAddSubtask,
   onDeleteSubtask,
   onReorderSubtasks,
+  onToggleIntimidating,
 }: {
   task: TaskWithMeta;
   rank?: number;
   onPin?: (id: string, pinned: boolean) => void;
+  onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;
   onBreakdown?: (id: string) => Promise<void>;
@@ -51,6 +53,7 @@ export function TaskCard({
   const factors = parseJson<PriorityFactors | null>(task.priorityFactors, null);
   const subtaskList = task.subtasks ?? [];
   const doneCount = subtaskList.filter((s) => s.isDone).length;
+  const isIntimidating = task.intimidationScore >= 4;
 
   async function handleBreakdown() {
     if (!onBreakdown) return;
@@ -72,6 +75,8 @@ export function TaskCard({
       await onAddSubtask(task.id, subtaskTitle.trim(), asEntryPoint);
       setSubtaskTitle("");
       setAsEntryPoint(false);
+    } catch {
+      // parent shows error banner
     } finally {
       setAdding(false);
     }
@@ -110,7 +115,7 @@ export function TaskCard({
             {task.dueAt && (
               <span>截止 {new Date(task.dueAt).toLocaleDateString("zh-CN")}</span>
             )}
-            {task.intimidationScore >= 4 && (
+            {isIntimidating && (
               <span className="text-amber-600">恐吓任务</span>
             )}
           </div>
@@ -193,6 +198,19 @@ export function TaskCard({
             className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
           >
             {task.isPinned ? "取消置顶" : "置顶"}
+          </button>
+        )}
+        {onToggleIntimidating && (
+          <button
+            type="button"
+            onClick={() => onToggleIntimidating(task.id, !isIntimidating)}
+            className={`rounded-md border px-2 py-1 text-xs hover:bg-neutral-50 ${
+              isIntimidating
+                ? "border-amber-300 bg-amber-50 text-amber-800"
+                : "border-border"
+            }`}
+          >
+            {isIntimidating ? "取消恐吓" : "标记恐吓"}
           </button>
         )}
         {onLogTime && (

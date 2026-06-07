@@ -13,7 +13,7 @@ function devServerHint(status: number, url: string): string {
     return "（dev 服务器缓存过期或端口不对：停掉所有 npm run dev，执行 rm -rf .next && npm run dev，确认浏览器端口与终端一致）";
   }
   if (status >= 500) {
-    return "（服务端错误：重启 dev 服务器试试）";
+    return "（服务端错误：停掉 dev 后执行 npm run dev:reset）";
   }
   return "";
 }

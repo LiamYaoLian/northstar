@@ -80,16 +80,23 @@ export function SortableTaskList({
 
     const oldIndex = items.indexOf(String(active.id));
     const newIndex = items.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const previous = items;
     const next = arrayMove(items, oldIndex, newIndex);
     setItems(next);
-    await onReorder(next);
+    try {
+      await onReorder(next);
+    } catch {
+      setItems(previous);
+    }
   }
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
+      onDragEnd={(event) => void handleDragEnd(event)}
     >
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <div className="space-y-3">

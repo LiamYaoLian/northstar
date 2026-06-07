@@ -236,6 +236,7 @@ export function updateTask(
     pillarId: string | null;
     focusTrack: string | null;
     postponedCount: number;
+    intimidationScore: number;
   }>,
 ) {
   const db = getDb();
@@ -243,9 +244,17 @@ export function updateTask(
   const existing = db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0];
   if (!existing) return null;
 
+  const { intimidationScore, ...rest } = patch;
+  const safePatch = {
+    ...rest,
+    ...(intimidationScore != null
+      ? { intimidationScore: Math.min(5, Math.max(1, intimidationScore)) }
+      : {}),
+  };
+
   db.update(tasks)
     .set({
-      ...patch,
+      ...safePatch,
       completedAt: patch.status === "done" ? ts : existing.completedAt,
       updatedAt: ts,
     })
