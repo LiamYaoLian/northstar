@@ -1,6 +1,11 @@
+"use client";
+
+import { useLocale } from "@/lib/i18n/context";
+import { translatePillar } from "@/lib/i18n/entities";
 import type { PillarAlignment } from "@/lib/alignment";
 
 export function PillarBar({ pillar }: { pillar: PillarAlignment }) {
+  const { locale, t } = useLocale();
   const max = Math.max(pillar.targetPct, pillar.actualPct, 1);
   const targetWidth = (pillar.targetPct / max) * 100;
   const actualWidth = (pillar.actualPct / max) * 100;
@@ -8,9 +13,10 @@ export function PillarBar({ pillar }: { pillar: PillarAlignment }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{pillar.name}</span>
+        <span className="font-medium">{translatePillar(pillar.name, locale)}</span>
         <span className="text-muted">
-          目标 {pillar.targetPct}% · 实际 {pillar.actualPct}%
+          {t.common.target} {pillar.targetPct}% · {t.common.actual}{" "}
+          {pillar.actualPct}%
           {pillar.drift !== 0 && (
             <span
               className={
@@ -22,10 +28,10 @@ export function PillarBar({ pillar }: { pillar: PillarAlignment }) {
             </span>
           )}
           {pillar.alert === "over_cap" && (
-            <span className="ml-1 text-red-600">超 cap</span>
+            <span className="ml-1 text-red-600">{t.common.overCap}</span>
           )}
           {pillar.alert === "under_floor" && (
-            <span className="ml-1 text-red-600">低于 floor</span>
+            <span className="ml-1 text-red-600">{t.common.underFloor}</span>
           )}
         </span>
       </div>

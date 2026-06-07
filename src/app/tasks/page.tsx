@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
 import { apiFetch } from "@/lib/api-client";
+import { useLocale } from "@/lib/i18n/context";
+import { translatePillar } from "@/lib/i18n/entities";
 import type { Task, Subtask } from "@/lib/db/schema";
 
 type TaskRow = Task & {
@@ -13,6 +15,7 @@ type TaskRow = Task & {
 };
 
 export default function TasksPage() {
+  const { locale, t } = useLocale();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +45,9 @@ export default function TasksPage() {
         }),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
+      setError(e instanceof Error ? e.message : t.errors.loadFailed);
     }
-  }, []);
+  }, [t.errors.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -63,7 +66,7 @@ export default function TasksPage() {
       setTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "添加任务失败");
+      setError(err instanceof Error ? err.message : t.errors.addTaskFailed);
     }
   }
 
@@ -73,7 +76,7 @@ export default function TasksPage() {
       await apiFetch(`/api/tasks/${taskId}/breakdown`, { method: "POST" });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "拆解失败");
+      setError(err instanceof Error ? err.message : t.errors.breakdownFailed);
       throw err;
     }
   }
@@ -87,7 +90,7 @@ export default function TasksPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新子任务失败");
+      setError(err instanceof Error ? err.message : t.errors.updateSubtaskFailed);
     }
   }
 
@@ -101,7 +104,7 @@ export default function TasksPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "添加子任务失败");
+      setError(err instanceof Error ? err.message : t.errors.addSubtaskFailed);
     }
   }
 
@@ -110,7 +113,7 @@ export default function TasksPage() {
       await apiFetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除子任务失败");
+      setError(err instanceof Error ? err.message : t.errors.deleteSubtaskFailed);
     }
   }
 
@@ -123,7 +126,7 @@ export default function TasksPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "任务排序失败");
+      setError(err instanceof Error ? err.message : t.errors.reorderTasksFailed);
       throw err;
     }
   }
@@ -137,7 +140,7 @@ export default function TasksPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "子任务排序失败");
+      setError(err instanceof Error ? err.message : t.errors.reorderSubtasksFailed);
       throw err;
     }
   }
@@ -151,7 +154,7 @@ export default function TasksPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新任务失败");
+      setError(err instanceof Error ? err.message : t.errors.updateTaskFailed);
     }
   }
 
@@ -159,7 +162,7 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Tasks</h2>
+      <h2 className="text-lg font-semibold">{t.tasks.title}</h2>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -169,7 +172,7 @@ export default function TasksPage() {
             className="ml-2 underline"
             onClick={() => void load()}
           >
-            重试
+            {t.common.retry}
           </button>
         </div>
       )}
@@ -177,7 +180,7 @@ export default function TasksPage() {
       <form onSubmit={addTask} className="flex gap-2">
         <input
           className="flex-1 rounded-md border border-border px-3 py-2 text-sm"
-          placeholder="新任务，如：准备投资人 deck、刷 LC 题..."
+          placeholder={t.tasks.placeholder}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -185,13 +188,14 @@ export default function TasksPage() {
           type="submit"
           className="rounded-md bg-accent px-4 py-2 text-sm text-white"
         >
-          添加
+          {t.common.add}
         </button>
       </form>
 
       <p className="text-xs text-muted">
-        拖拽左侧把手排序任务与子任务 · 手动拆解或 AI 拆解
-        {pillars.length > 0 && ` · 归类：${pillars.map((p) => p.name).join(" · ")}`}
+        {t.tasks.hint}
+        {pillars.length > 0 &&
+          ` · ${t.tasks.categorized}：${pillars.map((p) => translatePillar(p.name, locale)).join(" · ")}`}
       </p>
 
       <SortableTaskList
@@ -222,7 +226,7 @@ export default function TasksPage() {
                 })
                   .then(() => load())
                   .catch((err) =>
-                    setError(err instanceof Error ? err.message : "记时失败"),
+                    setError(err instanceof Error ? err.message : t.errors.logTimeFailed),
                   )
               }
             />

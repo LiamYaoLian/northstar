@@ -19,16 +19,23 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocale } from "@/lib/i18n/context";
 import type { Subtask } from "@/lib/db/schema";
 
 function SortableSubtaskRow({
   subtask,
   onToggle,
   onDelete,
+  dragLabel,
+  deleteLabel,
+  entryPointBadge,
 }: {
   subtask: Subtask;
   onToggle?: (id: string, isDone: boolean) => void;
   onDelete?: (id: string) => void;
+  dragLabel: string;
+  deleteLabel: string;
+  entryPointBadge: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: subtask.id });
@@ -48,7 +55,7 @@ function SortableSubtaskRow({
       <button
         type="button"
         className="mt-0.5 cursor-grab touch-none text-muted hover:text-foreground active:cursor-grabbing"
-        aria-label="拖拽排序"
+        aria-label={dragLabel}
         {...attributes}
         {...listeners}
       >
@@ -70,7 +77,7 @@ function SortableSubtaskRow({
         }
       >
         {subtask.isEntryPoint && !subtask.isDone && (
-          <span className="mr-1 text-xs text-accent">入口 ·</span>
+          <span className="mr-1 text-xs text-accent">{entryPointBadge}</span>
         )}
         {subtask.title}
       </span>
@@ -79,9 +86,9 @@ function SortableSubtaskRow({
           type="button"
           onClick={() => onDelete(subtask.id)}
           className="text-xs text-muted opacity-0 hover:text-red-600 group-hover:opacity-100"
-          title="删除子任务"
+          title={deleteLabel}
         >
-          删除
+          {deleteLabel}
         </button>
       )}
     </li>
@@ -101,6 +108,7 @@ export function SortableSubtasks({
   onToggle?: (id: string, isDone: boolean) => void;
   onDelete?: (id: string) => void;
 }) {
+  const { t } = useLocale();
   const [items, setItems] = useState(subtasks);
 
   useEffect(() => {
@@ -151,6 +159,9 @@ export function SortableSubtasks({
               subtask={st}
               onToggle={onToggle}
               onDelete={onDelete}
+              dragLabel={t.taskCard.dragSubtask}
+              deleteLabel={t.taskCard.deleteSubtask}
+              entryPointBadge={t.taskCard.entryPointBadge}
             />
           ))}
         </ul>

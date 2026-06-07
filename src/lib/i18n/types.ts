@@ -1,0 +1,116 @@
+export type Locale = "zh" | "en";
+
+export type Messages = {
+  header: { tagline: string };
+  nav: { today: string; alignment: string; tasks: string; strategy: string };
+  common: {
+    loading: string;
+    retry: string;
+    add: string;
+    next: string;
+    back: string;
+    skip: string;
+    target: string;
+    actual: string;
+    floor: string;
+    cap: string;
+    overCap: string;
+    underFloor: string;
+    perWeek: string;
+    subTracks: string;
+  };
+  errors: {
+    loadFailed: string;
+    updateFailed: string;
+    updateTaskFailed: string;
+    addTaskFailed: string;
+    breakdownFailed: string;
+    updateSubtaskFailed: string;
+    addSubtaskFailed: string;
+    deleteSubtaskFailed: string;
+    reorderTasksFailed: string;
+    reorderSubtasksFailed: string;
+    logTimeFailed: string;
+  };
+  today: {
+    title: string;
+    subtitle: string;
+    empty: string;
+    viewAll: string;
+  };
+  tasks: {
+    title: string;
+    placeholder: string;
+    hint: string;
+    categorized: string;
+  };
+  alignment: {
+    title: string;
+    subtitle: string;
+    scoreLabel: string;
+    loggedThisWeek: string;
+    unallocated: string;
+    pillarDrift: string;
+    workSubTracks: string;
+    procrastinationRadar: string;
+  };
+  strategy: {
+    title: string;
+    notDefined: string;
+    startOnboarding: string;
+    northStar: string;
+    hoursPerWeek: string;
+    workPrimaryTrack: string;
+    resetStrategy: string;
+  };
+  taskCard: {
+    estMin: string;
+    subtasks: string;
+    due: string;
+    intimidating: string;
+    priority: string;
+    subtaskPlaceholder: string;
+    entryPoint: string;
+    addingSubtask: string;
+    addSubtask: string;
+    collapseBreakdown: string;
+    manualBreakdown: string;
+    breakingDown: string;
+    aiBreakdown: string;
+    whyRanked: string;
+    unpin: string;
+    pin: string;
+    unmarkIntimidating: string;
+    markIntimidating: string;
+    logTime: string;
+    complete: string;
+    factorStrategic: string;
+    factorDeadline: string;
+    factorIntimidation: string;
+    factorStaleness: string;
+    deleteSubtask: string;
+    dragTask: string;
+    dragSubtask: string;
+    entryPointBadge: string;
+  };
+  onboarding: {
+    title: string;
+    step: string;
+    horizon: string;
+    hoursPerWeek: string;
+    brainDumpPrompt: string;
+    brainDumpPlaceholder: string;
+    analyze: string;
+    skipTemplate: string;
+    critiqueTitle: string;
+    workPrimaryTrack: string;
+    northStar: string;
+    confirmBudget: string;
+    budgetTitle: string;
+    budgetNote: string;
+    seedTasks: string;
+    creating: string;
+    start: string;
+  };
+  language: { label: string; zh: string; en: string };
+};

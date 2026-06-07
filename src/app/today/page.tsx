@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TaskCard } from "@/components/task-card";
 import { apiFetch } from "@/lib/api-client";
+import { useLocale } from "@/lib/i18n/context";
+import { localeTag } from "@/lib/i18n/entities";
 import type { Task, Subtask } from "@/lib/db/schema";
 
 type TaskRow = Task & {
@@ -14,6 +17,7 @@ type TaskRow = Task & {
 
 export default function TodayPage() {
   const router = useRouter();
+  const { locale, t } = useLocale();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -53,16 +57,16 @@ export default function TodayPage() {
       setTasks(today);
       setUpdatedAt(
         today[0]?.priorityComputedAt
-          ? new Date(today[0].priorityComputedAt).toLocaleTimeString("zh-CN", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
+          ? new Date(today[0].priorityComputedAt).toLocaleTimeString(
+              localeTag(locale),
+              { hour: "2-digit", minute: "2-digit" },
+            )
           : "—",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
+      setError(e instanceof Error ? e.message : t.errors.loadFailed);
     }
-  }, [router]);
+  }, [router, locale, t.errors.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -77,7 +81,7 @@ export default function TodayPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新失败");
+      setError(err instanceof Error ? err.message : t.errors.updateFailed);
     }
   }
 
@@ -86,7 +90,7 @@ export default function TodayPage() {
       await apiFetch(`/api/tasks/${taskId}/breakdown`, { method: "POST" });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "拆解失败");
+      setError(err instanceof Error ? err.message : t.errors.breakdownFailed);
       throw err;
     }
   }
@@ -100,7 +104,7 @@ export default function TodayPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新子任务失败");
+      setError(err instanceof Error ? err.message : t.errors.updateSubtaskFailed);
     }
   }
 
@@ -113,7 +117,7 @@ export default function TodayPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "添加子任务失败");
+      setError(err instanceof Error ? err.message : t.errors.addSubtaskFailed);
       throw err;
     }
   }
@@ -123,7 +127,7 @@ export default function TodayPage() {
       await apiFetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除子任务失败");
+      setError(err instanceof Error ? err.message : t.errors.deleteSubtaskFailed);
     }
   }
 
@@ -136,7 +140,7 @@ export default function TodayPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "子任务排序失败");
+      setError(err instanceof Error ? err.message : t.errors.reorderSubtasksFailed);
       throw err;
     }
   }
@@ -144,8 +148,10 @@ export default function TodayPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Today</h2>
-        <p className="text-sm text-muted">自动排序 · 上次更新 {updatedAt}</p>
+        <h2 className="text-lg font-semibold">{t.today.title}</h2>
+        <p className="text-sm text-muted">
+          {t.today.subtitle} {updatedAt}
+        </p>
       </div>
 
       {error && (
@@ -156,7 +162,11 @@ export default function TodayPage() {
 
       {tasks.length === 0 ? (
         <p className="text-sm text-muted">
-          暂无待办。去 <a href="/tasks" className="text-accent">Tasks</a> 添加。
+          {t.today.empty}{" "}
+          <Link href="/tasks" className="text-accent">
+            {t.nav.tasks}
+          </Link>
+          .
         </p>
       ) : (
         tasks.map((task, i) => (
@@ -182,16 +192,16 @@ export default function TodayPage() {
               })
                 .then(() => load())
                 .catch((err) =>
-                  setError(err instanceof Error ? err.message : "记时失败"),
+                  setError(err instanceof Error ? err.message : t.errors.logTimeFailed),
                 )
             }
           />
         ))
       )}
 
-      <a href="/tasks" className="text-sm text-accent">
-        查看全部待办 →
-      </a>
+      <Link href="/tasks" className="text-sm text-accent">
+        {t.today.viewAll}
+      </Link>
     </div>
   );
 }

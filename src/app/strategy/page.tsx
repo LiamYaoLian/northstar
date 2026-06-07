@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { useLocale } from "@/lib/i18n/context";
+import {
+  translateFocusTrack,
+  translatePillar,
+  translatePillarDescription,
+} from "@/lib/i18n/entities";
 import { parseJson } from "@/lib/utils";
 import type { FocusTrack } from "@/lib/db/schema";
 
@@ -29,6 +36,7 @@ type Strategy = {
 };
 
 export default function StrategyPage() {
+  const { locale, t } = useLocale();
   const [strategy, setStrategy] = useState<Strategy | null>(null);
 
   useEffect(() => {
@@ -38,7 +46,14 @@ export default function StrategyPage() {
   }, []);
 
   if (!strategy) {
-    return <p className="text-sm text-muted">尚未定义战略。<a href="/onboarding" className="text-accent">开始 onboarding</a></p>;
+    return (
+      <p className="text-sm text-muted">
+        {t.strategy.notDefined}{" "}
+        <Link href="/onboarding" className="text-accent">
+          {t.strategy.startOnboarding}
+        </Link>
+      </p>
+    );
   }
 
   const { northStar, pillars } = strategy;
@@ -46,17 +61,17 @@ export default function StrategyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Strategy</h2>
+        <h2 className="text-lg font-semibold">{t.strategy.title}</h2>
         <p className="text-sm text-muted">{northStar.horizon}</p>
       </div>
 
       <Card className="space-y-2">
-        <h3 className="text-sm font-medium text-muted">North Star</h3>
+        <h3 className="text-sm font-medium text-muted">{t.strategy.northStar}</h3>
         <p>{northStar.statement}</p>
         <p className="text-xs text-muted">
-          每周 {northStar.hoursPerWeek}h 可规划
+          {northStar.hoursPerWeek}h {t.strategy.hoursPerWeek}
           {northStar.workPrimaryTrack &&
-            ` · Work 主赛道：${northStar.workPrimaryTrack}`}
+            ` · ${t.strategy.workPrimaryTrack}：${translateFocusTrack(northStar.workPrimaryTrack, locale)}`}
         </p>
       </Card>
 
@@ -71,28 +86,41 @@ export default function StrategyPage() {
                     className="h-3 w-3 rounded-full"
                     style={{ backgroundColor: p.color }}
                   />
-                  <span className="font-medium">{p.name}</span>
+                  <span className="font-medium">
+                    {translatePillar(p.name, locale)}
+                  </span>
                 </div>
                 <span className="text-sm text-muted">{p.targetPct}%</span>
               </div>
               {p.description && (
-                <p className="text-sm text-muted">{p.description}</p>
+                <p className="text-sm text-muted">
+                  {translatePillarDescription(p.name, p.description, locale)}
+                </p>
               )}
               <div className="flex flex-wrap gap-2 text-xs text-muted">
                 {p.isHardConstraint && (
                   <span className="rounded bg-green-50 px-2 py-0.5 text-green-700">
-                    floor {p.floorMinPerWeek ? `${p.floorMinPerWeek}min/周` : ""}
+                    {t.common.floor}{" "}
+                    {p.floorMinPerWeek
+                      ? `${p.floorMinPerWeek}${t.common.perWeek}`
+                      : ""}
                   </span>
                 )}
                 {p.capMaxPct && (
                   <span className="rounded bg-red-50 px-2 py-0.5 text-red-700">
-                    cap {p.capMaxPct}%
+                    {t.common.cap} {p.capMaxPct}%
                   </span>
                 )}
               </div>
               {tracks.length > 0 && (
                 <div className="text-xs text-muted">
-                  子赛道：{tracks.map((t) => `${t.name} ${t.shareOfParent}%`).join(" · ")}
+                  {t.common.subTracks}：
+                  {tracks
+                    .map(
+                      (tr) =>
+                        `${translateFocusTrack(tr.name, locale)} ${tr.shareOfParent}%`,
+                    )
+                    .join(" · ")}
                 </div>
               )}
             </Card>
@@ -100,12 +128,9 @@ export default function StrategyPage() {
         })}
       </div>
 
-      <a
-        href="/onboarding"
-        className="inline-block text-sm text-accent"
-      >
-        重新设定战略 →
-      </a>
+      <Link href="/onboarding" className="inline-block text-sm text-accent">
+        {t.strategy.resetStrategy}
+      </Link>
     </div>
   );
 }

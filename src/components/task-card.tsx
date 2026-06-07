@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
+import { useLocale } from "@/lib/i18n/context";
+import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
 import { parseJson } from "@/lib/utils";
 import type { Task, Subtask, PriorityFactors } from "@/lib/db/schema";
 
@@ -44,6 +46,7 @@ export function TaskCard({
     orderedIds: string[],
   ) => Promise<void>;
 }) {
+  const { locale, localeTag, t } = useLocale();
   const [showWhy, setShowWhy] = useState(false);
   const [breaking, setBreaking] = useState(false);
   const [showManual, setShowManual] = useState(false);
@@ -82,6 +85,13 @@ export function TaskCard({
     }
   }
 
+  const pillarLabel = task.pillarName
+    ? translatePillar(task.pillarName, locale)
+    : undefined;
+  const focusLabel = task.focusTrack
+    ? translateFocusTrack(task.focusTrack, locale)
+    : undefined;
+
   return (
     <Card className="space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -94,7 +104,7 @@ export function TaskCard({
             {task.title}
           </h3>
           <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
-            {task.pillarName && (
+            {pillarLabel && (
               <span
                 className="rounded-full px-2 py-0.5"
                 style={{
@@ -102,26 +112,33 @@ export function TaskCard({
                   color: task.pillarColor,
                 }}
               >
-                {task.pillarName}
-                {task.focusTrack ? ` · ${task.focusTrack}` : ""}
+                {pillarLabel}
+                {focusLabel ? ` · ${focusLabel}` : ""}
               </span>
             )}
-            {task.estimatedMin && <span>估 {task.estimatedMin}min</span>}
+            {task.estimatedMin && (
+              <span>
+                {t.taskCard.estMin} {task.estimatedMin}min
+              </span>
+            )}
             {subtaskList.length > 0 && (
               <span>
-                子任务 {doneCount}/{subtaskList.length}
+                {t.taskCard.subtasks} {doneCount}/{subtaskList.length}
               </span>
             )}
             {task.dueAt && (
-              <span>截止 {new Date(task.dueAt).toLocaleDateString("zh-CN")}</span>
+              <span>
+                {t.taskCard.due}{" "}
+                {new Date(task.dueAt).toLocaleDateString(localeTag)}
+              </span>
             )}
             {isIntimidating && (
-              <span className="text-amber-600">恐吓任务</span>
+              <span className="text-amber-600">{t.taskCard.intimidating}</span>
             )}
           </div>
         </div>
         <div className="text-right text-xs text-muted">
-          优先级 {(task.priorityScore * 100).toFixed(0)}
+          {t.taskCard.priority} {(task.priorityScore * 100).toFixed(0)}
         </div>
       </div>
 
@@ -142,7 +159,7 @@ export function TaskCard({
         >
           <input
             className="w-full rounded-md border border-border px-2 py-1.5 text-sm"
-            placeholder="子任务，如：列出 3 个核心信息点"
+            placeholder={t.taskCard.subtaskPlaceholder}
             value={subtaskTitle}
             onChange={(e) => setSubtaskTitle(e.target.value)}
           />
@@ -152,14 +169,14 @@ export function TaskCard({
               checked={asEntryPoint}
               onChange={(e) => setAsEntryPoint(e.target.checked)}
             />
-            标记为入口步骤（≤2min 可启动）
+            {t.taskCard.entryPoint}
           </label>
           <button
             type="submit"
             disabled={adding || !subtaskTitle.trim()}
             className="rounded-md bg-accent px-3 py-1 text-xs text-white disabled:opacity-50"
           >
-            {adding ? "添加中..." : "添加子任务"}
+            {adding ? t.taskCard.addingSubtask : t.taskCard.addSubtask}
           </button>
         </form>
       )}
@@ -171,7 +188,7 @@ export function TaskCard({
             onClick={() => setShowManual(!showManual)}
             className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
           >
-            {showManual ? "收起拆解" : "手动拆解"}
+            {showManual ? t.taskCard.collapseBreakdown : t.taskCard.manualBreakdown}
           </button>
         )}
         {onBreakdown && (
@@ -181,7 +198,7 @@ export function TaskCard({
             onClick={handleBreakdown}
             className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50"
           >
-            {breaking ? "拆解中..." : "AI 拆解"}
+            {breaking ? t.taskCard.breakingDown : t.taskCard.aiBreakdown}
           </button>
         )}
         <button
@@ -189,7 +206,7 @@ export function TaskCard({
           onClick={() => setShowWhy(!showWhy)}
           className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
         >
-          为什么排这里？
+          {t.taskCard.whyRanked}
         </button>
         {onPin && (
           <button
@@ -197,7 +214,7 @@ export function TaskCard({
             onClick={() => onPin(task.id, !task.isPinned)}
             className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
           >
-            {task.isPinned ? "取消置顶" : "置顶"}
+            {task.isPinned ? t.taskCard.unpin : t.taskCard.pin}
           </button>
         )}
         {onToggleIntimidating && (
@@ -210,7 +227,9 @@ export function TaskCard({
                 : "border-border"
             }`}
           >
-            {isIntimidating ? "取消恐吓" : "标记恐吓"}
+            {isIntimidating
+              ? t.taskCard.unmarkIntimidating
+              : t.taskCard.markIntimidating}
           </button>
         )}
         {onLogTime && (
@@ -219,7 +238,7 @@ export function TaskCard({
             onClick={() => onLogTime(task.id, task.estimatedMin ?? 30)}
             className="rounded-md bg-accent px-2 py-1 text-xs text-white hover:opacity-90"
           >
-            记录时间
+            {t.taskCard.logTime}
           </button>
         )}
         {onComplete && task.status !== "done" && (
@@ -228,17 +247,28 @@ export function TaskCard({
             onClick={() => onComplete(task.id)}
             className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
           >
-            完成
+            {t.taskCard.complete}
           </button>
         )}
       </div>
 
       {showWhy && factors && (
         <div className="space-y-1 rounded-lg bg-neutral-50 p-3 text-xs">
-          <div>战略纠偏: {(factors.strategicUrgency * 100).toFixed(0)}</div>
-          <div>截止压力: {(factors.deadlinePressure * 100).toFixed(0)}</div>
-          <div>恐吓加成: {(factors.intimidationEscalation * 100).toFixed(0)}</div>
-          <div>积压程度: {(factors.staleness * 100).toFixed(0)}</div>
+          <div>
+            {t.taskCard.factorStrategic}:{" "}
+            {(factors.strategicUrgency * 100).toFixed(0)}
+          </div>
+          <div>
+            {t.taskCard.factorDeadline}:{" "}
+            {(factors.deadlinePressure * 100).toFixed(0)}
+          </div>
+          <div>
+            {t.taskCard.factorIntimidation}:{" "}
+            {(factors.intimidationEscalation * 100).toFixed(0)}
+          </div>
+          <div>
+            {t.taskCard.factorStaleness}: {(factors.staleness * 100).toFixed(0)}
+          </div>
         </div>
       )}
     </Card>

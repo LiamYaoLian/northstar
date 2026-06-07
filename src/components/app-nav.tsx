@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLocale } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
-
-const links = [
-  { href: "/today", label: "Today" },
-  { href: "/alignment", label: "Alignment" },
-  { href: "/tasks", label: "Tasks" },
-  { href: "/strategy", label: "Strategy" },
-];
 
 export function AppNav() {
   const pathname = usePathname();
+  const { t } = useLocale();
+
+  const links = [
+    { href: "/today", label: t.nav.today },
+    { href: "/alignment", label: t.nav.alignment },
+    { href: "/tasks", label: t.nav.tasks },
+    { href: "/strategy", label: t.nav.strategy },
+  ];
+
   return (
     <nav className="flex gap-1 rounded-lg border border-border bg-card p-1 text-sm">
       {links.map((link) => (

@@ -19,13 +19,16 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useLocale } from "@/lib/i18n/context";
 
 function SortableTaskWrapper({
   id,
   children,
+  dragLabel,
 }: {
   id: string;
   children: ReactNode;
+  dragLabel: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -41,7 +44,7 @@ function SortableTaskWrapper({
       <button
         type="button"
         className="mt-4 shrink-0 cursor-grab touch-none text-muted hover:text-foreground active:cursor-grabbing"
-        aria-label="拖拽排序任务"
+        aria-label={dragLabel}
         {...attributes}
         {...listeners}
       >
@@ -61,6 +64,7 @@ export function SortableTaskList({
   onReorder: (orderedIds: string[]) => Promise<void>;
   children: (taskId: string) => ReactNode;
 }) {
+  const { t } = useLocale();
   const [items, setItems] = useState(taskIds);
 
   useEffect(() => {
@@ -101,7 +105,11 @@ export function SortableTaskList({
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <div className="space-y-3">
           {items.map((taskId) => (
-            <SortableTaskWrapper key={taskId} id={taskId}>
+            <SortableTaskWrapper
+              key={taskId}
+              id={taskId}
+              dragLabel={t.taskCard.dragTask}
+            >
               {children(taskId)}
             </SortableTaskWrapper>
           ))}
