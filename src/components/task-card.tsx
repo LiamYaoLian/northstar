@@ -1,0 +1,253 @@
+"use client";
+
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { parseJson } from "@/lib/utils";
+import type { Task, Subtask, PriorityFactors } from "@/lib/db/schema";
+
+type TaskWithMeta = Task & {
+  pillarName?: string;
+  pillarColor?: string;
+  subtasks?: Subtask[];
+};
+
+export function TaskCard({
+  task,
+  rank,
+  onPin,
+  onComplete,
+  onLogTime,
+  onBreakdown,
+  onToggleSubtask,
+  onAddSubtask,
+  onDeleteSubtask,
+}: {
+  task: TaskWithMeta;
+  rank?: number;
+  onPin?: (id: string, pinned: boolean) => void;
+  onComplete?: (id: string) => void;
+  onLogTime?: (id: string, minutes: number) => void;
+  onBreakdown?: (id: string) => Promise<void>;
+  onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
+  onAddSubtask?: (
+    taskId: string,
+    title: string,
+    isEntryPoint: boolean,
+  ) => Promise<void>;
+  onDeleteSubtask?: (subtaskId: string) => void;
+}) {
+  const [showWhy, setShowWhy] = useState(false);
+  const [breaking, setBreaking] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [asEntryPoint, setAsEntryPoint] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const factors = parseJson<PriorityFactors | null>(task.priorityFactors, null);
+  const subtaskList = task.subtasks ?? [];
+  const doneCount = subtaskList.filter((s) => s.isDone).length;
+
+  async function handleBreakdown() {
+    if (!onBreakdown) return;
+    setBreaking(true);
+    try {
+      await onBreakdown(task.id);
+    } catch {
+      // parent shows error banner
+    } finally {
+      setBreaking(false);
+    }
+  }
+
+  async function handleAddSubtask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!onAddSubtask || !subtaskTitle.trim()) return;
+    setAdding(true);
+    try {
+      await onAddSubtask(task.id, subtaskTitle.trim(), asEntryPoint);
+      setSubtaskTitle("");
+      setAsEntryPoint(false);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          {rank != null && (
+            <span className="text-xs font-medium text-muted">#{rank}</span>
+          )}
+          <h3 className="font-medium leading-snug">
+            {task.isPinned && <span className="mr-1">📌</span>}
+            {task.title}
+          </h3>
+          <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
+            {task.pillarName && (
+              <span
+                className="rounded-full px-2 py-0.5"
+                style={{
+                  backgroundColor: `${task.pillarColor}22`,
+                  color: task.pillarColor,
+                }}
+              >
+                {task.pillarName}
+                {task.focusTrack ? ` · ${task.focusTrack}` : ""}
+              </span>
+            )}
+            {task.estimatedMin && <span>估 {task.estimatedMin}min</span>}
+            {subtaskList.length > 0 && (
+              <span>
+                子任务 {doneCount}/{subtaskList.length}
+              </span>
+            )}
+            {task.dueAt && (
+              <span>截止 {new Date(task.dueAt).toLocaleDateString("zh-CN")}</span>
+            )}
+            {task.intimidationScore >= 4 && (
+              <span className="text-amber-600">恐吓任务</span>
+            )}
+          </div>
+        </div>
+        <div className="text-right text-xs text-muted">
+          优先级 {(task.priorityScore * 100).toFixed(0)}
+        </div>
+      </div>
+
+      {subtaskList.length > 0 && (
+        <ul className="space-y-1.5 border-l-2 border-neutral-200 pl-3">
+          {subtaskList.map((st) => (
+            <li key={st.id} className="group flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={st.isDone}
+                onChange={(e) =>
+                  onToggleSubtask?.(st.id, e.target.checked)
+                }
+                className="mt-0.5"
+              />
+              <span
+                className={
+                  st.isDone
+                    ? "flex-1 text-muted line-through"
+                    : st.isEntryPoint
+                      ? "flex-1 font-medium text-accent"
+                      : "flex-1"
+                }
+              >
+                {st.isEntryPoint && !st.isDone && (
+                  <span className="mr-1 text-xs text-accent">入口 ·</span>
+                )}
+                {st.title}
+              </span>
+              {onDeleteSubtask && (
+                <button
+                  type="button"
+                  onClick={() => onDeleteSubtask(st.id)}
+                  className="text-xs text-muted opacity-0 hover:text-red-600 group-hover:opacity-100"
+                  title="删除子任务"
+                >
+                  删除
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showManual && onAddSubtask && (
+        <form
+          onSubmit={handleAddSubtask}
+          className="space-y-2 rounded-lg border border-dashed border-border bg-neutral-50 p-3"
+        >
+          <input
+            className="w-full rounded-md border border-border px-2 py-1.5 text-sm"
+            placeholder="子任务，如：列出 3 个核心信息点"
+            value={subtaskTitle}
+            onChange={(e) => setSubtaskTitle(e.target.value)}
+          />
+          <label className="flex items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={asEntryPoint}
+              onChange={(e) => setAsEntryPoint(e.target.checked)}
+            />
+            标记为入口步骤（≤2min 可启动）
+          </label>
+          <button
+            type="submit"
+            disabled={adding || !subtaskTitle.trim()}
+            className="rounded-md bg-accent px-3 py-1 text-xs text-white disabled:opacity-50"
+          >
+            {adding ? "添加中..." : "添加子任务"}
+          </button>
+        </form>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {onAddSubtask && (
+          <button
+            type="button"
+            onClick={() => setShowManual(!showManual)}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
+          >
+            {showManual ? "收起拆解" : "手动拆解"}
+          </button>
+        )}
+        {onBreakdown && (
+          <button
+            type="button"
+            disabled={breaking}
+            onClick={handleBreakdown}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50"
+          >
+            {breaking ? "拆解中..." : "AI 拆解"}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowWhy(!showWhy)}
+          className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
+        >
+          为什么排这里？
+        </button>
+        {onPin && (
+          <button
+            type="button"
+            onClick={() => onPin(task.id, !task.isPinned)}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
+          >
+            {task.isPinned ? "取消置顶" : "置顶"}
+          </button>
+        )}
+        {onLogTime && (
+          <button
+            type="button"
+            onClick={() => onLogTime(task.id, task.estimatedMin ?? 30)}
+            className="rounded-md bg-accent px-2 py-1 text-xs text-white hover:opacity-90"
+          >
+            记录时间
+          </button>
+        )}
+        {onComplete && task.status !== "done" && (
+          <button
+            type="button"
+            onClick={() => onComplete(task.id)}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
+          >
+            完成
+          </button>
+        )}
+      </div>
+
+      {showWhy && factors && (
+        <div className="space-y-1 rounded-lg bg-neutral-50 p-3 text-xs">
+          <div>战略纠偏: {(factors.strategicUrgency * 100).toFixed(0)}</div>
+          <div>截止压力: {(factors.deadlinePressure * 100).toFixed(0)}</div>
+          <div>恐吓加成: {(factors.intimidationEscalation * 100).toFixed(0)}</div>
+          <div>积压程度: {(factors.staleness * 100).toFixed(0)}</div>
+        </div>
+      )}
+    </Card>
+  );
+}
