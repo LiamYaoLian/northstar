@@ -296,13 +296,40 @@ export function updateTask(
   const existing = db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0];
   if (!existing) return null;
 
-  const { intimidationScore, ...rest } = patch;
-  const safePatch = {
+  const { intimidationScore, pillarId, focusTrack, ...rest } = patch;
+  const safePatch: Record<string, unknown> = {
     ...rest,
     ...(intimidationScore != null
       ? { intimidationScore: Math.min(5, Math.max(1, intimidationScore)) }
       : {}),
   };
+
+  if (pillarId !== undefined) {
+    if (pillarId === null) {
+      safePatch.pillarId = null;
+      if (focusTrack === undefined) safePatch.focusTrack = null;
+    } else {
+      const pillar = db
+        .select()
+        .from(strategicPillars)
+        .where(eq(strategicPillars.id, pillarId))
+        .all()[0];
+      if (!pillar) return null;
+      safePatch.pillarId = pillarId;
+      const workPillar = db
+        .select()
+        .from(strategicPillars)
+        .all()
+        .find((p) => p.name === "工作");
+      if (pillar.id !== workPillar?.id && focusTrack === undefined) {
+        safePatch.focusTrack = null;
+      }
+    }
+  }
+
+  if (focusTrack !== undefined) {
+    safePatch.focusTrack = focusTrack;
+  }
 
   db.update(tasks)
     .set({

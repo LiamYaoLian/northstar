@@ -3,11 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TaskCard } from "@/components/task-card";
+import { TaskCard, type PillarOption } from "@/components/task-card";
 import { apiFetch } from "@/lib/api-client";
 import { useLocale } from "@/lib/i18n/context";
 import { localeTag } from "@/lib/i18n/entities";
-import type { Task, Subtask } from "@/lib/db/schema";
+import { parseJson } from "@/lib/utils";
+import type { Task, Subtask, FocusTrack } from "@/lib/db/schema";
+
+type StrategyPillar = {
+  id: string;
+  name: string;
+  color: string;
+  focusTracks: string | null;
+};
 
 type TaskRow = Task & {
   pillarName?: string;
@@ -19,6 +27,7 @@ export default function TodayPage() {
   const router = useRouter();
   const { locale, t } = useLocale();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +36,7 @@ export default function TodayPage() {
       setError(null);
       const [tasksData, strategyData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
-        apiFetch<{ hasStrategy: boolean; strategy: { pillars: { id: string; name: string; color: string }[] } | null }>(
+        apiFetch<{ hasStrategy: boolean; strategy: { pillars: StrategyPillar[] } | null }>(
           "/api/strategy",
         ),
       ]);
@@ -37,9 +46,14 @@ export default function TodayPage() {
         return;
       }
 
-      const pillarMap = new Map(
-        strategyData.strategy?.pillars?.map((p) => [p.id, p]) ?? [],
-      );
+      const strategyPillars = (strategyData.strategy?.pillars ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        focusTracks: parseJson<FocusTrack[]>(p.focusTracks, []),
+      }));
+      setPillars(strategyPillars);
+      const pillarMap = new Map(strategyPillars.map((p) => [p.id, p]));
 
       const today = tasksData.tasks
         .filter((t) => t.status !== "done")
@@ -83,6 +97,18 @@ export default function TodayPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errors.updateFailed);
     }
+  }
+
+  function changePillar(
+    taskId: string,
+    pillarId: string | null,
+    focusTrack?: string | null,
+  ) {
+    const body: Record<string, unknown> = { pillarId };
+    if (focusTrack !== undefined) {
+      body.focusTrack = focusTrack;
+    }
+    void patchTask(taskId, body);
   }
 
   async function breakdownTask(taskId: string, userPrompt?: string) {
@@ -178,6 +204,8 @@ export default function TodayPage() {
             key={task.id}
             task={task}
             rank={i + 1}
+            pillars={pillars}
+            onChangePillar={changePillar}
             onBreakdown={breakdownTask}
             onAddSubtask={addSubtask}
             onDeleteSubtask={(id) => void deleteSubtask(id)}

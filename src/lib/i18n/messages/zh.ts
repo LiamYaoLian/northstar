@@ -48,6 +48,8 @@ export const zh: Messages = {
     placeholder: "新任务，如：准备投资人 deck、刷 LC 题...",
     hint: "拖拽排序会同步更新优先级 · 引擎重算也会更新板序",
     categorized: "归类",
+    categoryOnCreate: "类别",
+    autoCategory: "自动识别",
   },
   alignment: {
     title: "对齐",
@@ -101,6 +103,9 @@ export const zh: Messages = {
     dragTask: "拖拽排序任务",
     dragSubtask: "拖拽排序",
     entryPointBadge: "入口 ·",
+    category: "类别",
+    uncategorized: "未分类",
+    focusTrack: "子赛道",
   },
   onboarding: {
     title: "定义你的战略",

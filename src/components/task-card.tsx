@@ -6,7 +6,14 @@ import { Card } from "@/components/ui/card";
 import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
 import { parseJson } from "@/lib/utils";
-import type { Task, Subtask, PriorityFactors } from "@/lib/db/schema";
+import type { Task, Subtask, PriorityFactors, FocusTrack } from "@/lib/db/schema";
+
+export type PillarOption = {
+  id: string;
+  name: string;
+  color: string;
+  focusTracks?: FocusTrack[];
+};
 
 type TaskWithMeta = Task & {
   pillarName?: string;
@@ -17,6 +24,7 @@ type TaskWithMeta = Task & {
 export function TaskCard({
   task,
   rank,
+  pillars,
   onPin,
   onComplete,
   onLogTime,
@@ -26,9 +34,11 @@ export function TaskCard({
   onDeleteSubtask,
   onReorderSubtasks,
   onToggleIntimidating,
+  onChangePillar,
 }: {
   task: TaskWithMeta;
   rank?: number;
+  pillars?: PillarOption[];
   onPin?: (id: string, pinned: boolean) => void;
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
@@ -45,6 +55,11 @@ export function TaskCard({
     taskId: string,
     orderedIds: string[],
   ) => Promise<void>;
+  onChangePillar?: (
+    taskId: string,
+    pillarId: string | null,
+    focusTrack?: string | null,
+  ) => void;
 }) {
   const { locale, localeTag, t } = useLocale();
   const [showWhy, setShowWhy] = useState(false);
@@ -59,6 +74,19 @@ export function TaskCard({
   const subtaskList = task.subtasks ?? [];
   const doneCount = subtaskList.filter((s) => s.isDone).length;
   const isIntimidating = task.intimidationScore >= 4;
+
+  const selectedPillar =
+    pillars?.find((p) => p.id === task.pillarId) ??
+    (task.pillarName
+      ? {
+          id: task.pillarId ?? "",
+          name: task.pillarName,
+          color: task.pillarColor ?? "#6b7280",
+          focusTracks: [] as FocusTrack[],
+        }
+      : undefined);
+  const isWorkPillar = selectedPillar?.name === "工作";
+  const focusTracks = selectedPillar?.focusTracks ?? [];
 
   async function handleBreakdown(e: React.FormEvent) {
     e.preventDefault();
@@ -97,6 +125,9 @@ export function TaskCard({
     ? translateFocusTrack(task.focusTrack, locale)
     : undefined;
 
+  const categorySelectClass =
+    "rounded-full border bg-white px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-accent";
+
   return (
     <Card className="space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -108,18 +139,74 @@ export function TaskCard({
             {task.isPinned && <span className="mr-1">📌</span>}
             {task.title}
           </h3>
-          <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
-            {pillarLabel && (
-              <span
-                className="rounded-full px-2 py-0.5"
-                style={{
-                  backgroundColor: `${task.pillarColor}22`,
-                  color: task.pillarColor,
-                }}
-              >
-                {pillarLabel}
-                {focusLabel ? ` · ${focusLabel}` : ""}
-              </span>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+            {pillars && onChangePillar ? (
+              <>
+                <label className="flex items-center gap-1">
+                  <span className="sr-only">{t.taskCard.category}</span>
+                  <select
+                    className={categorySelectClass}
+                    style={
+                      selectedPillar
+                        ? {
+                            borderColor: selectedPillar.color,
+                            color: selectedPillar.color,
+                          }
+                        : undefined
+                    }
+                    value={task.pillarId ?? ""}
+                    onChange={(e) =>
+                      onChangePillar(
+                        task.id,
+                        e.target.value ? e.target.value : null,
+                      )
+                    }
+                  >
+                    <option value="">{t.taskCard.uncategorized}</option>
+                    {pillars.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {translatePillar(p.name, locale)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {isWorkPillar && focusTracks.length > 0 && (
+                  <label className="flex items-center gap-1">
+                    <span className="sr-only">{t.taskCard.focusTrack}</span>
+                    <select
+                      className={categorySelectClass}
+                      value={task.focusTrack ?? ""}
+                      onChange={(e) =>
+                        onChangePillar(
+                          task.id,
+                          task.pillarId,
+                          e.target.value || null,
+                        )
+                      }
+                    >
+                      <option value="">—</option>
+                      {focusTracks.map((track) => (
+                        <option key={track.name} value={track.name}>
+                          {translateFocusTrack(track.name, locale)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            ) : (
+              pillarLabel && (
+                <span
+                  className="rounded-full px-2 py-0.5"
+                  style={{
+                    backgroundColor: `${task.pillarColor}22`,
+                    color: task.pillarColor,
+                  }}
+                >
+                  {pillarLabel}
+                  {focusLabel ? ` · ${focusLabel}` : ""}
+                </span>
+              )
             )}
             {task.estimatedMin && (
               <span>

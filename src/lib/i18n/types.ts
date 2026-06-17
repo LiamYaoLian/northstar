@@ -43,6 +43,8 @@ export type Messages = {
     placeholder: string;
     hint: string;
     categorized: string;
+    categoryOnCreate: string;
+    autoCategory: string;
   };
   alignment: {
     title: string;
@@ -95,6 +97,9 @@ export type Messages = {
     dragTask: string;
     dragSubtask: string;
     entryPointBadge: string;
+    category: string;
+    uncategorized: string;
+    focusTrack: string;
   };
   onboarding: {
     title: string;

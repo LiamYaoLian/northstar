@@ -48,6 +48,8 @@ export const en: Messages = {
     placeholder: "New task, e.g. prep investor deck, LC problems...",
     hint: "Drag to reorder tasks — updates priority; engine recalc also updates board order",
     categorized: "Categories",
+    categoryOnCreate: "Category",
+    autoCategory: "Auto-detect",
   },
   alignment: {
     title: "Alignment",
@@ -101,6 +103,9 @@ export const en: Messages = {
     dragTask: "Drag to reorder task",
     dragSubtask: "Drag to reorder",
     entryPointBadge: "Entry ·",
+    category: "Category",
+    uncategorized: "Uncategorized",
+    focusTrack: "Sub-track",
   },
   onboarding: {
     title: "Define your strategy",
