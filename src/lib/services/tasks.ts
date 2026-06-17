@@ -6,7 +6,8 @@ import {
   generateBreakdown,
   shouldAutoBreakdown,
 } from "@/lib/ai/breakdown";
-import { rerankAll, suggestFocusTrack, priorityScoreFromRank } from "@/lib/priority";
+import { rerankAll, priorityScoreFromRank } from "@/lib/priority";
+import { classifyTaskTitle } from "@/lib/tasks/classify";
 import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 import type { Subtask, Task } from "@/lib/db/schema";
@@ -151,24 +152,17 @@ export async function createTask(input: {
   const db = getDb();
   const ts = nowIso();
   const pillars = db.select().from(strategicPillars).all();
-  const workPillar = pillars.find((p) => p.name === "工作");
+  const classified = await classifyTaskTitle(input.title, pillars);
 
-  let pillarId = input.pillarId;
-  let focusTrack = input.focusTrack;
-
-  if (!pillarId) {
-    const title = input.title.toLowerCase();
-    if (/跑步|锻炼|健身|睡眠|冥想/.test(title)) {
-      pillarId = pillars.find((p) => p.name === "健康")?.id;
-    } else if (/陪伴|家庭|晚餐|约会|朋友/.test(title)) {
-      pillarId = pillars.find((p) => p.name === "关系")?.id;
-    } else if (/游戏|追剧|电影/.test(title)) {
-      pillarId = pillars.find((p) => p.name === "娱乐")?.id;
-    } else if (/家务|账单|快递|预约/.test(title)) {
-      pillarId = pillars.find((p) => p.name === "琐事")?.id;
+  const pillarId = input.pillarId ?? classified.pillarId;
+  let focusTrack: string | null | undefined = input.focusTrack;
+  if (focusTrack === undefined) {
+    if (input.pillarId) {
+      const workPillar = pillars.find((p) => p.name === "工作");
+      focusTrack =
+        input.pillarId === workPillar?.id ? classified.focusTrack : null;
     } else {
-      pillarId = workPillar?.id;
-      focusTrack = suggestFocusTrack(input.title, workPillar) ?? undefined;
+      focusTrack = classified.focusTrack;
     }
   }
 

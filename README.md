@@ -10,7 +10,7 @@ AI-driven todo app focused on **strategic alignment** and **automatic prioritiza
 - Automatic priority engine with factor breakdown
 - Today queue (Top 5)
 - Alignment dashboard with pillar drift + procrastination radar
-- Task CRUD with auto-classification + time logging
+- Task CRUD with **LLM auto-classification** (rules fallback) + time logging
 - **Subtasks with AI breakdown** — auto on complex tasks; rule templates + optional OpenAI
 
 ## Quick start
@@ -38,9 +38,12 @@ npm run db:push  # Push Drizzle schema (SQLite)
 - Tailwind CSS 4
 - Vitest
 
-## AI Breakdown
+## AI (OpenAI)
 
-By default uses **rule-based templates** (LC、deck、投资、面试等). Set `OPENAI_API_KEY` in `.env.local` for LLM-powered breakdown.
+Set `OPENAI_API_KEY` in `.env.local` (optional `OPENAI_MODEL`, default `gpt-4o-mini`):
+
+- **Task classify** — LLM first when creating tasks or live preview on Tasks page; falls back to keyword rules without a key
+- **Subtask breakdown** — LLM when key is set; otherwise rule-based templates (LC、deck、投资、面试等)
 
 ```
 POST /api/tasks/{id}/breakdown   # 手动重新拆解

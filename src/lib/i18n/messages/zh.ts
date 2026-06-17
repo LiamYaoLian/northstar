@@ -55,6 +55,11 @@ export const zh: Messages = {
     autoCategory: "自动识别",
     recalculatePriority: "重算优先级",
     recalculating: "重算中...",
+    autoDetected: "自动识别",
+    classifying: "识别中...",
+    classifySourceAi: "AI",
+    classifySourceRules: "规则",
+    manualOverride: "手动指定",
   },
   alignment: {
     title: "对齐",

@@ -55,6 +55,11 @@ export const en: Messages = {
     autoCategory: "Auto-detect",
     recalculatePriority: "Recalculate priority",
     recalculating: "Recalculating...",
+    autoDetected: "Auto-detected",
+    classifying: "Detecting category...",
+    classifySourceAi: "AI",
+    classifySourceRules: "rules",
+    manualOverride: "Manual",
   },
   alignment: {
     title: "Alignment",

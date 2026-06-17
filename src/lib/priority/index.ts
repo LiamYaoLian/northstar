@@ -216,7 +216,7 @@ export function suggestFocusTrack(
   if (!workPillar) return null;
   const tracks = parseJson<FocusTrack[]>(workPillar.focusTracks, []);
   const t = title.toLowerCase();
-  if (/leetcode|lc|面试|mock|投递|内推|system design|sd/.test(t)) return "进大厂";
+  if (/leetcode|lc|面试|mock|投递|内推|system design|sd|behavior|bq|resume|cv|algorithm|刷题|leetcode/i.test(t)) return "进大厂";
   if (/调研|探索|请教|创业|方向|1:1/.test(t)) return "探索方向";
   if (/投资|理财|研报|仓位|复盘/.test(t)) return "投资";
   return tracks[0]?.name ?? null;

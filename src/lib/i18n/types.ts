@@ -50,6 +50,11 @@ export type Messages = {
     autoCategory: string;
     recalculatePriority: string;
     recalculating: string;
+    autoDetected: string;
+    classifying: string;
+    classifySourceAi: string;
+    classifySourceRules: string;
+    manualOverride: string;
   };
   alignment: {
     title: string;
