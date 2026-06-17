@@ -36,12 +36,15 @@ export const en: Messages = {
     reorderTasksFailed: "Failed to reorder tasks",
     reorderSubtasksFailed: "Failed to reorder subtasks",
     logTimeFailed: "Failed to log time",
+    recalculateFailed: "Failed to recalculate priority",
   },
   today: {
     title: "Today",
     subtitle: "Auto-ranked · Last updated",
     empty: "Nothing on your plate. Go to",
     viewAll: "View all tasks →",
+    recalculatePriority: "Recalculate priority",
+    recalculating: "Recalculating...",
   },
   tasks: {
     title: "Tasks",
@@ -50,6 +53,8 @@ export const en: Messages = {
     categorized: "Categories",
     categoryOnCreate: "Category",
     autoCategory: "Auto-detect",
+    recalculatePriority: "Recalculate priority",
+    recalculating: "Recalculating...",
   },
   alignment: {
     title: "Alignment",

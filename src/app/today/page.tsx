@@ -29,6 +29,7 @@ export default function TodayPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string>("");
+  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -111,6 +112,19 @@ export default function TodayPage() {
     void patchTask(taskId, body);
   }
 
+  async function recalculatePriority() {
+    try {
+      setRecalculating(true);
+      setError(null);
+      await apiFetch("/api/tasks/recalculate-priorities", { method: "POST" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errors.recalculateFailed);
+    } finally {
+      setRecalculating(false);
+    }
+  }
+
   async function breakdownTask(taskId: string, userPrompt?: string) {
     try {
       await apiFetch(`/api/tasks/${taskId}/breakdown`, {
@@ -177,11 +191,21 @@ export default function TodayPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">{t.today.title}</h2>
-        <p className="text-sm text-muted">
-          {t.today.subtitle} {updatedAt}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">{t.today.title}</h2>
+          <p className="text-sm text-muted">
+            {t.today.subtitle} {updatedAt}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={recalculating}
+          onClick={() => void recalculatePriority()}
+          className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {recalculating ? t.today.recalculating : t.today.recalculatePriority}
+        </button>
       </div>
 
       {error && (

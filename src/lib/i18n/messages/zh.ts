@@ -36,12 +36,15 @@ export const zh: Messages = {
     reorderTasksFailed: "任务排序失败",
     reorderSubtasksFailed: "子任务排序失败",
     logTimeFailed: "记时失败",
+    recalculateFailed: "优先级重算失败",
   },
   today: {
     title: "今日",
     subtitle: "自动排序 · 上次更新",
     empty: "暂无待办。去",
     viewAll: "查看全部待办 →",
+    recalculatePriority: "重算优先级",
+    recalculating: "重算中...",
   },
   tasks: {
     title: "任务",
@@ -50,6 +53,8 @@ export const zh: Messages = {
     categorized: "归类",
     categoryOnCreate: "类别",
     autoCategory: "自动识别",
+    recalculatePriority: "重算优先级",
+    recalculating: "重算中...",
   },
   alignment: {
     title: "对齐",

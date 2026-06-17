@@ -31,12 +31,15 @@ export type Messages = {
     reorderTasksFailed: string;
     reorderSubtasksFailed: string;
     logTimeFailed: string;
+    recalculateFailed: string;
   };
   today: {
     title: string;
     subtitle: string;
     empty: string;
     viewAll: string;
+    recalculatePriority: string;
+    recalculating: string;
   };
   tasks: {
     title: string;
@@ -45,6 +48,8 @@ export type Messages = {
     categorized: string;
     categoryOnCreate: string;
     autoCategory: string;
+    recalculatePriority: string;
+    recalculating: string;
   };
   alignment: {
     title: string;

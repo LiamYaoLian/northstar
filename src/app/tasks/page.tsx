@@ -27,6 +27,7 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [title, setTitle] = useState("");
   const [newTaskPillarId, setNewTaskPillarId] = useState("");
+  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
 
@@ -192,11 +193,34 @@ export default function TasksPage() {
     void patchTask(taskId, body);
   }
 
+  async function recalculatePriority() {
+    try {
+      setRecalculating(true);
+      setError(null);
+      await apiFetch("/api/tasks/recalculate-priorities", { method: "POST" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errors.recalculateFailed);
+    } finally {
+      setRecalculating(false);
+    }
+  }
+
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{t.tasks.title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">{t.tasks.title}</h2>
+        <button
+          type="button"
+          disabled={recalculating}
+          onClick={() => void recalculatePriority()}
+          className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {recalculating ? t.tasks.recalculating : t.tasks.recalculatePriority}
+        </button>
+      </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

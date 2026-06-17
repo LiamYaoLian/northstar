@@ -11,7 +11,7 @@ import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 import type { Subtask, Task } from "@/lib/db/schema";
 
-function persistPriorities() {
+function persistPriorities(): string {
   const db = getDb();
   const allTasks = db.select().from(tasks).all();
   const pillars = db.select().from(strategicPillars).all();
@@ -49,6 +49,14 @@ function persistPriorities() {
       .where(eq(tasks.id, task.id))
       .run();
   });
+
+  return ts;
+}
+
+/** Run the priority engine and sync board order + scores. Call manually only. */
+export function recalculatePriorities() {
+  const computedAt = persistPriorities();
+  return { computedAt };
 }
 
 export type TaskSortMode = "priority" | "manual";
@@ -196,8 +204,6 @@ export async function createTask(input: {
     shouldAutoBreakdown(input.title, input.intimidationScore)
   ) {
     await breakdownTask(taskId);
-  } else {
-    persistPriorities();
   }
 
   return db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0];
@@ -251,8 +257,6 @@ export async function breakdownTask(
     })
     .where(eq(tasks.id, taskId))
     .run();
-
-  persistPriorities();
 
   return {
     task: db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0],
@@ -340,7 +344,6 @@ export function updateTask(
     .where(eq(tasks.id, taskId))
     .run();
 
-  persistPriorities();
   return db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0];
 }
 
@@ -365,7 +368,6 @@ export function addTimeEntry(input: {
     })
     .run();
 
-  persistPriorities();
   return db.select().from(timeEntries).all().slice(-1)[0];
 }
 
