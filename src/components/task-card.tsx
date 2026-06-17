@@ -33,7 +33,7 @@ export function TaskCard({
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;
-  onBreakdown?: (id: string) => Promise<void>;
+  onBreakdown?: (id: string, userPrompt?: string) => Promise<void>;
   onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
   onAddSubtask?: (
     taskId: string,
@@ -50,6 +50,8 @@ export function TaskCard({
   const [showWhy, setShowWhy] = useState(false);
   const [breaking, setBreaking] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [showAiBreakdown, setShowAiBreakdown] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [asEntryPoint, setAsEntryPoint] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -58,11 +60,14 @@ export function TaskCard({
   const doneCount = subtaskList.filter((s) => s.isDone).length;
   const isIntimidating = task.intimidationScore >= 4;
 
-  async function handleBreakdown() {
+  async function handleBreakdown(e: React.FormEvent) {
+    e.preventDefault();
     if (!onBreakdown) return;
     setBreaking(true);
     try {
-      await onBreakdown(task.id);
+      await onBreakdown(task.id, aiPrompt.trim() || undefined);
+      setAiPrompt("");
+      setShowAiBreakdown(false);
     } catch {
       // parent shows error banner
     } finally {
@@ -152,6 +157,27 @@ export function TaskCard({
         />
       )}
 
+      {showAiBreakdown && onBreakdown && (
+        <form
+          onSubmit={handleBreakdown}
+          className="space-y-2 rounded-lg border border-dashed border-border bg-neutral-50 p-3"
+        >
+          <textarea
+            className="min-h-16 w-full rounded-md border border-border px-2 py-1.5 text-sm"
+            placeholder={t.taskCard.breakdownPromptPlaceholder}
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={breaking}
+            className="rounded-md bg-accent px-3 py-1 text-xs text-white disabled:opacity-50"
+          >
+            {breaking ? t.taskCard.breakingDown : t.taskCard.runAiBreakdown}
+          </button>
+        </form>
+      )}
+
       {showManual && onAddSubtask && (
         <form
           onSubmit={handleAddSubtask}
@@ -194,11 +220,12 @@ export function TaskCard({
         {onBreakdown && (
           <button
             type="button"
-            disabled={breaking}
-            onClick={handleBreakdown}
-            className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50"
+            onClick={() => setShowAiBreakdown(!showAiBreakdown)}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
           >
-            {breaking ? t.taskCard.breakingDown : t.taskCard.aiBreakdown}
+            {showAiBreakdown
+              ? t.taskCard.collapseAiBreakdown
+              : t.taskCard.aiBreakdown}
           </button>
         )}
         <button

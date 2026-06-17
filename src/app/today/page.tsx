@@ -85,9 +85,13 @@ export default function TodayPage() {
     }
   }
 
-  async function breakdownTask(taskId: string) {
+  async function breakdownTask(taskId: string, userPrompt?: string) {
     try {
-      await apiFetch(`/api/tasks/${taskId}/breakdown`, { method: "POST" });
+      await apiFetch(`/api/tasks/${taskId}/breakdown`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userPrompt ?? "" }),
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errors.breakdownFailed);

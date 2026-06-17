@@ -46,7 +46,7 @@ export const zh: Messages = {
   tasks: {
     title: "任务",
     placeholder: "新任务，如：准备投资人 deck、刷 LC 题...",
-    hint: "拖拽左侧把手排序任务与子任务 · 手动拆解或 AI 拆解",
+    hint: "拖拽排序会同步更新优先级 · 引擎重算也会更新板序",
     categorized: "归类",
   },
   alignment: {
@@ -82,6 +82,10 @@ export const zh: Messages = {
     manualBreakdown: "手动拆解",
     breakingDown: "拆解中...",
     aiBreakdown: "AI 拆解",
+    collapseAiBreakdown: "收起 AI 拆解",
+    breakdownPromptPlaceholder:
+      "可选：补充背景或要求，如「我明天要路演，先拆前 3 步」「每步控制在 15min 内」",
+    runAiBreakdown: "开始拆解",
     whyRanked: "为什么排这里？",
     unpin: "取消置顶",
     pin: "置顶",

@@ -6,10 +6,10 @@ import {
   generateBreakdown,
   shouldAutoBreakdown,
 } from "@/lib/ai/breakdown";
-import { rerankAll, suggestFocusTrack } from "@/lib/priority";
+import { rerankAll, suggestFocusTrack, priorityScoreFromRank } from "@/lib/priority";
 import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
-import type { Subtask } from "@/lib/db/schema";
+import type { Subtask, Task } from "@/lib/db/schema";
 
 function persistPriorities() {
   const db = getDb();
@@ -27,34 +27,82 @@ function persistPriorities() {
   );
   const ts = nowIso();
 
-  for (const r of results) {
+  for (const [index, r] of results.entries()) {
     db.update(tasks)
       .set({
-        priorityScore: r.priorityScore,
+        priorityScore: priorityScoreFromRank(index, results.length),
         priorityFactors: JSON.stringify(r.factors),
         priorityComputedAt: ts,
+        manualSortOrder: index,
         updatedAt: ts,
       })
       .where(eq(tasks.id, r.taskId))
       .run();
   }
+
+  const doneTasks = allTasks
+    .filter((t) => t.status === "done")
+    .sort((a, b) => a.manualSortOrder - b.manualSortOrder);
+  doneTasks.forEach((task, i) => {
+    db.update(tasks)
+      .set({ manualSortOrder: results.length + i, updatedAt: ts })
+      .where(eq(tasks.id, task.id))
+      .run();
+  });
 }
 
 export type TaskSortMode = "priority" | "manual";
+
+/** Keep priorityScore monotonic with manual board order (repairs stale rows). */
+function syncActivePriorityFromManualOrder(
+  db: ReturnType<typeof getDb>,
+  filtered: Task[],
+) {
+  const active = filtered
+    .filter((t) => t.status !== "done")
+    .sort((a, b) => a.manualSortOrder - b.manualSortOrder);
+  const total = active.length;
+  if (total === 0) return;
+
+  const ts = nowIso();
+  for (const [index, task] of active.entries()) {
+    const score = priorityScoreFromRank(index, total);
+    if (Math.abs(task.priorityScore - score) > 1e-6) {
+      db.update(tasks)
+        .set({
+          priorityScore: score,
+          priorityComputedAt: ts,
+          updatedAt: ts,
+        })
+        .where(eq(tasks.id, task.id))
+        .run();
+    }
+  }
+}
 
 export function listTasks(status?: string, sort: TaskSortMode = "priority") {
   const db = getDb();
   const all = db.select().from(tasks).all();
   const filtered = status ? all.filter((t) => t.status === status) : all;
+
+  syncActivePriorityFromManualOrder(db, filtered);
+  const synced = db.select().from(tasks).all();
+  const rows = status ? synced.filter((t) => t.status === status) : synced;
+
   if (sort === "manual") {
-    return filtered.sort((a, b) => {
+    return rows.sort((a, b) => {
       if (a.manualSortOrder !== b.manualSortOrder) {
         return a.manualSortOrder - b.manualSortOrder;
       }
       return b.priorityScore - a.priorityScore;
     });
   }
-  return filtered.sort((a, b) => b.priorityScore - a.priorityScore);
+  return rows.sort((a, b) => {
+    if (b.priorityScore !== a.priorityScore) {
+      return b.priorityScore - a.priorityScore;
+    }
+    return a.manualSortOrder - b.manualSortOrder;
+  });
 }
 
 export function listTasksWithSubtasks(
@@ -155,7 +203,10 @@ export async function createTask(input: {
   return db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0];
 }
 
-export async function breakdownTask(taskId: string) {
+export async function breakdownTask(
+  taskId: string,
+  options?: { userPrompt?: string },
+) {
   const db = getDb();
   const task = db.select().from(tasks).where(eq(tasks.id, taskId)).all()[0];
   if (!task) return null;
@@ -172,6 +223,7 @@ export async function breakdownTask(taskId: string) {
   const result = await generateBreakdown(task.title, task.description, {
     northStar: star?.statement,
     pillar: pillar?.name,
+    userPrompt: options?.userPrompt,
   });
 
   db.delete(subtasks).where(eq(subtasks.parentTaskId, taskId)).run();
@@ -353,9 +405,16 @@ export function deleteSubtask(subtaskId: string) {
 export function reorderTasks(orderedIds: string[]) {
   const db = getDb();
   const ts = nowIso();
+  const total = orderedIds.length;
+
   orderedIds.forEach((taskId, index) => {
     db.update(tasks)
-      .set({ manualSortOrder: index, updatedAt: ts })
+      .set({
+        manualSortOrder: index,
+        priorityScore: priorityScoreFromRank(index, total),
+        priorityComputedAt: ts,
+        updatedAt: ts,
+      })
       .where(eq(tasks.id, taskId))
       .run();
   });

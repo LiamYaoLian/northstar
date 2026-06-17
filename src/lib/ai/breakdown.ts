@@ -126,7 +126,7 @@ export function ruleBasedBreakdown(
 async function openAiBreakdown(
   title: string,
   description: string | null | undefined,
-  context?: { northStar?: string; pillar?: string },
+  context?: { northStar?: string; pillar?: string; userPrompt?: string },
 ): Promise<BreakdownResult | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -134,6 +134,7 @@ async function openAiBreakdown(
   const system = `你是任务拆解助手。将任务拆成 3-6 个可执行子步骤。
 规则：
 - 第一步必须是 ≤2 分钟可完成的入口动作，标记 isEntryPoint: true
+- 若 userInstructions 有内容，优先遵循用户的补充说明与约束
 - 用中文
 - 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
 
@@ -142,6 +143,7 @@ async function openAiBreakdown(
     description,
     northStar: context?.northStar,
     pillar: context?.pillar,
+    userInstructions: context?.userPrompt?.trim() || undefined,
   });
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -179,15 +181,26 @@ async function openAiBreakdown(
   }
 }
 
+function mergeDescription(
+  description?: string | null,
+  userPrompt?: string,
+): string | null | undefined {
+  const parts = [description?.trim(), userPrompt?.trim()].filter(Boolean);
+  return parts.length > 0 ? parts.join("\n") : description;
+}
+
 export async function generateBreakdown(
   title: string,
   description?: string | null,
-  context?: { northStar?: string; pillar?: string },
+  context?: { northStar?: string; pillar?: string; userPrompt?: string },
 ): Promise<BreakdownResult & { source: "openai" | "rules" }> {
   const ai = await openAiBreakdown(title, description, context);
   if (ai) return { ...ai, source: "openai" };
 
-  const rules = ruleBasedBreakdown(title, description);
+  const rules = ruleBasedBreakdown(
+    title,
+    mergeDescription(description, context?.userPrompt),
+  );
   return { ...rules, source: "rules" };
 }
 

@@ -20,6 +20,11 @@ describe("ruleBasedBreakdown", () => {
     expect(result.subtasks).toHaveLength(4);
     expect(result.subtasks[0].isEntryPoint).toBe(true);
   });
+
+  it("uses user prompt in description for template matching", () => {
+    const result = ruleBasedBreakdown("本周练习", "重点是 leetcode 动态规划");
+    expect(result.subtasks.some((s) => /题|样例|复盘/.test(s.title))).toBe(true);
+  });
 });
 
 describe("shouldAutoBreakdown", () => {

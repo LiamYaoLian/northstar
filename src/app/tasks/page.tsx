@@ -70,10 +70,14 @@ export default function TasksPage() {
     }
   }
 
-  async function breakdownTask(taskId: string) {
+  async function breakdownTask(taskId: string, userPrompt?: string) {
     try {
       setError(null);
-      await apiFetch(`/api/tasks/${taskId}/breakdown`, { method: "POST" });
+      await apiFetch(`/api/tasks/${taskId}/breakdown`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userPrompt ?? "" }),
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errors.breakdownFailed);

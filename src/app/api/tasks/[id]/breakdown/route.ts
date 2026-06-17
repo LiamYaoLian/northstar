@@ -2,12 +2,21 @@ import { NextResponse } from "next/server";
 import { breakdownTask } from "@/lib/services/tasks";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const result = await breakdownTask(id);
+    let userPrompt: string | undefined;
+    try {
+      const body = await request.json();
+      if (body && typeof body.prompt === "string") {
+        userPrompt = body.prompt;
+      }
+    } catch {
+      // empty body is fine
+    }
+    const result = await breakdownTask(id, { userPrompt });
     if (!result) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }

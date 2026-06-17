@@ -77,6 +77,9 @@ export type Messages = {
     manualBreakdown: string;
     breakingDown: string;
     aiBreakdown: string;
+    collapseAiBreakdown: string;
+    breakdownPromptPlaceholder: string;
+    runAiBreakdown: string;
     whyRanked: string;
     unpin: string;
     pin: string;

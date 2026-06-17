@@ -46,7 +46,7 @@ export const en: Messages = {
   tasks: {
     title: "Tasks",
     placeholder: "New task, e.g. prep investor deck, LC problems...",
-    hint: "Drag handles to reorder tasks & subtasks · Manual or AI breakdown",
+    hint: "Drag to reorder tasks — updates priority; engine recalc also updates board order",
     categorized: "Categories",
   },
   alignment: {
@@ -82,6 +82,10 @@ export const en: Messages = {
     manualBreakdown: "Manual breakdown",
     breakingDown: "Breaking down...",
     aiBreakdown: "AI breakdown",
+    collapseAiBreakdown: "Collapse AI breakdown",
+    breakdownPromptPlaceholder:
+      "Optional: add context or constraints, e.g. \"pitch is tomorrow, first 3 steps only\" or \"keep each step under 15 min\"",
+    runAiBreakdown: "Break down",
     whyRanked: "Why ranked here?",
     unpin: "Unpin",
     pin: "Pin",
