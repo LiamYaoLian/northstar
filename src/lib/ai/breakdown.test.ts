@@ -43,7 +43,7 @@ describe("promptDrivenBreakdown", () => {
     expect(result!.subtasks.map((s) => s.title)).toEqual([
       ...AMAZON_LEADERSHIP_PRINCIPLES,
     ]);
-    expect(result!.subtasks[0].isEntryPoint).toBe(true);
+    expect(result!.subtasks.every((s) => !s.isEntryPoint)).toBe(true);
   });
 
   it("returns null for unrelated prompts", () => {

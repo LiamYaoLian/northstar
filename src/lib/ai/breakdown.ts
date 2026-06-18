@@ -113,10 +113,9 @@ function estimateIntimidation(title: string, itemCount: number): number {
 }
 
 export function amazonPrinciplesBreakdown(title: string): BreakdownResult {
-  const subtasks = AMAZON_LEADERSHIP_PRINCIPLES.map((principle, i) => ({
+  const subtasks = AMAZON_LEADERSHIP_PRINCIPLES.map((principle) => ({
     title: principle,
     estimatedMin: 30,
-    isEntryPoint: i === 0,
   }));
   const estimatedMinTotal = subtasks.reduce((s, t) => s + (t.estimatedMin ?? 0), 0);
   return {
@@ -200,7 +199,7 @@ async function openAiBreakdown(
 优先级（必须遵守）：
 1. 若 userInstructions 有内容，严格按用户指令生成——包括子任务数量、命名、结构。禁止套用「明确完成标准 / 收集材料 / 核心步骤 / 收尾」等通用模板。
 2. 若用户要求「每个 X 一个子任务」、列出 N 项、或给出枚举/清单，逐项生成对应子任务（2-${MAX_BREAKDOWN_SUBTASKS} 步均可）。
-3. 仅当用户没有特殊要求时，才拆成 3-6 步，且第一步是 ≤2 分钟的入口动作（isEntryPoint: true）。
+3. 仅当用户没有特殊要求时，才拆成 3-6 步；所有子任务 isEntryPoint 均为 false。
 4. 子任务标题用中文；专有名词（如 Amazon Leadership Principles 名称）可保留英文。
 5. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
 
@@ -237,9 +236,8 @@ async function openAiBreakdown(
 
   try {
     const parsed = BreakdownResultSchema.parse(JSON.parse(content));
-    if (!parsed.subtasks.some((s) => s.isEntryPoint)) {
-      parsed.subtasks[0].isEntryPoint = true;
-      parsed.subtasks[0].estimatedMin = Math.min(parsed.subtasks[0].estimatedMin ?? 2, 2);
+    for (const subtask of parsed.subtasks) {
+      subtask.isEntryPoint = false;
     }
     return parsed;
   } catch {

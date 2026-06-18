@@ -185,7 +185,6 @@ export async function breakdownTask(
   });
 
   const existing = await listSubtasks(taskId);
-  const hasEntryPoint = existing.some((s) => s.isEntryPoint);
 
   const ts = nowIso();
   for (const [i, item] of result.subtasks.entries()) {
@@ -194,7 +193,7 @@ export async function breakdownTask(
       parentTaskId: taskId,
       title: item.title,
       sortOrder: existing.length + i,
-      isEntryPoint: hasEntryPoint ? false : (item.isEntryPoint ?? i === 0),
+      isEntryPoint: false,
       isDone: false,
       createdAt: ts,
     });
