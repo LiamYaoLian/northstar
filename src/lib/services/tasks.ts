@@ -219,7 +219,6 @@ export async function createTask(input: {
     recurrenceDays,
     recurrenceCarryOver,
     manualSortOrder: maxOrder + 1,
-    postponedCount: 0,
     createdAt: ts,
     updatedAt: ts,
   });
@@ -464,7 +463,6 @@ export async function updateTask(
     status: string;
     pillarId: string | null;
     focusTrack: string | null;
-    postponedCount: number;
     intimidationScore: number;
     estimatedMin: number | null;
     recurrenceType: RecurrenceType;
@@ -503,9 +501,6 @@ export async function updateTask(
         .update(tasks)
         .set({
           ...safePatch,
-          ...(patch.status === "deferred" && current.status !== "deferred"
-            ? { postponedCount: current.postponedCount + 1 }
-            : {}),
           completedAt,
           updatedAt: ts,
         })

@@ -43,7 +43,7 @@ export const tasks = sqliteTable("tasks", {
   description: text("description"),
   pillarId: text("pillar_id"),
   focusTrack: text("focus_track"),
-  status: text("status").notNull().default("todo"), // todo | in_progress | done | deferred
+  status: text("status").notNull().default("todo"), // todo | in_progress | done
   intimidationScore: integer("intimidation_score").notNull().default(1),
   priorityScore: real("priority_score").notNull().default(0),
   priorityFactors: text("priority_factors"), // JSON
@@ -51,7 +51,6 @@ export const tasks = sqliteTable("tasks", {
   estimatedMin: integer("estimated_min"),
   dueAt: text("due_at"),
   manualSortOrder: integer("manual_sort_order").notNull().default(0),
-  postponedCount: integer("postponed_count").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   completedAt: text("completed_at"),

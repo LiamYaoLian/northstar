@@ -137,9 +137,6 @@ export function translateProcrastinationReason(
   if (reason === "高恐吓任务，尚未开始")
     return "High intimidation, not started yet";
 
-  const postponed = reason.match(/已推迟 (\d+) 次/);
-  if (postponed) return `Postponed ${postponed[1]} times`;
-
   return reason;
 }
 

@@ -13,7 +13,6 @@ export function TaskStatusFilterBar({ value, onChange }: TaskStatusFilterProps) 
   const { t } = useLocale();
   const options: { id: TaskStatusFilter; label: string }[] = [
     { id: "active", label: t.tasks.statusActive },
-    { id: "deferred", label: t.tasks.statusDeferred },
     { id: "done", label: t.tasks.statusDone },
     { id: "all", label: t.tasks.statusAll },
   ];

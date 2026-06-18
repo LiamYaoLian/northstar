@@ -58,19 +58,19 @@ describe("detectProcrastination", () => {
     expect(signals.some((s) => s.taskId === "stale")).toBe(true);
   });
 
-  it("flags frequently postponed tasks", () => {
+  it("flags high intimidation tasks with no logged time", () => {
     const now = new Date("2026-01-10T00:00:00.000Z");
     const signals = detectProcrastination(
       [
         makeTask({
-          id: "late",
-          postponedCount: 3,
+          id: "scary",
+          intimidationScore: 5,
           createdAt: "2026-01-08T00:00:00.000Z",
         }),
       ],
       [],
       now,
     );
-    expect(signals[0]?.reason).toContain("推迟");
+    expect(signals[0]?.reason).toContain("恐吓");
   });
 });

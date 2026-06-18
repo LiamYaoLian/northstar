@@ -164,7 +164,6 @@ export function detectProcrastination(
       if (days >= 7 && logged === 0) reason = `创建 ${days} 天，0 分钟记录`;
       else if (task.intimidationScore >= 4 && logged === 0)
         reason = `高恐吓任务，尚未开始`;
-      else if (task.postponedCount >= 3) reason = `已推迟 ${task.postponedCount} 次`;
 
       if (!reason) return null;
       return {

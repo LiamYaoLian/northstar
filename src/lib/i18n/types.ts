@@ -2,7 +2,7 @@ export type Locale = "zh" | "en";
 
 export type Messages = {
   header: { tagline: string };
-  nav: { today: string; alignment: string; tasks: string; strategy: string; completed: string; review: string };
+  nav: { today: string; alignment: string; tasks: string; strategy: string };
   common: {
     loading: string;
     retry: string;
@@ -64,9 +64,7 @@ export type Messages = {
     analyzing: string;
     statusActive: string;
     statusDone: string;
-    statusDeferred: string;
     statusAll: string;
-    deferredEmpty: string;
     activeEmpty: string;
   };
   completed: {
@@ -153,8 +151,6 @@ export type Messages = {
     logTime: string;
     complete: string;
     reopen: string;
-    defer: string;
-    restoreToToday: string;
     factorStrategic: string;
     factorDeadline: string;
     factorIntimidation: string;

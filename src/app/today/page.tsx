@@ -172,7 +172,6 @@ export default function TodayPage() {
               void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
             }
             onComplete={(id) => void patchTask(id, { status: "done" })}
-            onDefer={(id) => void patchTask(id, { status: "deferred" })}
             onLogTime={(id, minutes) => void logTime(id, minutes)}
             onUpdateRecurrence={(id, value) =>
               void patchTask(id, {

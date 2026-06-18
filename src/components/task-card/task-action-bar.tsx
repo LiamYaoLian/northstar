@@ -13,8 +13,6 @@ type TaskActionBarProps = {
   onLogTime?: (id: string, minutes: number) => void;
   onComplete?: (id: string) => void;
   onReopen?: (id: string) => void;
-  onDefer?: (id: string) => void;
-  onRestore?: (id: string) => void;
   hasAddSubtask?: boolean;
   hasBreakdown?: boolean;
 };
@@ -30,8 +28,6 @@ export function TaskActionBar({
   onLogTime,
   onComplete,
   onReopen,
-  onDefer,
-  onRestore,
   hasAddSubtask,
   hasBreakdown,
 }: TaskActionBarProps) {
@@ -77,19 +73,9 @@ export function TaskActionBar({
           {t.taskCard.logTime}
         </button>
       )}
-      {onComplete && task.status !== "done" && task.status !== "deferred" && (
+      {onComplete && task.status !== "done" && (
         <ActionButton onClick={() => onComplete(task.id)}>
           {t.taskCard.complete}
-        </ActionButton>
-      )}
-      {onDefer && task.status !== "done" && task.status !== "deferred" && (
-        <ActionButton onClick={() => onDefer(task.id)}>
-          {t.taskCard.defer}
-        </ActionButton>
-      )}
-      {onRestore && task.status === "deferred" && (
-        <ActionButton onClick={() => onRestore(task.id)}>
-          {t.taskCard.restoreToToday}
         </ActionButton>
       )}
       {onReopen && task.status === "done" && (

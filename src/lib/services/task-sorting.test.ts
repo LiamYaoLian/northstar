@@ -39,11 +39,10 @@ describe("sortTasks", () => {
 });
 
 describe("filterActiveTasks", () => {
-  it("excludes done and deferred tasks", () => {
+  it("excludes done tasks", () => {
     const rows = [
       makeTask({ id: "open", status: "todo" }),
       makeTask({ id: "closed", status: "done" }),
-      makeTask({ id: "later", status: "deferred" }),
     ];
     expect(filterActiveTasks(rows).map((t) => t.id)).toEqual(["open"]);
   });
@@ -152,15 +151,6 @@ describe("filterTasksDueToday", () => {
       filterTasksDueToday(rows, TEST_TZ, TUESDAY_10AM_NY).map((t) => t.id),
     ).toEqual(["carry"]);
   });
-
-  it("excludes deferred tasks", () => {
-    const rows = [
-      makeRecurringTaskRow({ id: "deferred", status: "deferred" }),
-    ];
-    expect(
-      filterTasksDueToday(rows, TEST_TZ, MONDAY_10AM_NY).map((t) => t.id),
-    ).toEqual([]);
-  });
 });
 
 describe("Today flow: pillar filter then rankAndLimit", () => {
@@ -201,19 +191,12 @@ describe("filterTasksByStatus", () => {
       status: "done",
       completedAt: "2025-01-07T01:00:00.000Z",
     }),
-    makeTask({ id: "later", status: "deferred" }),
   ];
 
-  it("active excludes done and deferred tasks (default Tasks tab)", () => {
+  it("active excludes done tasks (default Tasks tab)", () => {
     expect(filterTasksByStatus(rows, "active").map((t) => t.id)).toEqual([
       "open",
       "wip",
-    ]);
-  });
-
-  it("deferred includes only deferred tasks", () => {
-    expect(filterTasksByStatus(rows, "deferred").map((t) => t.id)).toEqual([
-      "later",
     ]);
   });
 
@@ -224,7 +207,7 @@ describe("filterTasksByStatus", () => {
   });
 
   it("all returns every task", () => {
-    expect(filterTasksByStatus(rows, "all")).toHaveLength(4);
+    expect(filterTasksByStatus(rows, "all")).toHaveLength(3);
   });
 });
 

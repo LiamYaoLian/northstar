@@ -137,6 +137,16 @@ export async function backfillCompletionEventsIfMissing(
 }
 
 /** Remove duplicate rows sharing the same task_id + completed_at. */
+export async function removeDeferFeatureIfPresent(client: Client): Promise<void> {
+  await client.execute("UPDATE tasks SET status = 'todo' WHERE status = 'deferred'");
+
+  const cols = await client.execute("PRAGMA table_info(tasks)");
+  const hasPostponedCount = cols.rows.some((row) => row.name === "postponed_count");
+  if (hasPostponedCount) {
+    await client.execute("ALTER TABLE tasks DROP COLUMN postponed_count");
+  }
+}
+
 export async function dedupeCompletionEvents(client: Client): Promise<number> {
   const rows = await client.execute(
     "SELECT id, task_id, completed_at FROM task_completion_events ORDER BY task_id, completed_at, id",
@@ -163,6 +173,7 @@ export async function dedupeCompletionEvents(client: Client): Promise<number> {
 export async function applyMigrations(client: Client, db: Db) {
   await safeDropIsPinnedIfExists(client);
   await dropIsEntryPointIfExists(client);
+  await removeDeferFeatureIfPresent(client);
   await migrate(db, { migrationsFolder });
   await addRecurrenceColumnsIfMissing(client);
   await addCompletionEventsTableIfMissing(client);

@@ -46,8 +46,8 @@ describe("shouldRecordCompletionTransition", () => {
     expect(shouldRecordCompletionTransition("todo", "in_progress")).toBe(false);
   });
 
-  it("returns true when transitioning deferred to done", () => {
-    expect(shouldRecordCompletionTransition("deferred", "done")).toBe(true);
+  it("returns true when transitioning in_progress to done", () => {
+    expect(shouldRecordCompletionTransition("in_progress", "done")).toBe(true);
   });
 });
 

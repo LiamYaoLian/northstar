@@ -9,7 +9,7 @@
 | 能力 | 状态 |
 |------|------|
 | 战略 / 任务 / 优先级 / recurring | ✅ |
-| 完成可见性 + defer + 策略编辑 | ✅ |
+| 完成可见性 + 策略编辑 | ✅ |
 | Alignment（本周）+ Review 快照 | ✅ |
 | CSV 导出（completions + time entries） | ✅ |
 | 空状态引导（Today 筛选 / Tasks 进行中） | ✅ Loop 7 |
@@ -31,14 +31,14 @@
 | 项 | 说明 |
 |----|------|
 | optimistic UI | 完成/记时局部更新，减少 reload |
-| Alignment 拖延雷达周期化 | 与 defer 统计对齐 |
+| Alignment 拖延雷达周期化 | 与 time log / 创建天数对齐 |
 | 多用户 / auth | 产品定位外 |
 
 ---
 
 ## Post-MVP UX 收敛 ✅（2026-06-17）
 
-- **三页合并**：`/completed`、`/review` 并入 `/alignment` 长滚动单页
+- **页面命名收敛**：完成记录与周期快照只使用 `/alignment` 长滚动单页
 - 统一 `?period=today|week|month|all` 驱动 KPI、pillar、完成记录与导出
 - 旧路由 thin redirect；导航减为 Today / 对齐 / Tasks / Strategy
 - 子组件提取至 `src/components/alignment/`

@@ -111,9 +111,8 @@ export function shouldShowOnToday(
   tz: string,
 ): boolean {
   if (task.recurrenceType === "none") {
-    return task.status !== "done" && task.status !== "deferred";
+    return task.status !== "done";
   }
-  if (task.status === "deferred") return false;
   if (isCompletedForToday(task, instant, tz)) return false;
   if (matchesRecurrenceDay(task, instant, tz)) return true;
   if (

@@ -44,7 +44,7 @@ describe("matchesRecurrenceDay", () => {
 });
 
 describe("shouldShowOnToday", () => {
-  it("one-off todo is shown; done and deferred are hidden", () => {
+  it("one-off todo is shown; done is hidden", () => {
     expect(
       shouldShowOnToday(
         makeRecurrenceTask({ status: "todo" }),
@@ -62,13 +62,6 @@ describe("shouldShowOnToday", () => {
     expect(
       shouldShowOnToday(
         makeRecurrenceTask({ status: "done" }),
-        MONDAY_10AM_NY,
-        TEST_TZ,
-      ),
-    ).toBe(false);
-    expect(
-      shouldShowOnToday(
-        makeRecurrenceTask({ status: "deferred" }),
         MONDAY_10AM_NY,
         TEST_TZ,
       ),

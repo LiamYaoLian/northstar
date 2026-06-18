@@ -50,7 +50,6 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     estimatedMin: 60,
     dueAt: null,
     manualSortOrder: 0,
-    postponedCount: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     completedAt: null,

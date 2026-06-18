@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   estimated_min INTEGER,
   due_at TEXT,
   manual_sort_order INTEGER NOT NULL DEFAULT 0,
-  postponed_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   completed_at TEXT,

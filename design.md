@@ -6,12 +6,12 @@
 
 ## 0. 当前状态（2026-06-18）
 
-MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Today、对齐、Tasks、Strategy；旧的 Completed / Review 页面保留为 thin redirect，分别跳到 Alignment 的完成记录与快照锚点。
+MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Today、对齐、Tasks、Strategy；完成记录与周期快照都收敛到 Alignment 页面内。
 
 | 能力 | 最新状态 |
 |------|----------|
 | 战略 / Onboarding | 5 步模板化建模；Strategy 页可编辑 North Star、horizon、每周小时与 Work 主赛道 |
-| 任务 / 优先级 | 创建、AI/规则分类与估时、自动拆解、手动排序、Top 5 Today、defer、recurring lazy reset 均已接入 |
+| 任务 / 优先级 | 创建、AI/规则分类与估时、自动拆解、手动排序、Top 5 Today、recurring lazy reset 均已接入 |
 | 完成可见性 | `task_completion_events` 不可变快照已落库；Today 有「今日已完成」折叠；Alignment 有周期完成记录 |
 | Alignment | `?period=today\|week\|month\|all` 驱动 KPI、pillar drift、Work sub-tracks、完成记录与 CSV 导出 |
 | Review 快照 | week/month 周期可在 Alignment 顶部保存；`#snapshots` 展示最近历史 |
@@ -46,8 +46,6 @@ MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Toda
 | `/tasks` | 全量任务板（状态分段、手动排序、创建、分类预览） |
 | `/strategy` | North Star 编辑 + pillars 只读展示；完整重配走 onboarding |
 | `/alignment` | **对齐单页**（长滚动）：KPI、pillar drift、work sub-tracks、拖延雷达、`#completions` 完成记录、`#snapshots` 快照；顶部 `?period=today\|week\|month\|all` 驱动全页 |
-| `/completed` | → 重定向 `/alignment?period=…#completions`（保留书签） |
-| `/review` | → 重定向 `/alignment?period=week#snapshots`（保留书签） |
 
 ---
 
@@ -150,14 +148,13 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 
 | 字段 | 说明 |
 |------|------|
-| `status` | `todo` \| `in_progress` \| `done` \| `deferred` |
+| `status` | `todo` \| `in_progress` \| `done` |
 | `pillarId` / `focusTrack` | 战略归属 |
 | `priorityScore` / `priorityFactors` / `priorityComputedAt` | 优先级引擎输出 |
 | `manualSortOrder` | 看板手动顺序（0 = 顶部） |
 | `intimidationScore` | 1–5，高恐吓未启动时抬高优先级 |
 | `estimatedMin` | 预估时长 |
 | `dueAt` | 一次性截止日期（与 recurrence **互斥**） |
-| `postponedCount` | 推迟次数（拖延检测用） |
 | `completedAt` | 完成时间 ISO |
 | `recurrenceType` / `recurrenceDays` / `recurrenceCarryOver` | 重复规则（见 §6） |
 
@@ -192,7 +189,7 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 
 ### 3.3 回顾层
 
-**`review_snapshots`** — 周期回顾快照（Alignment 页 week/month 可保存；`/review` 仅重定向到 `#snapshots`）
+**`review_snapshots`** — 周期回顾快照（Alignment 页 week/month 可保存；`#snapshots` 展示历史）
 
 | 字段 | 说明 |
 |------|------|
@@ -299,7 +296,6 @@ Alignment 顶部同时提供两个导出入口：完成记录 CSV 复用当前 p
 
 - 创建 ≥7 天且 0 分钟记录
 - 高恐吓（≥4）且未启动
-- `postponedCount ≥ 3`
 
 最多返回 5 条，供 Alignment 页展示。
 
@@ -329,8 +325,6 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 
 完成：`status: "done"` + 写入 `completedAt` + `task_completion_events` 快照。MVP **无 optimistic UI**，完成后 `reload()` 全量刷新。
 
-**推迟（Defer）**：Today / Tasks「稍后再说」→ `status: "deferred"`，服务端 `postponedCount++`；Today 不再显示（`shouldShowOnToday`）。Tasks **进行中** tab 排除 deferred；**稍后** tab 可「回到今日」→ `status: "todo"`（保留 postponedCount 供 Alignment 拖延雷达）。
-
 ### 7.3 子任务
 
 | 端点 | 行为 |
@@ -352,12 +346,12 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 | 页面 | 数据源 | 客户端过滤 |
 |------|--------|------------|
 | **Today** | `GET /api/tasks/today?tz=` + `GET /api/completions?since=today&until=today` | pillar filter → Top 5 `rankAndLimit(5)`；底部折叠「今日已完成」 |
-| **Tasks** | `GET /api/tasks?sort=manual&tz=` | **状态分段**（进行中 / 稍后 / 已完成 / 全部）+ pillar filter；稍后 & 已完成 tab 禁拖拽 |
+| **Tasks** | `GET /api/tasks?sort=manual&tz=` | **状态分段**（进行中 / 已完成 / 全部）+ pillar filter；已完成 tab 禁拖拽 |
 | **Alignment** | `GET /api/alignment?period=&tz=` + `GET /api/completions?since=&until=` + `GET /api/reviews?period=`（week/month 快照区） | 统一 period 选择器；`#completions` 逐条列表 + pillar 筛选；`#snapshots` 历史与保存（week/month） |
 
 Today API 返回 **priority 预排序**的 due-today 全量 + subtasks；客户端不再用 `takeTopTasks`（后者会额外排除 done，Today 路径不需要）。
 
-Tasks 板**不做日历过滤**；**进行中** tab 排除 `done` 与 `deferred`；**稍后** tab 仅 deferred；**已完成** tab 仅当前仍为 done 的行（recurring reset 后不在此 tab，但 **completion event 保留**）。
+Tasks 板**不做日历过滤**；**进行中** tab 排除 `done`；**已完成** tab 仅当前仍为 done 的行（recurring reset 后不在此 tab，但 **completion event 保留**）。
 
 完成写入：`task_completion_events` 表（不可变快照）；仅 `status` 非 done → done 时 INSERT；reopen / recurring reset **不删** event。
 
@@ -511,7 +505,7 @@ Zod schemas：`src/lib/api/tasks/schemas.ts`；tz 解析：`parse-tz-query.ts` +
 | `CategoryFilter` | Pillar 过滤 chips |
 | `PillarBar` | Alignment 页 drift 条 |
 | `alignment/*` | 对齐单页各区块（KPI、pillar、work tracks、拖延、完成记录、快照） |
-| `TaskStatusFilterBar` | Tasks 页进行中 / 稍后 / 已完成分段 |
+| `TaskStatusFilterBar` | Tasks 页进行中 / 已完成分段 |
 | `CompletionListItem` | 完成记录按日分组行 |
 | `AppHeader` / `AppNav` | 顶栏导航（Today / 对齐 / Tasks / Strategy）+ 语言切换 |
 
@@ -584,7 +578,6 @@ Vitest 覆盖核心逻辑与服务：
 | 回顾 | `review/period.test.ts`, `review/build-snapshot.test.ts`, `reviews.integration.test.ts` |
 | 导出 | `export/completions-csv.test.ts`, `export/time-entries-csv.test.ts` |
 | 策略 | `strategy/work-track.test.ts`, `strategy-update.integration.test.ts` |
-| Defer | `tasks-defer.integration.test.ts` |
 | API schema | `schemas.test.ts`, `parse-tz-query.test.ts` |
 | 组件 | `task-card.test.tsx`, `sortable-subtasks.test.tsx` |
 
@@ -615,7 +608,6 @@ Turso 空库时可 `npm run db:sync-turso` 从本地同步。
 | Onboarding raw fetch | 创建 seed 任务不带 tz，不影响首屏 openOcc |
 | Daily done 跨日 | 首次 list 请求前 Tasks 板仍显示 done，直到 openOcc |
 | 无 optimistic UI | 完成/ PATCH 后 full reload |
-| Defer 恢复 | 「回到今日」仅改 status，不重置 postponedCount（供拖延雷达） |
 | One-off due Today | 非 recurring 任务不做「仅 due 日显示」过滤 |
 | Review save tz | `POST /api/reviews` 当前读 body.tz；客户端自动 append 的 query `tz` 不参与保存请求 |
 | DST 测试 | 实现 DST-safe，无专项 transition 测试套件 |
@@ -629,8 +621,6 @@ src/app/
   page.tsx                 # → /today
   today/page.tsx           # Top 5 + 今日已完成折叠
   tasks/page.tsx           # 全量看板 + 状态分段 + 创建
-  completed/page.tsx       # → /alignment#completions 重定向
-  review/page.tsx          # → /alignment#snapshots 重定向
   strategy/page.tsx        # North Star 编辑 + pillars 只读
   alignment/page.tsx       # 对齐单页（KPI + pillar + 完成 + 快照）
   onboarding/page.tsx      # 5 步引导
