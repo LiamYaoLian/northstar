@@ -12,7 +12,7 @@ MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Toda
 |------|----------|
 | 战略 / Onboarding | 5 步模板化建模；Strategy 页可编辑 North Star、horizon、每周小时与 Work 主赛道 |
 | 任务 / 优先级 | 创建、AI/规则分类与估时、自动拆解、手动排序、Top 5 Today、recurring lazy reset 均已接入 |
-| 完成可见性 | `task_completion_events` 不可变快照已落库；Today 有「今日已完成」折叠；Alignment 有周期完成记录 |
+| 完成可见性 | `task_completion_events` 快照已落库；Today 有「今日已完成」折叠；Alignment 有周期完成记录；误点完成可通过 reopen 撤销当前 event |
 | Alignment | `?period=today\|week\|month\|all` 驱动 KPI、pillar drift、Work sub-tracks、完成记录与 CSV 导出 |
 | Review 快照 | week/month 周期可在 Alignment 顶部保存；`#snapshots` 展示最近历史 |
 | CSV 导出 | Alignment 支持 completions CSV 与 time entries CSV；导出使用当前 period 与 pillar 筛选 |
@@ -175,7 +175,7 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 
 时间记录**不删除**；recurring 任务 lazy reset 只清 `status` / `completedAt` / 子任务勾选。
 
-**`task_completion_events`** — 完成快照（不可变；reopen / recurring reset **不删**）
+**`task_completion_events`** — 完成快照（recurring reset **不删**；用户 reopen 当前 done 任务会撤销本次 event）
 
 | 字段 | 说明 |
 |------|------|
@@ -323,7 +323,7 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 
 `PATCH /api/tasks/[id]` — 支持 status、pillar、focusTrack、estimatedMin、intimidationScore、recurrence 等。
 
-完成：`status: "done"` + 写入 `completedAt` + `task_completion_events` 快照。MVP **无 optimistic UI**，完成后 `reload()` 全量刷新。
+完成：`status: "done"` + 写入 `completedAt` + `task_completion_events` 快照。用户误点完成后，可通过「重新打开」把任务改回 `todo` 并删除同一 `taskId + completedAt` 对应的本次 event。MVP **无 optimistic UI**，完成后 `reload()` 全量刷新。
 
 ### 7.3 子任务
 
@@ -353,7 +353,7 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 
 Tasks 板**不做日历过滤**；**进行中** tab 排除 `done`；**已完成** tab 仅当前仍为 done 的行（recurring reset 后不在此 tab，但 **completion event 保留**）。
 
-完成写入：`task_completion_events` 表（不可变快照）；仅 `status` 非 done → done 时 INSERT；reopen / recurring reset **不删** event。
+完成写入：`task_completion_events` 表；仅 `status` 非 done → done 时 INSERT；用户 `done → todo` reopen 删除当前 `completedAt` 精确匹配的 event；recurring reset **不删**历史 event。
 
 ### 7.6 Completion events API
 

@@ -40,7 +40,10 @@ import { needsOccurrenceReset } from "@/lib/tasks/recurrence";
 import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
 import { resolveTimezone } from "@/lib/tasks/timezone";
 import { shouldRecordCompletionTransition } from "@/lib/tasks/completion-events";
-import { recordCompletionEvent } from "@/lib/services/completions";
+import {
+  deleteCompletionEventForTaskCompletion,
+  recordCompletionEvent,
+} from "@/lib/services/completions";
 import { id, nowIso } from "@/lib/utils";
 import { eq, inArray } from "drizzle-orm";
 import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
@@ -513,6 +516,10 @@ export async function updateTask(
       const recordEvent =
         patch.status === "done" &&
         shouldRecordCompletionTransition(current.status, "done");
+      const undoCompletion =
+        current.status === "done" &&
+        patch.status !== undefined &&
+        patch.status !== "done";
 
       if (recordEvent) {
         const updatedTask = {
@@ -523,6 +530,13 @@ export async function updateTask(
           updatedAt: ts,
         } as Task;
         await recordCompletionEvent(tx, updatedTask, resolvedTz, now);
+      }
+      if (undoCompletion) {
+        await deleteCompletionEventForTaskCompletion(
+          tx,
+          current.id,
+          current.completedAt,
+        );
       }
     });
   } catch (err) {

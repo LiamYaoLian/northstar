@@ -45,6 +45,7 @@ function rowToEvent(row: typeof taskCompletionEvents.$inferSelect): TaskCompleti
 }
 
 type DbWriter = Pick<Db, "insert" | "select">;
+type DbCompletionDeleter = Pick<Db, "delete">;
 
 export async function recordCompletionEvent(
   tx: DbWriter,
@@ -95,6 +96,22 @@ export async function recordCompletionEvent(
   });
 
   return payload;
+}
+
+export async function deleteCompletionEventForTaskCompletion(
+  tx: DbCompletionDeleter,
+  taskId: string,
+  completedAt: string | null,
+): Promise<void> {
+  if (!completedAt) return;
+  await tx
+    .delete(taskCompletionEvents)
+    .where(
+      and(
+        eq(taskCompletionEvents.taskId, taskId),
+        eq(taskCompletionEvents.completedAt, completedAt),
+      ),
+    );
 }
 
 export async function listCompletionEvents(
