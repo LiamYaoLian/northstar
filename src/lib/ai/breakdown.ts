@@ -8,8 +8,29 @@ export const BreakdownItemSchema = z.object({
 
 export type BreakdownItem = z.infer<typeof BreakdownItemSchema>;
 
+export const MAX_BREAKDOWN_SUBTASKS = 20;
+
+export const AMAZON_LEADERSHIP_PRINCIPLES = [
+  "Customer Obsession",
+  "Ownership",
+  "Invent and Simplify",
+  "Are Right, A Lot",
+  "Learn and Be Curious",
+  "Hire and Develop the Best",
+  "Insist on the Highest Standards",
+  "Think Big",
+  "Bias for Action",
+  "Frugality",
+  "Earn Trust",
+  "Dive Deep",
+  "Have Backbone; Disagree and Commit",
+  "Deliver Results",
+  "Strive to be Earth's Best Employer",
+  "Success and Scale Bring Broad Responsibility",
+] as const;
+
 export const BreakdownResultSchema = z.object({
-  subtasks: z.array(BreakdownItemSchema).min(2).max(8),
+  subtasks: z.array(BreakdownItemSchema).min(2).max(MAX_BREAKDOWN_SUBTASKS),
   intimidationScore: z.number().min(1).max(5).optional(),
   estimatedMinTotal: z.number().optional(),
   summary: z.string().optional(),
@@ -91,6 +112,49 @@ function estimateIntimidation(title: string, itemCount: number): number {
   return Math.min(5, score);
 }
 
+export function amazonPrinciplesBreakdown(title: string): BreakdownResult {
+  const subtasks = AMAZON_LEADERSHIP_PRINCIPLES.map((principle, i) => ({
+    title: principle,
+    estimatedMin: 30,
+    isEntryPoint: i === 0,
+  }));
+  const estimatedMinTotal = subtasks.reduce((s, t) => s + (t.estimatedMin ?? 0), 0);
+  return {
+    subtasks: [...subtasks],
+    intimidationScore: estimateIntimidation(title, subtasks.length),
+    estimatedMinTotal,
+    summary: `已按 Amazon 16 条 Leadership Principles 生成 ${subtasks.length} 个子任务。`,
+  };
+}
+
+function wantsAmazonPrinciples(text: string): boolean {
+  return (
+    /amazon|亚马逊/i.test(text) &&
+    /(?:16|十六).{0,12}(?:principle|原则|领导力)|leadership\s*principles?/i.test(text)
+  );
+}
+
+export function promptDrivenBreakdown(
+  userPrompt: string,
+  title: string,
+): BreakdownResult | null {
+  const prompt = userPrompt.trim();
+  if (!prompt) return null;
+
+  if (wantsAmazonPrinciples(prompt)) {
+    return amazonPrinciplesBreakdown(title);
+  }
+
+  return null;
+}
+
+export class BreakdownError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BreakdownError";
+  }
+}
+
 export function ruleBasedBreakdown(
   title: string,
   description?: string | null,
@@ -131,12 +195,14 @@ async function openAiBreakdown(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
-  const system = `你是任务拆解助手。将任务拆成 3-6 个可执行子步骤。
-规则：
-- 第一步必须是 ≤2 分钟可完成的入口动作，标记 isEntryPoint: true
-- 若 userInstructions 有内容，优先遵循用户的补充说明与约束
-- 用中文
-- 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
+  const system = `你是任务拆解助手。将任务拆成可执行的子步骤。
+
+优先级（必须遵守）：
+1. 若 userInstructions 有内容，严格按用户指令生成——包括子任务数量、命名、结构。禁止套用「明确完成标准 / 收集材料 / 核心步骤 / 收尾」等通用模板。
+2. 若用户要求「每个 X 一个子任务」、列出 N 项、或给出枚举/清单，逐项生成对应子任务（2-${MAX_BREAKDOWN_SUBTASKS} 步均可）。
+3. 仅当用户没有特殊要求时，才拆成 3-6 步，且第一步是 ≤2 分钟的入口动作（isEntryPoint: true）。
+4. 子任务标题用中文；专有名词（如 Amazon Leadership Principles 名称）可保留英文。
+5. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
 
   const user = JSON.stringify({
     title,
@@ -181,27 +247,31 @@ async function openAiBreakdown(
   }
 }
 
-function mergeDescription(
-  description?: string | null,
-  userPrompt?: string,
-): string | null | undefined {
-  const parts = [description?.trim(), userPrompt?.trim()].filter(Boolean);
-  return parts.length > 0 ? parts.join("\n") : description;
-}
-
 export async function generateBreakdown(
   title: string,
   description?: string | null,
   context?: { northStar?: string; pillar?: string; userPrompt?: string },
 ): Promise<BreakdownResult & { source: "openai" | "rules" }> {
+  const userPrompt = context?.userPrompt?.trim() ?? "";
+
   const ai = await openAiBreakdown(title, description, context);
   if (ai) return { ...ai, source: "openai" };
 
-  const rules = ruleBasedBreakdown(
-    title,
-    mergeDescription(description, context?.userPrompt),
-  );
-  return { ...rules, source: "rules" };
+  if (userPrompt) {
+    const fromPrompt = promptDrivenBreakdown(userPrompt, title);
+    if (fromPrompt) return { ...fromPrompt, source: "rules" };
+
+    if (!process.env.OPENAI_API_KEY) {
+      throw new BreakdownError(
+        "未配置 OPENAI_API_KEY，无法理解自定义拆解指令。请在 .env.local 中设置 API Key，或使用更明确的指令（如 Amazon 16 principles）。",
+      );
+    }
+    throw new BreakdownError(
+      "AI 未能理解你的拆解指令，请换一种描述后重试。",
+    );
+  }
+
+  return { ...ruleBasedBreakdown(title, description), source: "rules" };
 }
 
 export function shouldAutoBreakdown(title: string, intimidationScore?: number): boolean {
