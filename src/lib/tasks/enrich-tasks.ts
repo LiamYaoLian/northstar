@@ -1,0 +1,47 @@
+import type { FocusTrack, Task } from "@/lib/db/schema";
+import { parseJson } from "@/lib/utils";
+
+export type StrategyPillarDto = {
+  id: string;
+  name: string;
+  color: string;
+  focusTracks: string | null;
+};
+
+export type PillarOption = {
+  id: string;
+  name: string;
+  color: string;
+  focusTracks: FocusTrack[];
+};
+
+export type TaskRow = Task & {
+  pillarName?: string;
+  pillarColor?: string;
+};
+
+export function parseStrategyPillars(
+  pillars: StrategyPillarDto[],
+): PillarOption[] {
+  return pillars.map((p) => ({
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    focusTracks: parseJson<FocusTrack[]>(p.focusTracks, []),
+  }));
+}
+
+export function enrichTasksWithPillars<T extends Task>(
+  taskList: T[],
+  pillars: PillarOption[],
+): (T & { pillarName?: string; pillarColor?: string })[] {
+  const pillarMap = new Map(pillars.map((p) => [p.id, p]));
+  return taskList.map((t) => {
+    const pillar = t.pillarId ? pillarMap.get(t.pillarId) : null;
+    return {
+      ...t,
+      pillarName: pillar?.name,
+      pillarColor: pillar?.color,
+    };
+  });
+}

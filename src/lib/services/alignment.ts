@@ -2,6 +2,7 @@ import "server-only";
 
 import { ensureDbReady, getDb } from "@/lib/db";
 import { strategicPillars, tasks, timeEntries } from "@/lib/db/schema";
+import { findWorkPillar } from "@/lib/pillars";
 import {
   computeAlignment,
   computeWorkFocusTracks,
@@ -18,7 +19,7 @@ export async function getAlignmentDashboard() {
   const entries = await db.select().from(timeEntries);
 
   const alignment = computeAlignment(pillars, taskList, entries);
-  const workPillar = pillars.find((p) => p.name === "工作");
+  const workPillar = findWorkPillar(pillars);
   const workTracks = workPillar
     ? computeWorkFocusTracks(workPillar, taskList, entries)
     : [];

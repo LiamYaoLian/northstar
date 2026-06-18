@@ -1,26 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TaskCard, type PillarOption } from "@/components/task-card";
+import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
 import { apiFetch } from "@/lib/api-client";
+import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
-import { parseJson } from "@/lib/utils";
-import type { Task, Subtask, FocusTrack } from "@/lib/db/schema";
-
-type StrategyPillar = {
-  id: string;
-  name: string;
-  color: string;
-  focusTracks: string | null;
-};
-
-type TaskRow = Task & {
-  pillarName?: string;
-  pillarColor?: string;
-  subtasks?: Subtask[];
-};
+import {
+  enrichTasksWithPillars,
+  parseStrategyPillars,
+  type PillarOption,
+  type TaskRow,
+} from "@/lib/tasks/enrich-tasks";
 
 type ClassifyPreview = {
   pillarName: string | null;
@@ -33,7 +25,6 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [title, setTitle] = useState("");
   const [newTaskPillarId, setNewTaskPillarId] = useState("");
-  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
@@ -44,28 +35,15 @@ export default function TasksPage() {
       setError(null);
       const [tasksData, strategyData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
-        apiFetch<{ strategy: { pillars: StrategyPillar[] } | null }>(
+        apiFetch<{ strategy: { pillars: { id: string; name: string; color: string; focusTracks: string | null }[] } | null }>(
           "/api/strategy",
         ),
       ]);
-      const strategyPillars = (strategyData.strategy?.pillars ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        color: p.color,
-        focusTracks: parseJson<FocusTrack[]>(p.focusTracks, []),
-      }));
-      const pillarMap = new Map(strategyPillars.map((p) => [p.id, p]));
-      setPillars(strategyPillars);
-      setTasks(
-        tasksData.tasks.map((t) => {
-          const pillar = t.pillarId ? pillarMap.get(t.pillarId) : null;
-          return {
-            ...t,
-            pillarName: pillar?.name,
-            pillarColor: pillar?.color,
-          };
-        }),
+      const strategyPillars = parseStrategyPillars(
+        strategyData.strategy?.pillars ?? [],
       );
+      setPillars(strategyPillars);
+      setTasks(enrichTasksWithPillars(tasksData.tasks, strategyPillars));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.errors.loadFailed);
     }
@@ -120,6 +98,24 @@ export default function TasksPage() {
     return pillar;
   }, [autoClassify, locale]);
 
+  const {
+    recalculating,
+    patchTask,
+    changePillar,
+    recalculatePriority,
+    breakdownTask,
+    toggleSubtask,
+    addSubtask,
+    deleteSubtask,
+    reorderSubtasks,
+    reorderTasks,
+    logTime,
+  } = useTaskActions({
+    reload: load,
+    errors: t.errors,
+    onError: setError,
+  });
+
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -142,124 +138,7 @@ export default function TasksPage() {
     }
   }
 
-  async function breakdownTask(taskId: string, userPrompt?: string) {
-    try {
-      setError(null);
-      await apiFetch(`/api/tasks/${taskId}/breakdown`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userPrompt ?? "" }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.breakdownFailed);
-      throw err;
-    }
-  }
-
-  async function toggleSubtask(subtaskId: string, isDone: boolean) {
-    try {
-      await apiFetch(`/api/subtasks/${subtaskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDone }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.updateSubtaskFailed);
-    }
-  }
-
-  async function addSubtask(taskId: string, stTitle: string, isEntryPoint: boolean) {
-    try {
-      setError(null);
-      await apiFetch(`/api/tasks/${taskId}/subtasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: stTitle, isEntryPoint }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.addSubtaskFailed);
-    }
-  }
-
-  async function deleteSubtask(subtaskId: string) {
-    try {
-      await apiFetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.deleteSubtaskFailed);
-    }
-  }
-
-  async function reorderTasks(orderedIds: string[]) {
-    try {
-      await apiFetch("/api/tasks/reorder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderedIds }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.reorderTasksFailed);
-      throw err;
-    }
-  }
-
-  async function reorderSubtasks(taskId: string, orderedIds: string[]) {
-    try {
-      await apiFetch(`/api/tasks/${taskId}/subtasks/reorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderedIds }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.reorderSubtasksFailed);
-      throw err;
-    }
-  }
-
-  async function patchTask(id: string, body: Record<string, unknown>) {
-    try {
-      await apiFetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.updateTaskFailed);
-    }
-  }
-
-  function changePillar(
-    taskId: string,
-    pillarId: string | null,
-    focusTrack?: string | null,
-  ) {
-    const body: Record<string, unknown> = { pillarId };
-    if (focusTrack !== undefined) {
-      body.focusTrack = focusTrack;
-    }
-    void patchTask(taskId, body);
-  }
-
-  async function recalculatePriority() {
-    try {
-      setRecalculating(true);
-      setError(null);
-      await apiFetch("/api/tasks/recalculate-priorities", { method: "POST" });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.recalculateFailed);
-    } finally {
-      setRecalculating(false);
-    }
-  }
-
-  const taskMap = new Map(tasks.map((t) => [t.id, t]));
+  const taskMap = new Map(tasks.map((task) => [task.id, task]));
 
   return (
     <div className="space-y-4">
@@ -353,7 +232,7 @@ export default function TasksPage() {
       </p>
 
       <SortableTaskList
-        taskIds={tasks.map((t) => t.id)}
+        taskIds={tasks.map((task) => task.id)}
         onReorder={reorderTasks}
       >
         {(taskId) => {
@@ -374,17 +253,7 @@ export default function TasksPage() {
                 void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
               }
               onComplete={(id) => void patchTask(id, { status: "done" })}
-              onLogTime={(id, minutes) =>
-                void apiFetch("/api/time-entries", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ taskId: id, durationMin: minutes }),
-                })
-                  .then(() => load())
-                  .catch((err) =>
-                    setError(err instanceof Error ? err.message : t.errors.logTimeFailed),
-                  )
-              }
+              onLogTime={(id, minutes) => void logTime(id, minutes)}
             />
           );
         }}

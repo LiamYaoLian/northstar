@@ -6,6 +6,7 @@ import type {
   PriorityFactors,
   FocusTrack,
 } from "@/lib/db/schema";
+import { findWorkPillar } from "@/lib/pillars";
 import { computeAlignment, computeWorkFocusTracks } from "@/lib/alignment";
 import { parseJson } from "@/lib/utils";
 
@@ -108,7 +109,7 @@ export function computeTaskPriority(
     };
   }
 
-  const workPillar = pillars.find((p) => p.name === "工作");
+  const workPillar = findWorkPillar(pillars);
   const factors: PriorityFactors = {
     strategicUrgency: strategicUrgency(
       task,
@@ -162,7 +163,7 @@ export function rerankAll(
     alignment.pillars.map((p) => [p.pillarId, p.drift]),
   );
 
-  const workPillar = pillars.find((p) => p.name === "工作");
+  const workPillar = findWorkPillar(pillars);
   const workTracks = workPillar
     ? computeWorkFocusTracks(workPillar, taskList, entries)
     : [];

@@ -1,94 +1,38 @@
 import "server-only";
 
 import { ensureDbReady, getDb } from "@/lib/db";
-import { tasks, timeEntries, subtasks, strategicPillars, northStars } from "@/lib/db/schema";
+import {
+  tasks,
+  timeEntries,
+  subtasks,
+  strategicPillars,
+  northStars,
+} from "@/lib/db/schema";
 import {
   generateBreakdown,
   shouldAutoBreakdown,
 } from "@/lib/ai/breakdown";
-import { rerankAll, priorityScoreFromRank } from "@/lib/priority";
-import { classifyTaskTitle } from "@/lib/tasks/classify";
+import { findWorkPillar, isWorkPillar } from "@/lib/pillars";
+import { classifyTaskTitle, type ClassifyResult } from "@/lib/tasks/classify";
+import {
+  applyManualReorderScores,
+  persistPriorities,
+  syncActivePriorityFromManualOrder,
+} from "@/lib/services/task-priority-sync";
+import {
+  sortTasks,
+  takeTopTasks,
+  type TaskSortMode,
+} from "@/lib/services/task-sorting";
 import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
-import type { Subtask, Task } from "@/lib/db/schema";
+import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
 
-async function persistPriorities(): Promise<string> {
-  await ensureDbReady();
-  const db = getDb();
-  const allTasks = await db.select().from(tasks);
-  const pillars = await db.select().from(strategicPillars);
-  const entries = await db.select().from(timeEntries);
-  const stars = await db.select().from(northStars);
-  const star = stars[0];
-  const allSubtasks = await db.select().from(subtasks);
-  const results = rerankAll(
-    allTasks,
-    pillars,
-    entries,
-    star?.workPrimaryTrack,
-    allSubtasks,
-  );
-  const ts = nowIso();
+export type { TaskSortMode };
 
-  for (const [index, r] of results.entries()) {
-    await db
-      .update(tasks)
-      .set({
-        priorityScore: priorityScoreFromRank(index, results.length),
-        priorityFactors: JSON.stringify(r.factors),
-        priorityComputedAt: ts,
-        manualSortOrder: index,
-        updatedAt: ts,
-      })
-      .where(eq(tasks.id, r.taskId));
-  }
-
-  const doneTasks = allTasks
-    .filter((t) => t.status === "done")
-    .sort((a, b) => a.manualSortOrder - b.manualSortOrder);
-  for (const [i, task] of doneTasks.entries()) {
-    await db
-      .update(tasks)
-      .set({ manualSortOrder: results.length + i, updatedAt: ts })
-      .where(eq(tasks.id, task.id));
-  }
-
-  return ts;
-}
-
-/** Run the priority engine and sync board order + scores. Call manually only. */
 export async function recalculatePriorities() {
   const computedAt = await persistPriorities();
   return { computedAt };
-}
-
-export type TaskSortMode = "priority" | "manual";
-
-/** Keep priorityScore monotonic with manual board order (repairs stale rows). */
-async function syncActivePriorityFromManualOrder(
-  db: ReturnType<typeof getDb>,
-  filtered: Task[],
-) {
-  const active = filtered
-    .filter((t) => t.status !== "done")
-    .sort((a, b) => a.manualSortOrder - b.manualSortOrder);
-  const total = active.length;
-  if (total === 0) return;
-
-  const ts = nowIso();
-  for (const [index, task] of active.entries()) {
-    const score = priorityScoreFromRank(index, total);
-    if (Math.abs(task.priorityScore - score) > 1e-6) {
-      await db
-        .update(tasks)
-        .set({
-          priorityScore: score,
-          priorityComputedAt: ts,
-          updatedAt: ts,
-        })
-        .where(eq(tasks.id, task.id));
-    }
-  }
 }
 
 export async function listTasks(
@@ -103,21 +47,7 @@ export async function listTasks(
   await syncActivePriorityFromManualOrder(db, filtered);
   const synced = await db.select().from(tasks);
   const rows = status ? synced.filter((t) => t.status === status) : synced;
-
-  if (sort === "manual") {
-    return rows.sort((a, b) => {
-      if (a.manualSortOrder !== b.manualSortOrder) {
-        return a.manualSortOrder - b.manualSortOrder;
-      }
-      return b.priorityScore - a.priorityScore;
-    });
-  }
-  return rows.sort((a, b) => {
-    if (b.priorityScore !== a.priorityScore) {
-      return b.priorityScore - a.priorityScore;
-    }
-    return a.manualSortOrder - b.manualSortOrder;
-  });
+  return sortTasks(rows, sort);
 }
 
 export async function listTasksWithSubtasks(
@@ -128,21 +58,27 @@ export async function listTasksWithSubtasks(
   const db = getDb();
   const taskList = await listTasks(status, sort);
   const allSubtasks = await db.select().from(subtasks);
-  const byParent = new Map<string, Subtask[]>();
-  for (const s of allSubtasks) {
-    const list = byParent.get(s.parentTaskId) ?? [];
-    list.push(s);
-    byParent.set(s.parentTaskId, list);
-  }
+  const byParent = groupSubtasksByParent(allSubtasks);
   return taskList.map((t) => ({
     ...t,
     subtasks: (byParent.get(t.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
   }));
 }
 
+function groupSubtasksByParent(allSubtasks: Subtask[]) {
+  const byParent = new Map<string, Subtask[]>();
+  for (const s of allSubtasks) {
+    const list = byParent.get(s.parentTaskId) ?? [];
+    list.push(s);
+    byParent.set(s.parentTaskId, list);
+  }
+  return byParent;
+}
+
 export async function getTodayTasks(limit = 5) {
-  const rows = await listTasks();
-  return rows.filter((t) => t.status !== "done").slice(0, limit);
+  await ensureDbReady();
+  const all = await getDb().select().from(tasks);
+  return takeTopTasks(all, limit);
 }
 
 export async function createTask(input: {
@@ -160,18 +96,11 @@ export async function createTask(input: {
   const ts = nowIso();
   const pillars = await db.select().from(strategicPillars);
   const classified = await classifyTaskTitle(input.title, pillars);
-
-  const pillarId = input.pillarId ?? classified.pillarId;
-  let focusTrack: string | null | undefined = input.focusTrack;
-  if (focusTrack === undefined) {
-    if (input.pillarId) {
-      const workPillar = pillars.find((p) => p.name === "工作");
-      focusTrack =
-        input.pillarId === workPillar?.id ? classified.focusTrack : null;
-    } else {
-      focusTrack = classified.focusTrack;
-    }
-  }
+  const { pillarId, focusTrack } = resolveCreateClassification(
+    input,
+    pillars,
+    classified,
+  );
 
   const taskId = id();
   const allTasks = await db.select().from(tasks);
@@ -184,8 +113,8 @@ export async function createTask(input: {
     id: taskId,
     title: input.title,
     description: input.description ?? null,
-    pillarId: pillarId ?? null,
-    focusTrack: focusTrack ?? null,
+    pillarId,
+    focusTrack,
     status: "todo",
     intimidationScore: input.intimidationScore ?? 2,
     priorityScore: 0,
@@ -205,8 +134,31 @@ export async function createTask(input: {
     await breakdownTask(taskId);
   }
 
-  const rows = await db.select().from(tasks).where(eq(tasks.id, taskId));
-  return rows[0];
+  return fetchTaskById(taskId);
+}
+
+function resolveCreateClassification(
+  input: { pillarId?: string; focusTrack?: string },
+  pillars: StrategicPillar[],
+  classified: ClassifyResult,
+) {
+  const pillarId = input.pillarId ?? classified.pillarId ?? null;
+  let focusTrack: string | null | undefined = input.focusTrack;
+  const workPillar = findWorkPillar(pillars);
+
+  if (focusTrack === undefined) {
+    if (input.pillarId) {
+      focusTrack =
+        input.pillarId === workPillar?.id ? classified.focusTrack : null;
+    } else {
+      focusTrack = classified.focusTrack;
+    }
+  }
+
+  return {
+    pillarId,
+    focusTrack: focusTrack ?? null,
+  };
 }
 
 export async function breakdownTask(
@@ -215,23 +167,19 @@ export async function breakdownTask(
 ) {
   await ensureDbReady();
   const db = getDb();
-  const taskRows = await db.select().from(tasks).where(eq(tasks.id, taskId));
-  const task = taskRows[0];
+  const task = await fetchTaskById(taskId);
   if (!task) return null;
 
   const stars = await db.select().from(northStars);
-  const star = stars[0];
   const pillar = task.pillarId
-    ? (
-        await db
-          .select()
-          .from(strategicPillars)
-          .where(eq(strategicPillars.id, task.pillarId))
-      )[0]
+    ? (await db
+        .select()
+        .from(strategicPillars)
+        .where(eq(strategicPillars.id, task.pillarId)))[0]
     : null;
 
   const result = await generateBreakdown(task.title, task.description, {
-    northStar: star?.statement,
+    northStar: stars[0]?.statement,
     pillar: pillar?.name,
     userPrompt: options?.userPrompt,
   });
@@ -261,7 +209,7 @@ export async function breakdownTask(
     .where(eq(tasks.id, taskId));
 
   return {
-    task: (await db.select().from(tasks).where(eq(tasks.id, taskId)))[0],
+    task: await fetchTaskById(taskId),
     subtasks: await listSubtasks(taskId),
     breakdown: result,
   };
@@ -272,11 +220,7 @@ export async function toggleSubtask(subtaskId: string, isDone: boolean) {
   const db = getDb();
   await db.update(subtasks).set({ isDone }).where(eq(subtasks.id, subtaskId));
 
-  const subRows = await db
-    .select()
-    .from(subtasks)
-    .where(eq(subtasks.id, subtaskId));
-  const sub = subRows[0];
+  const sub = await fetchSubtaskById(subtaskId);
   if (!sub) return null;
 
   const siblings = await listSubtasks(sub.parentTaskId);
@@ -284,7 +228,7 @@ export async function toggleSubtask(subtaskId: string, isDone: boolean) {
     await updateTask(sub.parentTaskId, { status: "done" });
   }
 
-  return (await db.select().from(subtasks).where(eq(subtasks.id, subtaskId)))[0];
+  return fetchSubtaskById(subtaskId);
 }
 
 export async function updateTask(
@@ -302,13 +246,29 @@ export async function updateTask(
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
-  const existingRows = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, taskId));
-  const existing = existingRows[0];
+  const existing = await fetchTaskById(taskId);
   if (!existing) return null;
 
+  const safePatch = await buildTaskPatch(db, existing, patch);
+  if (safePatch === null) return null;
+
+  await db
+    .update(tasks)
+    .set({
+      ...safePatch,
+      completedAt: patch.status === "done" ? ts : existing.completedAt,
+      updatedAt: ts,
+    })
+    .where(eq(tasks.id, taskId));
+
+  return fetchTaskById(taskId);
+}
+
+async function buildTaskPatch(
+  db: ReturnType<typeof getDb>,
+  existing: Task,
+  patch: Parameters<typeof updateTask>[1],
+) {
   const { intimidationScore, pillarId, focusTrack, ...rest } = patch;
   const safePatch: Record<string, unknown> = {
     ...rest,
@@ -330,9 +290,8 @@ export async function updateTask(
       )[0];
       if (!pillar) return null;
       safePatch.pillarId = pillarId;
-      const allPillars = await db.select().from(strategicPillars);
-      const workPillar = allPillars.find((p) => p.name === "工作");
-      if (pillar.id !== workPillar?.id && focusTrack === undefined) {
+      const workPillar = findWorkPillar(await db.select().from(strategicPillars));
+      if (!isWorkPillar(pillar, workPillar) && focusTrack === undefined) {
         safePatch.focusTrack = null;
       }
     }
@@ -342,16 +301,7 @@ export async function updateTask(
     safePatch.focusTrack = focusTrack;
   }
 
-  await db
-    .update(tasks)
-    .set({
-      ...safePatch,
-      completedAt: patch.status === "done" ? ts : existing.completedAt,
-      updatedAt: ts,
-    })
-    .where(eq(tasks.id, taskId));
-
-  return (await db.select().from(tasks).where(eq(tasks.id, taskId)))[0];
+  return safePatch;
 }
 
 export async function addTimeEntry(input: {
@@ -375,11 +325,7 @@ export async function addTimeEntry(input: {
     createdAt: ts,
   });
 
-  const rows = await db
-    .select()
-    .from(timeEntries)
-    .where(eq(timeEntries.id, entryId));
-  return rows[0];
+  return fetchTimeEntryById(entryId);
 }
 
 export async function listTimeEntries() {
@@ -402,8 +348,7 @@ export async function createSubtask(
 ) {
   await ensureDbReady();
   const db = getDb();
-  const taskRows = await db.select().from(tasks).where(eq(tasks.id, taskId));
-  if (!taskRows[0]) return null;
+  if (!(await fetchTaskById(taskId))) return null;
 
   const existing = await listSubtasks(taskId);
   const ts = nowIso();
@@ -420,50 +365,34 @@ export async function createSubtask(
   });
 
   await db.update(tasks).set({ updatedAt: ts }).where(eq(tasks.id, taskId));
-
-  return (await db.select().from(subtasks).where(eq(subtasks.id, subtaskId)))[0];
+  return fetchSubtaskById(subtaskId);
 }
 
 export async function deleteSubtask(subtaskId: string) {
   await ensureDbReady();
   const db = getDb();
-  const subRows = await db
-    .select()
-    .from(subtasks)
-    .where(eq(subtasks.id, subtaskId));
-  const sub = subRows[0];
+  const sub = await fetchSubtaskById(subtaskId);
   if (!sub) return false;
 
   await db.delete(subtasks).where(eq(subtasks.id, subtaskId));
+  await reindexSubtasks(sub.parentTaskId);
+  return true;
+}
 
-  const remaining = await listSubtasks(sub.parentTaskId);
+async function reindexSubtasks(parentTaskId: string) {
+  const db = getDb();
+  const remaining = await listSubtasks(parentTaskId);
   for (const [i, s] of remaining.entries()) {
     await db
       .update(subtasks)
       .set({ sortOrder: i })
       .where(eq(subtasks.id, s.id));
   }
-
-  return true;
 }
 
 export async function reorderTasks(orderedIds: string[]) {
   await ensureDbReady();
-  const db = getDb();
-  const ts = nowIso();
-  const total = orderedIds.length;
-
-  for (const [index, taskId] of orderedIds.entries()) {
-    await db
-      .update(tasks)
-      .set({
-        manualSortOrder: index,
-        priorityScore: priorityScoreFromRank(index, total),
-        priorityComputedAt: ts,
-        updatedAt: ts,
-      })
-      .where(eq(tasks.id, taskId));
-  }
+  await applyManualReorderScores(getDb(), orderedIds);
   return listTasks(undefined, "manual");
 }
 
@@ -471,13 +400,7 @@ export async function reorderSubtasks(taskId: string, orderedIds: string[]) {
   await ensureDbReady();
   const db = getDb();
   const existing = await listSubtasks(taskId);
-  const idSet = new Set(existing.map((s) => s.id));
-  if (
-    orderedIds.length !== existing.length ||
-    !orderedIds.every((sid) => idSet.has(sid))
-  ) {
-    return null;
-  }
+  if (!isValidReorder(orderedIds, existing.map((s) => s.id))) return null;
 
   for (const [index, subtaskId] of orderedIds.entries()) {
     await db
@@ -487,4 +410,36 @@ export async function reorderSubtasks(taskId: string, orderedIds: string[]) {
   }
 
   return listSubtasks(taskId);
+}
+
+function isValidReorder(orderedIds: string[], existingIds: string[]) {
+  const idSet = new Set(existingIds);
+  return (
+    orderedIds.length === existingIds.length &&
+    orderedIds.every((sid) => idSet.has(sid))
+  );
+}
+
+async function fetchTaskById(taskId: string) {
+  const rows = await getDb()
+    .select()
+    .from(tasks)
+    .where(eq(tasks.id, taskId));
+  return rows[0];
+}
+
+async function fetchSubtaskById(subtaskId: string) {
+  const rows = await getDb()
+    .select()
+    .from(subtasks)
+    .where(eq(subtasks.id, subtaskId));
+  return rows[0];
+}
+
+async function fetchTimeEntryById(entryId: string) {
+  const rows = await getDb()
+    .select()
+    .from(timeEntries)
+    .where(eq(timeEntries.id, entryId));
+  return rows[0];
 }

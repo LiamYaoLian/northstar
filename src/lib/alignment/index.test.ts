@@ -1,107 +1,76 @@
 import { describe, it, expect } from "vitest";
-import { computeAlignment } from "./index";
-import type { StrategicPillar, Task, TimeEntry } from "@/lib/db/schema";
+import {
+  computeAlignment,
+  computePillarMinutes,
+  computeWorkFocusTracks,
+  detectProcrastination,
+} from "./index";
+import { makeTask, testEntries, testPillars } from "@/lib/test-fixtures";
 
-const pillars: StrategicPillar[] = [
-  {
-    id: "p1",
-    name: "工作",
-    description: null,
-    targetPct: 40,
-    color: "#3b82f6",
-    keywords: "[]",
-    focusTracks: null,
-    floorMinPerWeek: null,
-    capMaxPct: null,
-    isHardConstraint: false,
-    sortOrder: 0,
-    createdAt: "2026-01-01",
-  },
-  {
-    id: "p2",
-    name: "健康",
-    description: null,
-    targetPct: 20,
-    color: "#22c55e",
-    keywords: "[]",
-    focusTracks: null,
-    floorMinPerWeek: null,
-    capMaxPct: null,
-    isHardConstraint: false,
-    sortOrder: 1,
-    createdAt: "2026-01-01",
-  },
+const taskList = [
+  makeTask({ id: "t1", pillarId: "p-work" }),
+  makeTask({ id: "t2", pillarId: "p-health", title: "跑步" }),
 ];
 
-const taskList: Task[] = [
-  {
-    id: "t1",
-    title: "LC",
-    description: null,
-    pillarId: "p1",
-    focusTrack: null,
-    status: "todo",
-    intimidationScore: 3,
-    priorityScore: 0,
-    priorityFactors: null,
-    priorityComputedAt: null,
-    estimatedMin: 60,
-    dueAt: null,
-    isPinned: false,
-    postponedCount: 0,
-    createdAt: "2026-01-01",
-    updatedAt: "2026-01-01",
-    completedAt: null,
-  },
-  {
-    id: "t2",
-    title: "跑步",
-    description: null,
-    pillarId: "p2",
-    focusTrack: null,
-    status: "todo",
-    intimidationScore: 1,
-    priorityScore: 0,
-    priorityFactors: null,
-    priorityComputedAt: null,
-    estimatedMin: 30,
-    dueAt: null,
-    isPinned: false,
-    postponedCount: 0,
-    createdAt: "2026-01-01",
-    updatedAt: "2026-01-01",
-    completedAt: null,
-  },
-];
-
-const entries: TimeEntry[] = [
-  {
-    id: "e1",
-    taskId: "t1",
-    startedAt: "2026-01-02",
-    durationMin: 120,
-    source: "manual",
-    note: null,
-    createdAt: "2026-01-02",
-  },
-  {
-    id: "e2",
-    taskId: "t2",
-    startedAt: "2026-01-02",
-    durationMin: 30,
-    source: "manual",
-    note: null,
-    createdAt: "2026-01-02",
-  },
-];
+describe("computePillarMinutes", () => {
+  it("aggregates minutes by pillar and tracks unallocated", () => {
+    const minutes = computePillarMinutes(testPillars, taskList, testEntries);
+    expect(minutes.get("p-work")).toBe(120);
+    expect(minutes.get("p-health")).toBe(30);
+    expect(minutes.get("__unallocated__")).toBe(0);
+  });
+});
 
 describe("computeAlignment", () => {
   it("calculates drift and alignment score", () => {
-    const result = computeAlignment(pillars, taskList, entries);
+    const result = computeAlignment(testPillars, taskList, testEntries);
     expect(result.totalLoggedMin).toBe(150);
     expect(result.pillars[0].actualPct).toBe(80);
     expect(result.pillars[0].drift).toBe(40);
     expect(result.pillars[1].actualPct).toBe(20);
     expect(result.alignmentScore).toBeLessThan(100);
+  });
+});
+
+describe("computeWorkFocusTracks", () => {
+  it("computes drift per work focus track", () => {
+    const tracks = computeWorkFocusTracks(testPillars[0], taskList, testEntries);
+    expect(tracks.length).toBe(3);
+    expect(tracks[0].actualShare).toBe(100);
+    expect(tracks[0].drift).toBeGreaterThan(0);
+  });
+});
+
+describe("detectProcrastination", () => {
+  it("flags stale intimidating tasks with no logged time", () => {
+    const now = new Date("2026-02-01T00:00:00.000Z");
+    const signals = detectProcrastination(
+      [
+        makeTask({
+          id: "stale",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          intimidationScore: 4,
+        }),
+      ],
+      [],
+      now,
+    );
+    expect(signals.some((s) => s.taskId === "stale")).toBe(true);
+  });
+
+  it("flags frequently postponed tasks", () => {
+    const now = new Date("2026-01-10T00:00:00.000Z");
+    const signals = detectProcrastination(
+      [
+        makeTask({
+          id: "late",
+          postponedCount: 3,
+          createdAt: "2026-01-08T00:00:00.000Z",
+        }),
+      ],
+      [],
+      now,
+    );
+    expect(signals[0]?.reason).toContain("推迟");
   });
 });

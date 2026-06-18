@@ -3,25 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TaskCard, type PillarOption } from "@/components/task-card";
+import { TaskCard } from "@/components/task-card";
 import { apiFetch } from "@/lib/api-client";
+import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { localeTag } from "@/lib/i18n/entities";
-import { parseJson } from "@/lib/utils";
-import type { Task, Subtask, FocusTrack } from "@/lib/db/schema";
-
-type StrategyPillar = {
-  id: string;
-  name: string;
-  color: string;
-  focusTracks: string | null;
-};
-
-type TaskRow = Task & {
-  pillarName?: string;
-  pillarColor?: string;
-  subtasks?: Subtask[];
-};
+import {
+  enrichTasksWithPillars,
+  parseStrategyPillars,
+  type PillarOption,
+  type TaskRow,
+} from "@/lib/tasks/enrich-tasks";
+import { takeTopTasks } from "@/lib/services/task-sorting";
 
 export default function TodayPage() {
   const router = useRouter();
@@ -29,7 +22,6 @@ export default function TodayPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string>("");
-  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -37,7 +29,7 @@ export default function TodayPage() {
       setError(null);
       const [tasksData, strategyData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
-        apiFetch<{ hasStrategy: boolean; strategy: { pillars: StrategyPillar[] } | null }>(
+        apiFetch<{ hasStrategy: boolean; strategy: { pillars: { id: string; name: string; color: string; focusTracks: string | null }[] } | null }>(
           "/api/strategy",
         ),
       ]);
@@ -47,28 +39,15 @@ export default function TodayPage() {
         return;
       }
 
-      const strategyPillars = (strategyData.strategy?.pillars ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        color: p.color,
-        focusTracks: parseJson<FocusTrack[]>(p.focusTracks, []),
-      }));
+      const strategyPillars = parseStrategyPillars(
+        strategyData.strategy?.pillars ?? [],
+      );
       setPillars(strategyPillars);
-      const pillarMap = new Map(strategyPillars.map((p) => [p.id, p]));
 
-      const today = tasksData.tasks
-        .filter((t) => t.status !== "done")
-        .sort((a, b) => b.priorityScore - a.priorityScore)
-        .slice(0, 5)
-        .map((t) => {
-          const pillar = t.pillarId ? pillarMap.get(t.pillarId) : null;
-          return {
-            ...t,
-            pillarName: pillar?.name,
-            pillarColor: pillar?.color,
-          };
-        });
-
+      const today = enrichTasksWithPillars(
+        takeTopTasks(tasksData.tasks, 5),
+        strategyPillars,
+      );
       setTasks(today);
       setUpdatedAt(
         today[0]?.priorityComputedAt
@@ -87,107 +66,22 @@ export default function TodayPage() {
     void load();
   }, [load]);
 
-  async function patchTask(id: string, body: Record<string, unknown>) {
-    try {
-      await apiFetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.updateFailed);
-    }
-  }
-
-  function changePillar(
-    taskId: string,
-    pillarId: string | null,
-    focusTrack?: string | null,
-  ) {
-    const body: Record<string, unknown> = { pillarId };
-    if (focusTrack !== undefined) {
-      body.focusTrack = focusTrack;
-    }
-    void patchTask(taskId, body);
-  }
-
-  async function recalculatePriority() {
-    try {
-      setRecalculating(true);
-      setError(null);
-      await apiFetch("/api/tasks/recalculate-priorities", { method: "POST" });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.recalculateFailed);
-    } finally {
-      setRecalculating(false);
-    }
-  }
-
-  async function breakdownTask(taskId: string, userPrompt?: string) {
-    try {
-      await apiFetch(`/api/tasks/${taskId}/breakdown`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userPrompt ?? "" }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.breakdownFailed);
-      throw err;
-    }
-  }
-
-  async function toggleSubtask(subtaskId: string, isDone: boolean) {
-    try {
-      await apiFetch(`/api/subtasks/${subtaskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDone }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.updateSubtaskFailed);
-    }
-  }
-
-  async function addSubtask(taskId: string, title: string, isEntryPoint: boolean) {
-    try {
-      await apiFetch(`/api/tasks/${taskId}/subtasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, isEntryPoint }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.addSubtaskFailed);
-      throw err;
-    }
-  }
-
-  async function deleteSubtask(subtaskId: string) {
-    try {
-      await apiFetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.deleteSubtaskFailed);
-    }
-  }
-
-  async function reorderSubtasks(taskId: string, orderedIds: string[]) {
-    try {
-      await apiFetch(`/api/tasks/${taskId}/subtasks/reorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderedIds }),
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.reorderSubtasksFailed);
-      throw err;
-    }
-  }
+  const {
+    recalculating,
+    patchTask,
+    changePillar,
+    recalculatePriority,
+    breakdownTask,
+    toggleSubtask,
+    addSubtask,
+    deleteSubtask,
+    reorderSubtasks,
+    logTime,
+  } = useTaskActions({
+    reload: load,
+    errors: { ...t.errors, updateTaskFailed: t.errors.updateFailed },
+    onError: setError,
+  });
 
   return (
     <div className="space-y-4">
@@ -240,17 +134,7 @@ export default function TodayPage() {
               void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
             }
             onComplete={(id) => void patchTask(id, { status: "done" })}
-            onLogTime={(id, minutes) =>
-              void apiFetch("/api/time-entries", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ taskId: id, durationMin: minutes }),
-              })
-                .then(() => load())
-                .catch((err) =>
-                  setError(err instanceof Error ? err.message : t.errors.logTimeFailed),
-                )
-            }
+            onLogTime={(id, minutes) => void logTime(id, minutes)}
           />
         ))
       )}

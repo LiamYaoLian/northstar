@@ -1,3 +1,4 @@
+import { findWorkPillar, WORK_PILLAR_NAME } from "@/lib/pillars";
 import { z } from "zod";
 import { suggestFocusTrack } from "@/lib/priority";
 import { parseJson } from "@/lib/utils";
@@ -71,7 +72,7 @@ export function ruleBasedClassify(
   }
 
   const t = trimmed.toLowerCase();
-  const workPillar = findPillar(pillars, "工作");
+  const workPillar = findWorkPillar(pillars);
 
   for (const rule of PILLAR_PATTERNS) {
     if (rule.pattern.test(t)) {
@@ -116,7 +117,7 @@ function resolvePillarChoice(
   const pillar = findPillar(pillars, pillarName);
   if (!pillar) return null;
 
-  const workPillar = findPillar(pillars, "工作");
+  const workPillar = findWorkPillar(pillars);
   let resolvedFocus: string | null = null;
 
   if (pillar.id === workPillar?.id) {
@@ -148,7 +149,7 @@ async function openAiClassify(
   const pillarOptions = pillars.map((p) => ({
     name: p.name,
     focusTracks:
-      p.name === "工作"
+      p.name === WORK_PILLAR_NAME
         ? parseJson<FocusTrack[]>(p.focusTracks, []).map((t) => t.name)
         : [],
   }));
