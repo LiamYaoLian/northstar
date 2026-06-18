@@ -35,7 +35,14 @@ async function initSchema(client: Client, db: Db) {
     await client.execute("PRAGMA busy_timeout = 5000");
   }
 
-  await client.executeMultiple(INIT_SQL);
+  try {
+    await client.executeMultiple(INIT_SQL);
+  } catch (err) {
+    console.warn(
+      "INIT_SQL executeMultiple failed; continuing with incremental migrations",
+      err,
+    );
+  }
   await applyMigrations(client, db);
 
   if (!process.env.TURSO_DATABASE_URL) {

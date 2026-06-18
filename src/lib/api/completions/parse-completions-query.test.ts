@@ -77,9 +77,16 @@ describe("parseCompletionsQuery", () => {
     ).toThrow(InvalidTimezoneError);
   });
 
-  it("treats missing pillarId as null", () => {
+  it("omits pillarId when not in query (no pillar filter)", () => {
     const parsed = parseCompletionsQuery(
       new URLSearchParams("since=2025-01-06&until=2025-01-06"),
+    );
+    expect(parsed.pillarId).toBeUndefined();
+  });
+
+  it("treats empty pillarId as unassigned-only filter", () => {
+    const parsed = parseCompletionsQuery(
+      new URLSearchParams("since=2025-01-06&until=2025-01-06&pillarId="),
     );
     expect(parsed.pillarId).toBeNull();
   });

@@ -19,7 +19,8 @@ export type ParsedCompletionsQuery = {
   tz: string;
   since: string;
   until: string;
-  pillarId: string | null;
+  /** undefined = no pillar filter; null = unassigned only; string = that pillar */
+  pillarId?: string | null;
   limit: number;
 };
 
@@ -56,8 +57,11 @@ export function parseCompletionsQuery(
 ): ParsedCompletionsQuery {
   const tz = parseTz(searchParams);
   const { since, until } = parseSinceUntil(searchParams);
-  const pillarRaw = searchParams.get("pillarId");
-  const pillarId = pillarRaw && pillarRaw.length > 0 ? pillarRaw : null;
+  let pillarId: string | null | undefined = undefined;
+  if (searchParams.has("pillarId")) {
+    const pillarRaw = searchParams.get("pillarId");
+    pillarId = pillarRaw && pillarRaw.length > 0 ? pillarRaw : null;
+  }
   const limitRaw = searchParams.get("limit");
   let limit = MAX_COMPLETION_LIMIT;
   if (limitRaw != null && limitRaw !== "") {

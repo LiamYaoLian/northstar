@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDb } from "@/lib/db";
+import { getDb, ensureDbReady } from "@/lib/db";
 import { strategicPillars, taskCompletionEvents } from "@/lib/db/schema";
 import type { Task } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
@@ -84,6 +84,7 @@ export async function recordCompletionEvent(
 export async function listCompletionEvents(
   query: ListCompletionEventsQuery,
 ): Promise<TaskCompletionEvent[]> {
+  await ensureDbReady();
   const db = getDb();
   const conditions = [
     gte(taskCompletionEvents.occurrenceDate, query.since),
