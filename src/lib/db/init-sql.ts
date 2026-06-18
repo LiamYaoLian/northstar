@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority_computed_at TEXT,
   estimated_min INTEGER,
   due_at TEXT,
-  is_pinned INTEGER NOT NULL DEFAULT 0,
   manual_sort_order INTEGER NOT NULL DEFAULT 0,
   postponed_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,

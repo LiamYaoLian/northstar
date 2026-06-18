@@ -99,8 +99,6 @@ export type Messages = {
     breakdownCancel: string;
     breakdownApplying: string;
     whyRanked: string;
-    unpin: string;
-    pin: string;
     unmarkIntimidating: string;
     markIntimidating: string;
     logTime: string;

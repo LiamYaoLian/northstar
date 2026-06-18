@@ -147,7 +147,6 @@ export default function TodayPage() {
             onReorderSubtasks={reorderSubtasks}
             onToggleSubtask={toggleSubtask}
             onUpdateSubtaskTitle={updateSubtaskTitle}
-            onPin={(id, pinned) => void patchTask(id, { isPinned: pinned })}
             onToggleIntimidating={(id, intimidating) =>
               void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
             }

@@ -9,7 +9,6 @@ type TaskActionBarProps = {
   onToggleManual: () => void;
   onToggleAiBreakdown: () => void;
   onToggleWhy: () => void;
-  onPin?: (id: string, pinned: boolean) => void;
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onLogTime?: (id: string, minutes: number) => void;
   onComplete?: (id: string) => void;
@@ -24,7 +23,6 @@ export function TaskActionBar({
   onToggleManual,
   onToggleAiBreakdown,
   onToggleWhy,
-  onPin,
   onToggleIntimidating,
   onLogTime,
   onComplete,
@@ -49,11 +47,6 @@ export function TaskActionBar({
         </ActionButton>
       )}
       <ActionButton onClick={onToggleWhy}>{t.taskCard.whyRanked}</ActionButton>
-      {onPin && (
-        <ActionButton onClick={() => onPin(task.id, !task.isPinned)}>
-          {task.isPinned ? t.taskCard.unpin : t.taskCard.pin}
-        </ActionButton>
-      )}
       {onToggleIntimidating && (
         <button
           type="button"

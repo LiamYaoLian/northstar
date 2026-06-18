@@ -23,7 +23,6 @@ export function TaskCard({
   task,
   rank,
   pillars,
-  onPin,
   onComplete,
   onLogTime,
   onBreakdown,
@@ -122,7 +121,6 @@ export function TaskCard({
         onToggleManual={forms.toggleManual}
         onToggleAiBreakdown={forms.toggleAiBreakdown}
         onToggleWhy={() => setShowWhy((v) => !v)}
-        onPin={onPin}
         onToggleIntimidating={onToggleIntimidating}
         onLogTime={onLogTime}
         onComplete={onComplete}

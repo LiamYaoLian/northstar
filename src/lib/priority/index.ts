@@ -94,21 +94,6 @@ export function computeTaskPriority(
   workTrackAlignments: FocusTrackAlignment[],
   now = new Date(),
 ): { score: number; factors: PriorityFactors; reason: string } {
-  if (task.isPinned) {
-    return {
-      score: 1,
-      factors: {
-        strategicUrgency: 0,
-        deadlinePressure: 0,
-        intimidationEscalation: 0,
-        dependencyBlocker: 0,
-        staleness: 0,
-        recentlyDonePenalty: 0,
-      },
-      reason: "已置顶",
-    };
-  }
-
   const workPillar = findWorkPillar(pillars);
   const factors: PriorityFactors = {
     strategicUrgency: strategicUrgency(
@@ -197,7 +182,7 @@ export function rerankAll(
       taskId: task.id,
       priorityScore: Math.min(1, score + boost),
       factors,
-      reason: boost > 0 && reason !== "已置顶" ? `${reason} · 入口步骤待完成` : reason,
+      reason: boost > 0 ? `${reason} · 入口步骤待完成` : reason,
       rank: 0,
     };
   });

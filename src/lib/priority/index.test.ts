@@ -40,19 +40,6 @@ describe("boardOrderNeedsScoreSync", () => {
 });
 
 describe("computeTaskPriority", () => {
-  it("returns max score for pinned tasks", () => {
-    const result = computeTaskPriority(
-      makeTask({ isPinned: true }),
-      testPillars,
-      new Map(),
-      0,
-      "进大厂",
-      [],
-    );
-    expect(result.score).toBe(1);
-    expect(result.reason).toBe("已置顶");
-  });
-
   it("increases score for overdue deadlines", () => {
     const result = computeTaskPriority(
       makeTask({ dueAt: "2020-01-01T00:00:00.000Z" }),

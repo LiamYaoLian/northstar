@@ -19,7 +19,6 @@ export type TaskCardProps = {
   task: TaskWithMeta;
   rank?: number;
   pillars?: PillarOption[];
-  onPin?: (id: string, pinned: boolean) => void;
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;

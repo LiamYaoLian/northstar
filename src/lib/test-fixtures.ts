@@ -49,7 +49,6 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     priorityComputedAt: null,
     estimatedMin: 60,
     dueAt: null,
-    isPinned: false,
     manualSortOrder: 0,
     postponedCount: 0,
     createdAt: "2026-01-01T00:00:00.000Z",

@@ -128,7 +128,6 @@ export async function createTask(input: {
     priorityScore: 0,
     estimatedMin: input.estimatedMin ?? null,
     dueAt: input.dueAt ?? null,
-    isPinned: false,
     manualSortOrder: maxOrder + 1,
     postponedCount: 0,
     createdAt: ts,
@@ -373,7 +372,6 @@ export async function updateTask(
   patch: Partial<{
     title: string;
     status: string;
-    isPinned: boolean;
     pillarId: string | null;
     focusTrack: string | null;
     postponedCount: number;

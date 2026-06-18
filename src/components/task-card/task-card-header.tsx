@@ -20,10 +20,7 @@ export function TaskCardHeader({
         {rank != null && (
           <span className="text-xs font-medium text-muted">#{rank}</span>
         )}
-        <h3 className="font-medium leading-snug">
-          {task.isPinned && <span className="mr-1">📌</span>}
-          {task.title}
-        </h3>
+        <h3 className="font-medium leading-snug">{task.title}</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
           {children}
         </div>

@@ -105,8 +105,6 @@ export const en: Messages = {
     breakdownCancel: "Cancel",
     breakdownApplying: "Applying...",
     whyRanked: "Why ranked here?",
-    unpin: "Unpin",
-    pin: "Pin",
     unmarkIntimidating: "Unmark intimidating",
     markIntimidating: "Mark intimidating",
     logTime: "Log time",

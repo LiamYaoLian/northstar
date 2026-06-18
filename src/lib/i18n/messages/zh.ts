@@ -105,8 +105,6 @@ export const zh: Messages = {
     breakdownCancel: "取消",
     breakdownApplying: "应用中...",
     whyRanked: "为什么排这里？",
-    unpin: "取消置顶",
-    pin: "置顶",
     unmarkIntimidating: "取消恐吓",
     markIntimidating: "标记恐吓",
     logTime: "记录时间",
