@@ -110,6 +110,7 @@ export const zh: Messages = {
     factorIntimidation: "恐吓加成",
     factorStaleness: "积压程度",
     deleteSubtask: "删除",
+    editSubtask: "编辑子任务",
     dragTask: "拖拽排序任务",
     dragSubtask: "拖拽排序",
     entryPointBadge: "入口 ·",

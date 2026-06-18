@@ -27,6 +27,7 @@ export function TaskCard({
   onLogTime,
   onBreakdown,
   onToggleSubtask,
+  onUpdateSubtaskTitle,
   onAddSubtask,
   onDeleteSubtask,
   onReorderSubtasks,
@@ -75,6 +76,7 @@ export function TaskCard({
           subtasks={subtaskList}
           onReorder={onReorderSubtasks}
           onToggle={onToggleSubtask}
+          onUpdateTitle={onUpdateSubtaskTitle}
           onDelete={onDeleteSubtask}
         />
       )}

@@ -71,13 +71,13 @@ export function useTaskActions({
     [reload, errors.breakdownFailed, onError],
   );
 
-  const toggleSubtask = useCallback(
-    async (subtaskId: string, isDone: boolean) => {
+  const patchSubtask = useCallback(
+    async (subtaskId: string, body: { isDone?: boolean; title?: string }) => {
       try {
         await apiFetch(`/api/subtasks/${subtaskId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isDone }),
+          body: JSON.stringify(body),
         });
         await reload();
       } catch (err) {
@@ -85,6 +85,20 @@ export function useTaskActions({
       }
     },
     [reload, errors.updateSubtaskFailed, onError],
+  );
+
+  const toggleSubtask = useCallback(
+    (subtaskId: string, isDone: boolean) => {
+      void patchSubtask(subtaskId, { isDone });
+    },
+    [patchSubtask],
+  );
+
+  const updateSubtaskTitle = useCallback(
+    (subtaskId: string, title: string) => {
+      void patchSubtask(subtaskId, { title });
+    },
+    [patchSubtask],
   );
 
   const addSubtask = useCallback(
@@ -173,6 +187,7 @@ export function useTaskActions({
     recalculatePriority,
     breakdownTask,
     toggleSubtask,
+    updateSubtaskTitle,
     addSubtask,
     deleteSubtask,
     reorderSubtasks,

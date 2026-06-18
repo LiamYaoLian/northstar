@@ -215,20 +215,47 @@ export async function breakdownTask(
   };
 }
 
-export async function toggleSubtask(subtaskId: string, isDone: boolean) {
+export async function updateSubtask(
+  subtaskId: string,
+  patch: { title?: string; isDone?: boolean },
+) {
   await ensureDbReady();
   const db = getDb();
-  await db.update(subtasks).set({ isDone }).where(eq(subtasks.id, subtaskId));
+  const existing = await fetchSubtaskById(subtaskId);
+  if (!existing) return null;
 
-  const sub = await fetchSubtaskById(subtaskId);
-  if (!sub) return null;
+  const updates: { title?: string; isDone?: boolean } = {};
+  if (patch.title !== undefined) {
+    const trimmed = patch.title.trim();
+    if (!trimmed) return null;
+    updates.title = trimmed;
+  }
+  if (patch.isDone !== undefined) {
+    updates.isDone = patch.isDone;
+  }
+  if (Object.keys(updates).length === 0) return existing;
 
-  const siblings = await listSubtasks(sub.parentTaskId);
-  if (siblings.length > 0 && siblings.every((s) => s.isDone)) {
-    await updateTask(sub.parentTaskId, { status: "done" });
+  await db.update(subtasks).set(updates).where(eq(subtasks.id, subtaskId));
+
+  if (patch.isDone !== undefined) {
+    const siblings = await listSubtasks(existing.parentTaskId);
+    if (siblings.length > 0 && siblings.every((s) => s.isDone)) {
+      await updateTask(existing.parentTaskId, { status: "done" });
+    }
+  }
+
+  if (patch.title !== undefined) {
+    await db
+      .update(tasks)
+      .set({ updatedAt: nowIso() })
+      .where(eq(tasks.id, existing.parentTaskId));
   }
 
   return fetchSubtaskById(subtaskId);
+}
+
+export async function toggleSubtask(subtaskId: string, isDone: boolean) {
+  return updateSubtask(subtaskId, { isDone });
 }
 
 export async function updateTask(

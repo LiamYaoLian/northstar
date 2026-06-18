@@ -110,6 +110,7 @@ export const en: Messages = {
     factorIntimidation: "Intimidation boost",
     factorStaleness: "Staleness",
     deleteSubtask: "Delete",
+    editSubtask: "Edit subtask",
     dragTask: "Drag to reorder task",
     dragSubtask: "Drag to reorder",
     entryPointBadge: "Entry ·",

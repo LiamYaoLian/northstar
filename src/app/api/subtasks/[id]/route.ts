@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { toggleSubtask, deleteSubtask } from "@/lib/services/tasks";
+import { updateSubtask, deleteSubtask } from "@/lib/services/tasks";
 
 export async function PATCH(
   request: Request,
@@ -7,8 +7,17 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { isDone } = await request.json();
-    const subtask = await toggleSubtask(id, Boolean(isDone));
+    const body = await request.json();
+    const { isDone, title } = body as { isDone?: boolean; title?: string };
+
+    if (isDone === undefined && title === undefined) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
+
+    const subtask = await updateSubtask(id, {
+      ...(isDone !== undefined ? { isDone: Boolean(isDone) } : {}),
+      ...(title !== undefined ? { title: String(title) } : {}),
+    });
     if (!subtask) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

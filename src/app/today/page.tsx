@@ -73,6 +73,7 @@ export default function TodayPage() {
     recalculatePriority,
     breakdownTask,
     toggleSubtask,
+    updateSubtaskTitle,
     addSubtask,
     deleteSubtask,
     reorderSubtasks,
@@ -129,6 +130,7 @@ export default function TodayPage() {
             onDeleteSubtask={(id) => void deleteSubtask(id)}
             onReorderSubtasks={reorderSubtasks}
             onToggleSubtask={toggleSubtask}
+            onUpdateSubtaskTitle={updateSubtaskTitle}
             onPin={(id, pinned) => void patchTask(id, { isPinned: pinned })}
             onToggleIntimidating={(id, intimidating) =>
               void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })

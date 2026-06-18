@@ -23,6 +23,7 @@ export type TaskCardProps = {
   onLogTime?: (id: string, minutes: number) => void;
   onBreakdown?: (id: string, userPrompt?: string) => Promise<void>;
   onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
+  onUpdateSubtaskTitle?: (subtaskId: string, title: string) => void;
   onAddSubtask?: (
     taskId: string,
     title: string,

@@ -104,6 +104,7 @@ export type Messages = {
     factorIntimidation: string;
     factorStaleness: string;
     deleteSubtask: string;
+    editSubtask: string;
     dragTask: string;
     dragSubtask: string;
     entryPointBadge: string;
