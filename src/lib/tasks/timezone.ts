@@ -152,3 +152,9 @@ export function startOfLocalWeek(instant: Date, tz: string): Date {
   const monday = addLocalDays(instant, tz, -(weekday - 1));
   return startOfLocalDay(monday, tz);
 }
+
+/** First day of month 00:00 local in tz. */
+export function startOfLocalMonth(instant: Date, tz: string): Date {
+  const { year, month } = getLocalParts(instant, tz);
+  return zonedTimeToUtc(year, month, 1, 0, 0, 0, tz);
+}

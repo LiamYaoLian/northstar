@@ -15,8 +15,6 @@ describe("shouldAutoAppendTimezone", () => {
 
   it("returns false for unrelated API routes", () => {
     expect(shouldAutoAppendTimezone("/api/strategy")).toBe(false);
-    expect(shouldAutoAppendTimezone("/api/alignment")).toBe(false);
-    expect(shouldAutoAppendTimezone("/api/time-entries")).toBe(false);
   });
 });
 
@@ -49,6 +47,18 @@ describe("withAutoTimezone", () => {
   it("appends tz for /api/completions/summary", () => {
     expect(
       withAutoTimezone("/api/completions/summary?since=2025-01-06&until=2025-01-12"),
+    ).toContain("tz=");
+  });
+
+  it("appends tz for /api/completions/export", () => {
+    expect(
+      withAutoTimezone("/api/completions/export?since=2025-01-06&until=2025-01-12"),
+    ).toContain("tz=");
+  });
+
+  it("appends tz for /api/time-entries/export", () => {
+    expect(
+      withAutoTimezone("/api/time-entries/export?since=2025-01-06&until=2025-01-12"),
     ).toContain("tz=");
   });
 

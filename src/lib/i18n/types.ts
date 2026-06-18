@@ -2,7 +2,7 @@ export type Locale = "zh" | "en";
 
 export type Messages = {
   header: { tagline: string };
-  nav: { today: string; alignment: string; tasks: string; strategy: string; completed: string };
+  nav: { today: string; alignment: string; tasks: string; strategy: string; completed: string; review: string };
   common: {
     loading: string;
     retry: string;
@@ -44,6 +44,7 @@ export type Messages = {
     recalculating: string;
     completedToday: string;
     completedCount: string;
+    filteredEmpty: string;
   };
   tasks: {
     title: string;
@@ -63,7 +64,10 @@ export type Messages = {
     analyzing: string;
     statusActive: string;
     statusDone: string;
+    statusDeferred: string;
     statusAll: string;
+    deferredEmpty: string;
+    activeEmpty: string;
   };
   completed: {
     title: string;
@@ -73,6 +77,7 @@ export type Messages = {
     empty: string;
     groupDate: string;
     unassigned: string;
+    exportCsv: string;
   };
   alignment: {
     title: string;
@@ -85,6 +90,26 @@ export type Messages = {
     procrastinationRadar: string;
     weeklyCompletions: string;
     didVsLogged: string;
+    exportTimeCsv: string;
+  };
+  review: {
+    title: string;
+    subtitle: string;
+    thisWeek: string;
+    thisMonth: string;
+    saveSnapshot: string;
+    saving: string;
+    saved: string;
+    saveFailed: string;
+    alignmentScore: string;
+    driftScore: string;
+    loggedInPeriod: string;
+    completionsInPeriod: string;
+    pillarComparison: string;
+    history: string;
+    noHistory: string;
+    periodRange: string;
+    snapshotSavedAt: string;
   };
   strategy: {
     title: string;
@@ -94,6 +119,13 @@ export type Messages = {
     hoursPerWeek: string;
     workPrimaryTrack: string;
     resetStrategy: string;
+    edit: string;
+    save: string;
+    cancel: string;
+    saving: string;
+    saveFailed: string;
+    horizonLabel: string;
+    hoursPerWeekLabel: string;
   };
   taskCard: {
     estMin: string;
@@ -121,6 +153,8 @@ export type Messages = {
     logTime: string;
     complete: string;
     reopen: string;
+    defer: string;
+    restoreToToday: string;
     factorStrategic: string;
     factorDeadline: string;
     factorIntimidation: string;

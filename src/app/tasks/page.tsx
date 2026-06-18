@@ -327,10 +327,18 @@ export default function TasksPage() {
 
       <TaskStatusFilterBar value={statusFilter} onChange={setStatusFilter} />
 
-      {statusFilter === "done" ? (
+      {statusFilter === "done" || statusFilter === "deferred" ? (
         <div className="space-y-3">
           {filteredTasks.length === 0 ? (
-            <p className="text-sm text-muted">{t.completed.empty}</p>
+            <p className="text-sm text-muted">
+              {statusFilter === "deferred"
+                ? t.tasks.deferredEmpty
+                : statusFilter === "done"
+                  ? t.completed.empty
+                  : statusFilter === "active"
+                    ? t.tasks.activeEmpty
+                    : t.completed.empty}
+            </p>
           ) : (
             filteredTasks.map((task) => (
               <TaskCard
@@ -351,7 +359,16 @@ export default function TasksPage() {
                 onToggleIntimidating={(id, intimidating) =>
                   void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
                 }
-                onReopen={(id) => void patchTask(id, { status: "todo" })}
+                onReopen={
+                  statusFilter === "done"
+                    ? (id) => void patchTask(id, { status: "todo" })
+                    : undefined
+                }
+                onRestore={
+                  statusFilter === "deferred"
+                    ? (id) => void patchTask(id, { status: "todo" })
+                    : undefined
+                }
                 onLogTime={(id, minutes) => void logTime(id, minutes)}
                 onUpdateRecurrence={(id, value) =>
                   void patchTask(id, {
@@ -394,6 +411,7 @@ export default function TasksPage() {
                   void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
                 }
                 onComplete={(id) => void patchTask(id, { status: "done" })}
+                onDefer={(id) => void patchTask(id, { status: "deferred" })}
                 onLogTime={(id, minutes) => void logTime(id, minutes)}
                 onUpdateRecurrence={(id, value) =>
                   void patchTask(id, {

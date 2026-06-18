@@ -7,6 +7,10 @@ import {
   strategyRevisions,
 } from "@/lib/db/schema";
 import { LIFE_BALANCE_TEMPLATE, WORK_TRACK_PRESETS } from "@/lib/strategy/templates";
+import {
+  focusTracksForWorkTrack,
+  primaryTrackFromWorkTrackKey,
+} from "@/lib/strategy/work-track";
 import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 
@@ -107,6 +111,61 @@ export async function saveStrategy(input: {
   return getStrategy();
 }
 
+export async function updateNorthStar(input: {
+  statement: string;
+  horizon: string;
+  hoursPerWeek: number;
+  workTrack: string;
+}) {
+  const strategy = await getStrategy();
+  if (!strategy) return null;
+
+  const statement = input.statement.trim();
+  const horizon = input.horizon.trim();
+  if (!statement || !horizon) return null;
+  if (!Number.isInteger(input.hoursPerWeek) || input.hoursPerWeek < 1) {
+    return null;
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const ts = nowIso();
+  const workPrimaryTrack = primaryTrackFromWorkTrackKey(input.workTrack);
+  const focusTracks = focusTracksForWorkTrack(input.workTrack);
+
+  const workPillar = strategy.pillars.find((p) => p.name === "工作");
+  if (workPillar) {
+    await db
+      .update(strategicPillars)
+      .set({ focusTracks: JSON.stringify(focusTracks) })
+      .where(eq(strategicPillars.id, workPillar.id));
+  }
+
+  await db
+    .update(northStars)
+    .set({
+      statement,
+      horizon,
+      hoursPerWeek: input.hoursPerWeek,
+      workPrimaryTrack,
+      updatedAt: ts,
+    })
+    .where(eq(northStars.id, strategy.northStar.id));
+
+  const pillars = await db.select().from(strategicPillars);
+  await db.insert(strategyRevisions).values({
+    id: id(),
+    northStarStatement: statement,
+    horizon,
+    pillars: JSON.stringify(pillars),
+    effectiveFrom: ts,
+    source: "strategy_edit",
+    createdAt: ts,
+  });
+
+  return getStrategy();
+}
+
 export async function applyLifeBalanceTemplate(
   workTrack = "big_tech",
   overrides?: {
@@ -123,20 +182,11 @@ export async function applyLifeBalanceTemplate(
     return p;
   });
 
-  const primaryTrack =
-    workTrack === "big_tech"
-      ? "进大厂"
-      : workTrack === "explore"
-        ? "探索方向"
-        : workTrack === "invest"
-          ? "投资"
-          : preset.focusTracks[0]?.name ?? "进大厂";
-
   return saveStrategy({
     statement: overrides?.statement ?? LIFE_BALANCE_TEMPLATE.northStar,
     horizon: overrides?.horizon ?? LIFE_BALANCE_TEMPLATE.horizon,
     hoursPerWeek: overrides?.hoursPerWeek ?? 40,
-    workPrimaryTrack: primaryTrack,
+    workPrimaryTrack: primaryTrackFromWorkTrackKey(workTrack),
     pillars,
     source: "template",
   });

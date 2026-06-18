@@ -22,6 +22,8 @@ export type TaskCardProps = {
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
   onReopen?: (id: string) => void;
+  onDefer?: (id: string) => void;
+  onRestore?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;
   onBreakdown?: (id: string, userPrompt?: string) => Promise<BreakdownPreviewResult | null>;
   onApplyBreakdown?: (

@@ -1,6 +1,13 @@
 import { clientTimezone } from "@/lib/tasks/timezone";
 
-const TZ_PREFIXES = ["/api/tasks", "/api/subtasks", "/api/completions"] as const;
+const TZ_PREFIXES = [
+  "/api/tasks",
+  "/api/subtasks",
+  "/api/completions",
+  "/api/reviews",
+  "/api/alignment",
+  "/api/time-entries",
+] as const;
 
 function matchesTzPrefix(url: string): boolean {
   return TZ_PREFIXES.some(

@@ -52,13 +52,29 @@ export async function recordCompletionEvent(
   tz: string,
   now = new Date(),
 ): Promise<TaskCompletionEvent> {
+  const completedAtIso = task.completedAt ?? now.toISOString();
+
+  const existing = await tx
+    .select()
+    .from(taskCompletionEvents)
+    .where(
+      and(
+        eq(taskCompletionEvents.taskId, task.id),
+        eq(taskCompletionEvents.completedAt, completedAtIso),
+      ),
+    );
+  if (existing[0]) {
+    return rowToEvent(existing[0]);
+  }
+
   const pillars = await tx.select().from(strategicPillars);
   const snapshot = resolvePillarSnapshotForCompletion(task, pillars);
   const ts = nowIso();
+  const completedAt = new Date(completedAtIso);
   const payload = buildCompletionEventPayload(
-    { ...task, completedAt: now.toISOString() },
+    { ...task, completedAt: completedAtIso },
     tz,
-    now,
+    completedAt,
     snapshot,
     id(),
     ts,

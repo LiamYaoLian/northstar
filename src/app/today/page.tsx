@@ -138,11 +138,17 @@ export default function TodayPage() {
 
       {tasks.length === 0 ? (
         <p className="text-sm text-muted">
-          {t.today.empty}{" "}
-          <Link href="/tasks" className="text-accent">
-            {t.nav.tasks}
-          </Link>
-          .
+          {allTasks.length > 0 && categoryFilter
+            ? t.today.filteredEmpty
+            : (
+              <>
+                {t.today.empty}{" "}
+                <Link href="/tasks" className="text-accent">
+                  {t.nav.tasks}
+                </Link>
+                .
+              </>
+            )}
         </p>
       ) : (
         tasks.map((task, i) => (
@@ -166,6 +172,7 @@ export default function TodayPage() {
               void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
             }
             onComplete={(id) => void patchTask(id, { status: "done" })}
+            onDefer={(id) => void patchTask(id, { status: "deferred" })}
             onLogTime={(id, minutes) => void logTime(id, minutes)}
             onUpdateRecurrence={(id, value) =>
               void patchTask(id, {
@@ -198,7 +205,7 @@ export default function TodayPage() {
               {completedEvents.map((event) => (
                 <CompletionListItem key={event.id} event={event} />
               ))}
-              <Link href="/completed?range=today" className="text-sm text-accent">
+              <Link href="/alignment?period=today#completions" className="text-sm text-accent">
                 {t.today.viewAll}
               </Link>
             </div>

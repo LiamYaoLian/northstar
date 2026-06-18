@@ -503,6 +503,9 @@ export async function updateTask(
         .update(tasks)
         .set({
           ...safePatch,
+          ...(patch.status === "deferred" && current.status !== "deferred"
+            ? { postponedCount: current.postponedCount + 1 }
+            : {}),
           completedAt,
           updatedAt: ts,
         })

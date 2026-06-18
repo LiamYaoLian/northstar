@@ -39,10 +39,11 @@ describe("sortTasks", () => {
 });
 
 describe("filterActiveTasks", () => {
-  it("excludes done tasks", () => {
+  it("excludes done and deferred tasks", () => {
     const rows = [
       makeTask({ id: "open", status: "todo" }),
       makeTask({ id: "closed", status: "done" }),
+      makeTask({ id: "later", status: "deferred" }),
     ];
     expect(filterActiveTasks(rows).map((t) => t.id)).toEqual(["open"]);
   });
@@ -203,10 +204,15 @@ describe("filterTasksByStatus", () => {
     makeTask({ id: "later", status: "deferred" }),
   ];
 
-  it("active excludes done tasks (default Tasks tab)", () => {
+  it("active excludes done and deferred tasks (default Tasks tab)", () => {
     expect(filterTasksByStatus(rows, "active").map((t) => t.id)).toEqual([
       "open",
       "wip",
+    ]);
+  });
+
+  it("deferred includes only deferred tasks", () => {
+    expect(filterTasksByStatus(rows, "deferred").map((t) => t.id)).toEqual([
       "later",
     ]);
   });

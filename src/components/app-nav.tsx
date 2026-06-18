@@ -13,7 +13,6 @@ export function AppNav() {
     { href: "/today", label: t.nav.today },
     { href: "/alignment", label: t.nav.alignment },
     { href: "/tasks", label: t.nav.tasks },
-    { href: "/completed", label: t.nav.completed },
     { href: "/strategy", label: t.nav.strategy },
   ];
 

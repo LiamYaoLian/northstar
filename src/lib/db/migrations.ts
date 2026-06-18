@@ -136,11 +136,37 @@ export async function backfillCompletionEventsIfMissing(
   }
 }
 
+/** Remove duplicate rows sharing the same task_id + completed_at. */
+export async function dedupeCompletionEvents(client: Client): Promise<number> {
+  const rows = await client.execute(
+    "SELECT id, task_id, completed_at FROM task_completion_events ORDER BY task_id, completed_at, id",
+  );
+  const seen = new Set<string>();
+  const deleteIds: string[] = [];
+  for (const row of rows.rows) {
+    const key = `${String(row.task_id)}:${String(row.completed_at)}`;
+    if (seen.has(key)) {
+      deleteIds.push(String(row.id));
+    } else {
+      seen.add(key);
+    }
+  }
+  for (const eventId of deleteIds) {
+    await client.execute({
+      sql: "DELETE FROM task_completion_events WHERE id = ?",
+      args: [eventId],
+    });
+  }
+  return deleteIds.length;
+}
+
 export async function applyMigrations(client: Client, db: Db) {
   await safeDropIsPinnedIfExists(client);
   await dropIsEntryPointIfExists(client);
   await migrate(db, { migrationsFolder });
   await addRecurrenceColumnsIfMissing(client);
   await addCompletionEventsTableIfMissing(client);
+  await dedupeCompletionEvents(client);
   await backfillCompletionEventsIfMissing(db);
+  await dedupeCompletionEvents(client);
 }

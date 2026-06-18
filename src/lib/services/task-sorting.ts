@@ -4,7 +4,7 @@ import { shouldShowOnToday } from "@/lib/tasks/recurrence";
 
 export type TaskSortMode = "priority" | "manual";
 
-export type TaskStatusFilter = "active" | "done" | "all";
+export type TaskStatusFilter = "active" | "done" | "deferred" | "all";
 
 export function sortTasks(rows: Task[], sort: TaskSortMode): Task[] {
   if (sort === "manual") {
@@ -24,7 +24,7 @@ export function sortTasks(rows: Task[], sort: TaskSortMode): Task[] {
 }
 
 export function filterActiveTasks(tasks: Task[]): Task[] {
-  return tasks.filter((t) => t.status !== "done");
+  return tasks.filter((t) => t.status !== "done" && t.status !== "deferred");
 }
 
 export function rankAndLimit(tasks: Task[], limit: number): Task[] {
@@ -50,10 +50,13 @@ export function filterTasksByStatus(
   filter: TaskStatusFilter,
 ): Task[] {
   if (filter === "active") {
-    return tasks.filter((t) => t.status !== "done");
+    return tasks.filter((t) => t.status !== "done" && t.status !== "deferred");
   }
   if (filter === "done") {
     return tasks.filter((t) => t.status === "done");
+  }
+  if (filter === "deferred") {
+    return tasks.filter((t) => t.status === "deferred");
   }
   return tasks;
 }

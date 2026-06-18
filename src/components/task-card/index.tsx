@@ -32,6 +32,8 @@ export function TaskCard({
   pillars,
   onComplete,
   onReopen,
+  onDefer,
+  onRestore,
   onLogTime,
   onBreakdown,
   onApplyBreakdown,
@@ -69,6 +71,7 @@ export function TaskCard({
       className={cn(
         "space-y-3",
         task.status === "done" && "border-neutral-200 bg-neutral-50/80 opacity-90",
+        task.status === "deferred" && "border-amber-200/80 bg-amber-50/40",
       )}
     >
       <TaskCardHeader
@@ -184,6 +187,8 @@ export function TaskCard({
         onLogTime={onLogTime}
         onComplete={onComplete}
         onReopen={onReopen}
+        onDefer={onDefer}
+        onRestore={onRestore}
         hasAddSubtask={Boolean(onAddSubtask)}
         hasBreakdown={Boolean(onBreakdown)}
       />
