@@ -51,7 +51,7 @@ export const en: Messages = {
   tasks: {
     title: "Tasks",
     placeholder: "New task, e.g. prep investor deck, LC problems...",
-    hint: "Drag to reorder tasks — updates priority; engine recalc also updates board order",
+    hint: "Engine recalc also updates board order",
     categorized: "Categories",
     categoryOnCreate: "Category",
     autoCategory: "Auto-detect",

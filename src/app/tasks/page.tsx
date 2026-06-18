@@ -259,11 +259,7 @@ export default function TasksPage() {
         onChange={setCategoryFilter}
       />
 
-      <p className="text-xs text-muted">
-        {t.tasks.hint}
-        {pillars.length > 0 &&
-          ` · ${t.tasks.categorized}：${pillars.map((p) => translatePillar(p.name, locale)).join(" · ")}`}
-      </p>
+      <p className="text-xs text-muted">{t.tasks.hint}</p>
 
       <SortableTaskList
         taskIds={filteredTasks.map((task) => task.id)}

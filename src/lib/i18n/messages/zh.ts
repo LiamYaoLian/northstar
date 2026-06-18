@@ -51,7 +51,7 @@ export const zh: Messages = {
   tasks: {
     title: "任务",
     placeholder: "新任务，如：准备投资人 deck、刷 LC 题...",
-    hint: "拖拽排序会同步更新优先级 · 引擎重算也会更新板序",
+    hint: "引擎重算也会更新板序",
     categorized: "归类",
     categoryOnCreate: "类别",
     autoCategory: "自动识别",
