@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDb } from "@/lib/db";
+import { ensureDbReady, getDb } from "@/lib/db";
 import {
   northStars,
   strategicPillars,
@@ -10,25 +10,25 @@ import { LIFE_BALANCE_TEMPLATE, WORK_TRACK_PRESETS } from "@/lib/strategy/templa
 import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 
-export function hasStrategy() {
-  const db = getDb();
-  const stars = db.select().from(northStars).all();
+export async function hasStrategy() {
+  await ensureDbReady();
+  const stars = await getDb().select().from(northStars);
   return stars.length > 0;
 }
 
-export function getStrategy() {
+export async function getStrategy() {
+  await ensureDbReady();
   const db = getDb();
-  const star = db.select().from(northStars).all()[0];
+  const stars = await db.select().from(northStars);
+  const star = stars[0];
   if (!star) return null;
-  const pillars = db
-    .select()
-    .from(strategicPillars)
-    .all()
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const pillars = (await db.select().from(strategicPillars)).sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  );
   return { northStar: star, pillars };
 }
 
-export function saveStrategy(input: {
+export async function saveStrategy(input: {
   statement: string;
   horizon: string;
   hoursPerWeek: number;
@@ -46,13 +46,16 @@ export function saveStrategy(input: {
   }>;
   source?: string;
 }) {
+  await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
-  const existing = db.select().from(northStars).all()[0];
+  const existingRows = await db.select().from(northStars);
+  const existing = existingRows[0];
 
   if (existing) {
-    db.delete(strategicPillars).run();
-    db.update(northStars)
+    await db.delete(strategicPillars);
+    await db
+      .update(northStars)
       .set({
         statement: input.statement,
         horizon: input.horizon,
@@ -60,58 +63,51 @@ export function saveStrategy(input: {
         workPrimaryTrack: input.workPrimaryTrack ?? null,
         updatedAt: ts,
       })
-      .where(eq(northStars.id, existing.id))
-      .run();
+      .where(eq(northStars.id, existing.id));
   } else {
-    db.insert(northStars)
-      .values({
-        id: id(),
-        statement: input.statement,
-        horizon: input.horizon,
-        hoursPerWeek: input.hoursPerWeek,
-        workPrimaryTrack: input.workPrimaryTrack ?? null,
-        createdAt: ts,
-        updatedAt: ts,
-      })
-      .run();
+    await db.insert(northStars).values({
+      id: id(),
+      statement: input.statement,
+      horizon: input.horizon,
+      hoursPerWeek: input.hoursPerWeek,
+      workPrimaryTrack: input.workPrimaryTrack ?? null,
+      createdAt: ts,
+      updatedAt: ts,
+    });
   }
 
-  input.pillars.forEach((p, i) => {
-    db.insert(strategicPillars)
-      .values({
-        id: id(),
-        name: p.name,
-        description: p.description ?? null,
-        targetPct: p.targetPct,
-        color: p.color,
-        keywords: JSON.stringify(p.keywords),
-        focusTracks: p.focusTracks ? JSON.stringify(p.focusTracks) : null,
-        floorMinPerWeek: p.floorMinPerWeek ?? null,
-        capMaxPct: p.capMaxPct ?? null,
-        isHardConstraint: p.isHardConstraint ?? false,
-        sortOrder: i,
-        createdAt: ts,
-      })
-      .run();
-  });
-
-  const pillars = db.select().from(strategicPillars).all();
-  db.insert(strategyRevisions)
-    .values({
+  for (const [i, p] of input.pillars.entries()) {
+    await db.insert(strategicPillars).values({
       id: id(),
-      northStarStatement: input.statement,
-      horizon: input.horizon,
-      pillars: JSON.stringify(pillars),
-      effectiveFrom: ts,
-      source: input.source ?? "onboarding",
+      name: p.name,
+      description: p.description ?? null,
+      targetPct: p.targetPct,
+      color: p.color,
+      keywords: JSON.stringify(p.keywords),
+      focusTracks: p.focusTracks ? JSON.stringify(p.focusTracks) : null,
+      floorMinPerWeek: p.floorMinPerWeek ?? null,
+      capMaxPct: p.capMaxPct ?? null,
+      isHardConstraint: p.isHardConstraint ?? false,
+      sortOrder: i,
       createdAt: ts,
-    })
-    .run();
+    });
+  }
+
+  const pillars = await db.select().from(strategicPillars);
+  await db.insert(strategyRevisions).values({
+    id: id(),
+    northStarStatement: input.statement,
+    horizon: input.horizon,
+    pillars: JSON.stringify(pillars),
+    effectiveFrom: ts,
+    source: input.source ?? "onboarding",
+    createdAt: ts,
+  });
 
   return getStrategy();
 }
 
-export function applyLifeBalanceTemplate(
+export async function applyLifeBalanceTemplate(
   workTrack = "big_tech",
   overrides?: {
     statement?: string;

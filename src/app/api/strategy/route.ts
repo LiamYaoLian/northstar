@@ -7,15 +7,18 @@ import {
 } from "@/lib/services/strategy";
 
 export async function GET() {
-  const strategy = getStrategy();
-  return NextResponse.json({ hasStrategy: hasStrategy(), strategy });
+  const strategy = await getStrategy();
+  return NextResponse.json({
+    hasStrategy: await hasStrategy(),
+    strategy,
+  });
 }
 
 export async function POST(request: Request) {
   const body = await request.json();
 
   if (body.action === "template") {
-    const strategy = applyLifeBalanceTemplate(body.workTrack ?? "big_tech", {
+    const strategy = await applyLifeBalanceTemplate(body.workTrack ?? "big_tech", {
       statement: body.statement,
       horizon: body.horizon,
       hoursPerWeek: body.hoursPerWeek,
@@ -23,6 +26,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ strategy });
   }
 
-  const strategy = saveStrategy(body);
+  const strategy = await saveStrategy(body);
   return NextResponse.json({ strategy });
 }

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDb } from "@/lib/db";
+import { ensureDbReady, getDb } from "@/lib/db";
 import { strategicPillars, tasks, timeEntries } from "@/lib/db/schema";
 import {
   computeAlignment,
@@ -8,15 +8,14 @@ import {
   detectProcrastination,
 } from "@/lib/alignment";
 
-export function getAlignmentDashboard() {
+export async function getAlignmentDashboard() {
+  await ensureDbReady();
   const db = getDb();
-  const pillars = db
-    .select()
-    .from(strategicPillars)
-    .all()
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-  const taskList = db.select().from(tasks).all();
-  const entries = db.select().from(timeEntries).all();
+  const pillars = (await db.select().from(strategicPillars)).sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  );
+  const taskList = await db.select().from(tasks);
+  const entries = await db.select().from(timeEntries);
 
   const alignment = computeAlignment(pillars, taskList, entries);
   const workPillar = pillars.find((p) => p.name === "工作");

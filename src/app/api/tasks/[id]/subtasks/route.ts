@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    return NextResponse.json({ subtasks: listSubtasks(id) });
+    return NextResponse.json({ subtasks: await listSubtasks(id) });
   } catch (err) {
     console.error("GET /api/tasks/[id]/subtasks", err);
     return NextResponse.json(
@@ -27,7 +27,7 @@ export async function POST(
     if (!body.title?.trim()) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
     }
-    const subtask = createSubtask(id, {
+    const subtask = await createSubtask(id, {
       title: body.title,
       isEntryPoint: body.isEntryPoint,
     });

@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== "string")) {
       return NextResponse.json({ error: "orderedIds required" }, { status: 400 });
     }
-    const tasks = reorderTasks(orderedIds);
+    const tasks = await reorderTasks(orderedIds);
     return NextResponse.json({ tasks });
   } catch (err) {
     console.error("POST /api/tasks/reorder", err);

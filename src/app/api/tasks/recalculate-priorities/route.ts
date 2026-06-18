@@ -3,7 +3,7 @@ import { recalculatePriorities } from "@/lib/services/tasks";
 
 export async function POST() {
   try {
-    const result = recalculatePriorities();
+    const result = await recalculatePriorities();
     return NextResponse.json(result);
   } catch (err) {
     console.error("POST /api/tasks/recalculate-priorities", err);

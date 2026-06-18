@@ -17,24 +17,53 @@ AI-driven todo app focused on **strategic alignment** and **automatic prioritiza
 
 ```bash
 npm install
+cp .env.example .env.local   # add Turso + optional OpenAI keys
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) — you'll be guided through onboarding.
+
+## Turso (cloud database)
+
+Data is stored in [Turso](https://turso.tech) (SQLite-compatible). Without `TURSO_*` env vars, the app falls back to local `data/northstar.db`.
+
+```bash
+# One-time setup
+brew install tursodatabase/tap/turso
+turso auth login
+cp data/northstar.db data/northstar.db.bak
+turso db import ./data/northstar.db
+turso db show northstar --url
+turso db tokens create northstar
+npm run db:sync-turso  # if cloud DB is empty, copy local data/northstar.db
+```
+
+Add to `.env.local`:
+
+```
+TURSO_DATABASE_URL=libsql://...
+TURSO_AUTH_TOKEN=...
+```
+
+If Turso was created empty (no import), sync existing local data:
+
+```bash
+npm run db:sync-turso
+```
 
 ## Scripts
 
 ```bash
 npm run dev      # Start dev server
 npm run build    # Production build
-npm run test     # Run alignment unit tests
-npm run db:push  # Push Drizzle schema (SQLite)
+npm run test     # Run unit tests
+npm run db:push  # Push Drizzle schema to Turso / local file
 ```
 
 ## Stack
 
 - Next.js 15 (App Router)
-- SQLite + Drizzle ORM + better-sqlite3
+- Turso / libSQL + Drizzle ORM + `@libsql/client`
 - Tailwind CSS 4
 - Vitest
 
@@ -52,6 +81,7 @@ PATCH /api/subtasks/{id}         # { "isDone": true }
 
 ## Data
 
-SQLite database: `data/northstar.db` (auto-created on first run).
+- **Production / recommended:** Turso cloud (1-day PITR on free tier)
+- **Offline fallback:** `data/northstar.db` (auto-created when `TURSO_*` is unset)
 
 See [design.md](./design.md) for full product spec.

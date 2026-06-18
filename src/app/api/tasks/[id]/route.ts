@@ -7,7 +7,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const task = updateTask(id, body);
+  const task = await updateTask(id, body);
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ task });
 }

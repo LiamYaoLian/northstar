@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const { isDone } = await request.json();
-    const subtask = toggleSubtask(id, Boolean(isDone));
+    const subtask = await toggleSubtask(id, Boolean(isDone));
     if (!subtask) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -28,7 +28,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const ok = deleteSubtask(id);
+    const ok = await deleteSubtask(id);
     if (!ok) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

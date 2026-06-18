@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { ensureDbReady, getDb } from "@/lib/db";
 import { strategicPillars } from "@/lib/db/schema";
 import { classifyTaskTitle } from "@/lib/tasks/classify";
 
@@ -7,7 +7,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const title = typeof body.title === "string" ? body.title : "";
-    const pillars = getDb().select().from(strategicPillars).all();
+    await ensureDbReady();
+    const pillars = await getDb().select().from(strategicPillars);
     const classification = await classifyTaskTitle(title, pillars);
     return NextResponse.json({ classification });
   } catch (err) {

@@ -11,7 +11,7 @@ export async function POST(
     if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== "string")) {
       return NextResponse.json({ error: "orderedIds required" }, { status: 400 });
     }
-    const subtasks = reorderSubtasks(taskId, orderedIds);
+    const subtasks = await reorderSubtasks(taskId, orderedIds);
     if (!subtasks) {
       return NextResponse.json({ error: "Invalid subtask order" }, { status: 400 });
     }
