@@ -57,6 +57,8 @@ export type Messages = {
     classifySourceAi: string;
     classifySourceRules: string;
     manualOverride: string;
+    autoEstimated: string;
+    analyzing: string;
   };
   alignment: {
     title: string;
@@ -109,6 +111,8 @@ export type Messages = {
     factorStaleness: string;
     deleteSubtask: string;
     editSubtask: string;
+    editEstimatedMin: string;
+    addEstimatedMin: string;
     dragTask: string;
     dragSubtask: string;
     entryPointBadge: string;

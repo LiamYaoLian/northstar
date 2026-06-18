@@ -23,6 +23,11 @@ type ClassifyPreview = {
   source: "openai" | "rules";
 };
 
+type EstimatePreview = {
+  estimatedMin: number | null;
+  source: "openai" | "rules";
+};
+
 export default function TasksPage() {
   const { locale, t } = useLocale();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
@@ -32,7 +37,8 @@ export default function TasksPage() {
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
-  const [classifying, setClassifying] = useState(false);
+  const [autoEstimate, setAutoEstimate] = useState<EstimatePreview | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -58,31 +64,42 @@ export default function TasksPage() {
   }, [load]);
 
   useEffect(() => {
+    if (newTaskPillarId) setAutoClassify(null);
+  }, [newTaskPillarId]);
+
+  useEffect(() => {
     const trimmed = title.trim();
-    if (!trimmed || pillars.length === 0 || newTaskPillarId) {
+    if (!trimmed || pillars.length === 0) {
       setAutoClassify(null);
-      setClassifying(false);
+      setAutoEstimate(null);
+      setAnalyzing(false);
       return;
     }
 
-    setClassifying(true);
+    setAnalyzing(true);
     let cancelled = false;
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const data = await apiFetch<{ classification: ClassifyPreview }>(
-            "/api/tasks/classify",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title: trimmed }),
-            },
-          );
-          if (!cancelled) setAutoClassify(data.classification);
+          const data = await apiFetch<{
+            classification: ClassifyPreview;
+            estimate: EstimatePreview;
+          }>("/api/tasks/classify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: trimmed }),
+          });
+          if (!cancelled) {
+            setAutoEstimate(data.estimate);
+            if (!newTaskPillarId) setAutoClassify(data.classification);
+          }
         } catch {
-          if (!cancelled) setAutoClassify(null);
+          if (!cancelled) {
+            setAutoClassify(null);
+            setAutoEstimate(null);
+          }
         } finally {
-          if (!cancelled) setClassifying(false);
+          if (!cancelled) setAnalyzing(false);
         }
       })();
     }, 400);
@@ -101,6 +118,19 @@ export default function TasksPage() {
     }
     return pillar;
   }, [autoClassify, locale]);
+
+  const estimateLabel = useMemo(() => {
+    if (autoEstimate?.estimatedMin == null) return null;
+    const source =
+      autoEstimate.source === "openai"
+        ? t.tasks.classifySourceAi
+        : autoEstimate.source === "rules"
+          ? t.tasks.classifySourceRules
+          : null;
+    return source
+      ? `${t.tasks.autoEstimated} ${autoEstimate.estimatedMin}min · ${source}`
+      : `${t.tasks.autoEstimated} ${autoEstimate.estimatedMin}min`;
+  }, [autoEstimate, t.tasks.autoEstimated, t.tasks.classifySourceAi, t.tasks.classifySourceRules]);
 
   const {
     recalculating,
@@ -230,27 +260,32 @@ export default function TasksPage() {
         </div>
         {title.trim() && (
           <p className="text-xs text-muted">
-            {newTaskPillarId ? (
-              <>
-                {t.tasks.manualOverride}：
-                {translatePillar(
-                  pillars.find((p) => p.id === newTaskPillarId)?.name ?? "",
-                  locale,
-                )}
-              </>
-            ) : classifying ? (
-              t.tasks.classifying
-            ) : autoLabel ? (
-              <>
-                {t.tasks.autoDetected}：{autoLabel}
-                {autoClassify?.source === "openai"
-                  ? ` · ${t.tasks.classifySourceAi}`
-                  : autoClassify?.source === "rules"
-                    ? ` · ${t.tasks.classifySourceRules}`
-                    : null}
-              </>
+            {analyzing ? (
+              t.tasks.analyzing
             ) : (
-              t.taskCard.uncategorized
+              <>
+                {newTaskPillarId ? (
+                  <>
+                    {t.tasks.manualOverride}：
+                    {translatePillar(
+                      pillars.find((p) => p.id === newTaskPillarId)?.name ?? "",
+                      locale,
+                    )}
+                  </>
+                ) : autoLabel ? (
+                  <>
+                    {t.tasks.autoDetected}：{autoLabel}
+                    {autoClassify?.source === "openai"
+                      ? ` · ${t.tasks.classifySourceAi}`
+                      : autoClassify?.source === "rules"
+                        ? ` · ${t.tasks.classifySourceRules}`
+                        : null}
+                  </>
+                ) : (
+                  t.taskCard.uncategorized
+                )}
+                {estimateLabel && <> · {estimateLabel}</>}
+              </>
             )}
           </p>
         )}
@@ -281,6 +316,9 @@ export default function TasksPage() {
               onReorderSubtasks={reorderSubtasks}
               onToggleSubtask={toggleSubtask}
               onUpdateSubtaskTitle={updateSubtaskTitle}
+              onUpdateEstimatedMin={(id, minutes) =>
+                void patchTask(id, { estimatedMin: minutes })
+              }
               onToggleIntimidating={(id, intimidating) =>
                 void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
               }

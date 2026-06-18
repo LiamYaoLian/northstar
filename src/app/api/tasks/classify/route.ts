@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureDbReady, getDb } from "@/lib/db";
 import { strategicPillars } from "@/lib/db/schema";
-import { classifyTaskTitle } from "@/lib/tasks/classify";
+import { analyzeTaskTitle } from "@/lib/tasks/analyze";
 
 export async function POST(request: Request) {
   try {
@@ -9,8 +9,8 @@ export async function POST(request: Request) {
     const title = typeof body.title === "string" ? body.title : "";
     await ensureDbReady();
     const pillars = await getDb().select().from(strategicPillars);
-    const classification = await classifyTaskTitle(title, pillars);
-    return NextResponse.json({ classification });
+    const { classification, estimate } = await analyzeTaskTitle(title, pillars);
+    return NextResponse.json({ classification, estimate });
   } catch (err) {
     console.error("POST /api/tasks/classify", err);
     return NextResponse.json(

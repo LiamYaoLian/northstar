@@ -147,6 +147,9 @@ export default function TodayPage() {
             onReorderSubtasks={reorderSubtasks}
             onToggleSubtask={toggleSubtask}
             onUpdateSubtaskTitle={updateSubtaskTitle}
+            onUpdateEstimatedMin={(id, minutes) =>
+              void patchTask(id, { estimatedMin: minutes })
+            }
             onToggleIntimidating={(id, intimidating) =>
               void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
             }

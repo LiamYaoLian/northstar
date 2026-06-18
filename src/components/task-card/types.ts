@@ -44,6 +44,7 @@ export type TaskCardProps = {
     pillarId: string | null,
     focusTrack?: string | null,
   ) => void;
+  onUpdateEstimatedMin?: (taskId: string, minutes: number | null) => void;
 };
 
 export type { PriorityFactors };

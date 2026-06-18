@@ -62,6 +62,8 @@ export const en: Messages = {
     classifySourceAi: "AI",
     classifySourceRules: "rules",
     manualOverride: "Manual",
+    autoEstimated: "Est.",
+    analyzing: "Analyzing...",
   },
   alignment: {
     title: "Alignment",
@@ -115,6 +117,8 @@ export const en: Messages = {
     factorStaleness: "Staleness",
     deleteSubtask: "Delete",
     editSubtask: "Edit subtask",
+    editEstimatedMin: "Edit estimated time",
+    addEstimatedMin: "Add estimate",
     dragTask: "Drag to reorder task",
     dragSubtask: "Drag to reorder",
     entryPointBadge: "Entry ·",

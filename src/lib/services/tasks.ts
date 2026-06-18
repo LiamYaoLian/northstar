@@ -21,7 +21,8 @@ import {
   type ProposedSubtask,
   type SubtaskDiffLine,
 } from "@/lib/tasks/subtask-diff";
-import { classifyTaskTitle, type ClassifyResult } from "@/lib/tasks/classify";
+import { analyzeTaskTitle } from "@/lib/tasks/analyze";
+import type { ClassifyResult } from "@/lib/tasks/classify";
 import {
   applyManualReorderScores,
   persistPriorities,
@@ -103,7 +104,10 @@ export async function createTask(input: {
   const db = getDb();
   const ts = nowIso();
   const pillars = await db.select().from(strategicPillars);
-  const classified = await classifyTaskTitle(input.title, pillars);
+  const { classification: classified, estimate } = await analyzeTaskTitle(
+    input.title,
+    pillars,
+  );
   const { pillarId, focusTrack } = resolveCreateClassification(
     input,
     pillars,
@@ -126,7 +130,7 @@ export async function createTask(input: {
     status: "todo",
     intimidationScore: input.intimidationScore ?? 2,
     priorityScore: 0,
-    estimatedMin: input.estimatedMin ?? null,
+    estimatedMin: input.estimatedMin ?? estimate.estimatedMin ?? null,
     dueAt: input.dueAt ?? null,
     manualSortOrder: maxOrder + 1,
     postponedCount: 0,
@@ -376,6 +380,7 @@ export async function updateTask(
     focusTrack: string | null;
     postponedCount: number;
     intimidationScore: number;
+    estimatedMin: number | null;
   }>,
 ) {
   await ensureDbReady();
@@ -404,13 +409,22 @@ async function buildTaskPatch(
   existing: Task,
   patch: Parameters<typeof updateTask>[1],
 ) {
-  const { intimidationScore, pillarId, focusTrack, ...rest } = patch;
+  const { intimidationScore, estimatedMin, pillarId, focusTrack, ...rest } = patch;
   const safePatch: Record<string, unknown> = {
     ...rest,
     ...(intimidationScore != null
       ? { intimidationScore: Math.min(5, Math.max(1, intimidationScore)) }
       : {}),
   };
+
+  if (estimatedMin !== undefined) {
+    if (
+      estimatedMin === null ||
+      (Number.isInteger(estimatedMin) && estimatedMin > 0)
+    ) {
+      safePatch.estimatedMin = estimatedMin;
+    }
+  }
 
   if (pillarId !== undefined) {
     if (pillarId === null) {

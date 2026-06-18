@@ -34,6 +34,7 @@ export function TaskCard({
   onReorderSubtasks,
   onToggleIntimidating,
   onChangePillar,
+  onUpdateEstimatedMin,
 }: TaskCardProps) {
   const { t } = useLocale();
   const [showWhy, setShowWhy] = useState(false);
@@ -69,6 +70,11 @@ export function TaskCard({
           dueAt={task.dueAt}
           intimidationScore={task.intimidationScore}
           subtasks={subtaskList}
+          onUpdateEstimatedMin={
+            onUpdateEstimatedMin
+              ? (minutes) => onUpdateEstimatedMin(task.id, minutes)
+              : undefined
+          }
         />
       </TaskCardHeader>
 

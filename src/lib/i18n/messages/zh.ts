@@ -62,6 +62,8 @@ export const zh: Messages = {
     classifySourceAi: "AI",
     classifySourceRules: "规则",
     manualOverride: "手动指定",
+    autoEstimated: "估",
+    analyzing: "分析中...",
   },
   alignment: {
     title: "对齐",
@@ -115,6 +117,8 @@ export const zh: Messages = {
     factorStaleness: "积压程度",
     deleteSubtask: "删除",
     editSubtask: "编辑子任务",
+    editEstimatedMin: "编辑估计用时",
+    addEstimatedMin: "添加估计",
     dragTask: "拖拽排序任务",
     dragSubtask: "拖拽排序",
     entryPointBadge: "入口 ·",
