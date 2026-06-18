@@ -9,6 +9,8 @@ import type {
 import { findWorkPillar } from "@/lib/pillars";
 import { computeAlignment, computeWorkFocusTracks } from "@/lib/alignment";
 import { parseJson } from "@/lib/utils";
+import { toRecurrenceFields } from "@/lib/tasks/recurrence-types";
+import { virtualDeadlineForPriority } from "@/lib/tasks/recurrence";
 
 const WEIGHTS = {
   strategicUrgency: 0.3,
@@ -93,8 +95,13 @@ export function computeTaskPriority(
   workPrimaryTrack: string | null | undefined,
   workTrackAlignments: FocusTrackAlignment[],
   now = new Date(),
+  tz?: string,
 ): { score: number; factors: PriorityFactors; reason: string } {
   const workPillar = findWorkPillar(pillars);
+  const virtualDue = tz
+    ? virtualDeadlineForPriority(toRecurrenceFields(task), now, tz)
+    : null;
+  const effectiveDue = virtualDue?.toISOString() ?? task.dueAt;
   const factors: PriorityFactors = {
     strategicUrgency: strategicUrgency(
       task,
@@ -103,7 +110,7 @@ export function computeTaskPriority(
       workPrimaryTrack,
       workTrackAlignments,
     ),
-    deadlinePressure: deadlinePressure(task.dueAt, now),
+    deadlinePressure: deadlinePressure(effectiveDue, now),
     intimidationEscalation: intimidationEscalation(task, loggedMin),
     dependencyBlocker: 0,
     staleness: staleness(task, now),
@@ -142,6 +149,7 @@ export function rerankAll(
   workPrimaryTrack?: string | null,
   allSubtasks: Subtask[] = [],
   now = new Date(),
+  tz?: string,
 ): PriorityResult[] {
   const alignment = computeAlignment(pillars, taskList, entries);
   const pillarDrift = new Map(
@@ -176,6 +184,7 @@ export function rerankAll(
       workPrimaryTrack,
       workTracks,
       now,
+      tz,
     );
     const boost = subtaskProgressBoost(task, subtasksByTask.get(task.id) ?? []);
     return {

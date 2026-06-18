@@ -51,7 +51,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   postponed_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  completed_at TEXT
+  completed_at TEXT,
+  recurrence_type TEXT NOT NULL DEFAULT 'none',
+  recurrence_days TEXT,
+  recurrence_carry_over INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS subtasks (

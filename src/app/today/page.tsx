@@ -16,7 +16,7 @@ import {
   type PillarOption,
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
-import { takeTopTasks } from "@/lib/services/task-sorting";
+import { rankAndLimit } from "@/lib/services/task-sorting";
 
 export default function TodayPage() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function TodayPage() {
     try {
       setError(null);
       const [tasksData, strategyData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
+        apiFetch<{ tasks: TaskRow[] }>("/api/tasks/today"),
         apiFetch<{ hasStrategy: boolean; strategy: { pillars: { id: string; name: string; color: string; focusTracks: string | null }[] } | null }>(
           "/api/strategy",
         ),
@@ -64,7 +64,7 @@ export default function TodayPage() {
 
   const tasks = useMemo(() => {
     const filtered = filterTasksByPillar(allTasks, categoryFilter);
-    return takeTopTasks(filtered, 5);
+    return rankAndLimit(filtered, 5);
   }, [allTasks, categoryFilter]);
 
   useEffect(() => {
@@ -155,6 +155,16 @@ export default function TodayPage() {
             }
             onComplete={(id) => void patchTask(id, { status: "done" })}
             onLogTime={(id, minutes) => void logTime(id, minutes)}
+            onUpdateRecurrence={(id, value) =>
+              void patchTask(id, {
+                recurrenceType: value.recurrenceType,
+                recurrenceDays:
+                  value.recurrenceType === "weekly"
+                    ? value.recurrenceDays
+                    : null,
+                recurrenceCarryOver: value.recurrenceCarryOver,
+              })
+            }
           />
         ))
       )}

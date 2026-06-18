@@ -1,8 +1,6 @@
 import type { Client } from "@libsql/client";
-import { sql } from "drizzle-orm";
 import { type LibSQLDatabase } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
-import { readMigrationFiles } from "drizzle-orm/migrator";
 import path from "path";
 import * as schema from "./schema";
 
@@ -10,36 +8,37 @@ type Db = LibSQLDatabase<typeof schema>;
 
 const migrationsFolder = path.join(process.cwd(), "drizzle");
 
-async function stampMigration(db: Db, hash: string, createdAt: number) {
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS __drizzle_migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      hash text NOT NULL,
-      created_at numeric
-    )
-  `);
+export async function safeDropIsPinnedIfExists(client: Client): Promise<void> {
+  const cols = await client.execute("PRAGMA table_info(tasks)");
+  const hasIsPinned = cols.rows.some((row) => row.name === "is_pinned");
+  if (hasIsPinned) {
+    await client.execute("ALTER TABLE tasks DROP COLUMN is_pinned");
+  }
+}
 
-  const existing = await db.values(
-    sql`SELECT id FROM __drizzle_migrations WHERE hash = ${hash}`,
-  );
-  if (existing.length > 0) return;
+export async function addRecurrenceColumnsIfMissing(
+  client: Client,
+): Promise<void> {
+  const cols = await client.execute("PRAGMA table_info(tasks)");
+  const names = new Set(cols.rows.map((row) => String(row.name)));
 
-  await db.run(
-    sql`INSERT INTO __drizzle_migrations ("hash", "created_at") VALUES(${hash}, ${createdAt})`,
-  );
+  if (!names.has("recurrence_type")) {
+    await client.execute(
+      "ALTER TABLE tasks ADD COLUMN recurrence_type TEXT NOT NULL DEFAULT 'none'",
+    );
+  }
+  if (!names.has("recurrence_days")) {
+    await client.execute("ALTER TABLE tasks ADD COLUMN recurrence_days TEXT");
+  }
+  if (!names.has("recurrence_carry_over")) {
+    await client.execute(
+      "ALTER TABLE tasks ADD COLUMN recurrence_carry_over INTEGER NOT NULL DEFAULT 0",
+    );
+  }
 }
 
 export async function applyMigrations(client: Client, db: Db) {
-  const cols = await client.execute("PRAGMA table_info(tasks)");
-  const hasIsPinned = cols.rows.some((row) => row.name === "is_pinned");
-
-  if (hasIsPinned) {
-    await migrate(db, { migrationsFolder });
-    return;
-  }
-
-  const [dropMigration] = readMigrationFiles({ migrationsFolder });
-  if (!dropMigration) return;
-
-  await stampMigration(db, dropMigration.hash, dropMigration.folderMillis);
+  await safeDropIsPinnedIfExists(client);
+  await migrate(db, { migrationsFolder });
+  await addRecurrenceColumnsIfMissing(client);
 }

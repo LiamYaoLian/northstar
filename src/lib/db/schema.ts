@@ -55,6 +55,11 @@ export const tasks = sqliteTable("tasks", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   completedAt: text("completed_at"),
+  recurrenceType: text("recurrence_type").notNull().default("none"),
+  recurrenceDays: text("recurrence_days"),
+  recurrenceCarryOver: integer("recurrence_carry_over", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 export const subtasks = sqliteTable("subtasks", {

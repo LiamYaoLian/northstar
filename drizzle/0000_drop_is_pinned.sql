@@ -1,1 +1,2 @@
-ALTER TABLE `tasks` DROP COLUMN `is_pinned`;
+-- legacy no-op: is_pinned drop handled by safeDropIsPinnedIfExists()
+SELECT 1;

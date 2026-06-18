@@ -7,16 +7,62 @@
 | 决策 | 选择 |
 |------|------|
 | 数据模型 | **同一条任务**：完成后再到下次周期自动 reset 为 `todo`，保留 time entries 历史 |
-| 错过周期 | **可配置** `recurrence_carry_over`；默认 **不补做**（等到下一个选定周几再出现） |
+| 错过周期 | **可配置** `recurrence_carry_over`；**仅 weekly** 可开；默认 **不补做** |
+| 时区 | 边界用 IANA `tz`；**浏览器 UI 传 `clientTimezone()`**；**API query 缺省 `America/New_York`（EST/EDT）**；非法 tz → 400 |
+| Today 数据源 | **必做** `GET /api/tasks/today?tz=`；**priority 预排序**的 due-today 全量 + subtasks；client **pillar filter → rankAndLimit(5)** |
+| Tasks 板 | 不做日历过滤；`GET /api/tasks?tz=` 与 Today **同一 tz 源** |
+| `dueAt` 与 recurrence | **互斥**：有 recurrence 则 `dueAt` 恒 null |
+| `deferred` | Schema 保留；MVP 无 defer UI，不测 |
+| `in_progress` | 与 `todo` 同等（可进 Today / 可 overdue） |
+| lazy reset | **`openRecurringOccurrences(tz)`** 在 list / today / **recalculate 前**调用；须幂等 |
+| MVP 交互 | Complete 后仍 **full reload**（无 optimistic）；reload 时带 tz |
+| Priority + tz | recalculate 前 openOcc → `rerankAll(..., tz)` |
+
+### MVP 已知限制
+
+- [`onboarding/page.tsx`](src/app/onboarding/page.tsx) 用 raw `fetch("/api/tasks")` 无 tz——仅 create，不影响；首屏 Today/Tasks 才 openOcc
+- daily 任务昨日 done、今日首次请求前 Tasks 板仍显示 done；`nextScheduledAfter` 可能显示「下次：今天」直到 list 触发 reset
+
+---
+
+## 时区约定
+
+```typescript
+// src/lib/tasks/timezone.ts — isomorphic
+export const DEFAULT_TIMEZONE = "America/New_York"; // EST/EDT
+
+/** missing/null/"" → DEFAULT；非法 IANA → throw InvalidTimezoneError（API 转 400） */
+export function resolveTimezone(tz: string | null | undefined): string;
+export function isValidTimezone(tz: string): boolean;
+export function clientTimezone(): string;
+
+/** tz 内 calendar +n 天（DST-safe，禁止裸 +86400000ms） */
+export function addLocalDays(instant: Date, tz: string, days: number): Date;
+
+/** 该 tz 下 local midnight 对应的 UTC instant（用于 getTime 比较） */
+export function startOfLocalDay(instant: Date, tz: string): Date;
+export function endOfLocalDay(instant: Date, tz: string): Date;
+```
+
+| 调用方 | tz |
+|--------|-----|
+| 浏览器 Today / Tasks / Recalculate | `clientTimezone()` |
+| curl / 缺 `?tz=` | `America/New_York` |
+| `?tz=Bad/Zone` | **400** |
+
+**Client**：[`api-client.ts`](src/lib/api-client.ts) 对 `/api/tasks` 前缀 URL 自动 append `tz`（classify / reorder / breakdown 等多带无害）。
+
+**Server**：仅 **list / today / recalculate-priorities** 读取 `tz`；其它 routes **忽略** 多余 `tz` query。
+
+**时间比较**：`completedAt` 等 ISO 字符串 → **`Date.parse()` instant** vs `startOfLocalDay(...).getTime()`。
 
 ---
 
 ## 现状
 
-- 任务模型在 [`src/lib/db/schema.ts`](src/lib/db/schema.ts)：`status`、`dueAt`、`completedAt`，**无 recurrence 字段**
-- **Today 不是日历**：[`takeTopTasks`](src/lib/services/task-sorting.ts) 取 `status !== "done"` 的前 5 条 priority 任务，与「今天是否该做」无关
-- **完成后不会复现**：`updateTask` 设 `status: "done"` + `completedAt`，无 reset 逻辑
-- Priority 引擎 [`src/lib/priority/index.ts`](src/lib/priority/index.ts) 用 `dueAt` 算 deadline；`recentlyDonePenalty` 预留但未实现
+- [`schema.ts`](src/lib/db/schema.ts) 无 recurrence 字段
+- Today：pillar filter → `takeTopTasks(5)`（将改为 today API + `rankAndLimit`）
+- Migration：runner bug + [`0000_drop_is_pinned.sql`](drizzle/0000_drop_is_pinned.sql) 裸 DROP 会在新库失败（§0e 修复）
 
 ---
 
@@ -24,173 +70,320 @@
 
 ```mermaid
 flowchart TD
-  listTasks[listTasks / getTodayTasks] --> openOccurrence[openRecurringOccurrences]
-  openOccurrence --> matchDay{matchesRecurrence today?}
-  matchDay -->|no| skip[不在 Today 出现]
-  matchDay -->|yes| checkDone{status done?}
-  checkDone -->|no| show[可展示]
-  checkDone -->|yes| checkCompleted{completedAt 判断}
-  checkCompleted -->|今天已完成| hide[今日隐藏]
-  checkCompleted -->|上次周期完成| reset[reset 为 todo + 清 subtasks]
-  reset --> show
-  complete[用户点 Complete] --> markDone[status done + completedAt]
+  todayApi["GET /api/tasks/today?tz"] --> openOcc["openRecurringOccurrences(tz)"]
+  listApi["GET /api/tasks?tz"] --> openOcc
+  recalcApi["POST recalculate?tz"] --> openOcc2["openRecurringOccurrences(tz)"]
+  openOcc --> resetCheck{needsOccurrenceReset?}
+  openOcc2 --> resetCheck
+  resetCheck -->|yes| persistReset["reset done rows"]
+  resetCheck -->|no| continue[继续]
+  persistReset --> continue
+  todayApi --> duePool["filterTasksDueToday → sort → 全量+subtasks"]
+  duePool --> clientToday["client: pillar → rankAndLimit(5)"]
+  listApi --> allTasks["listTasksWithSubtasks"]
+  recalcApi --> rerank["persistPriorities → rerankAll(tz)"]
 ```
 
-**核心原则**：不新建 task 行；在新周期到来时 **lazy reset**（列表/Today 加载时触发），保留 time entries 历史。
+---
+
+## 0. Migration 策略（定稿）
+
+**方案 A**：recurrence 列由 `addRecurrenceColumnsIfMissing` JS 条件 ADD；**不创建** `0001.sql`。
+
+**单一入口**：[`applyMigrations`](src/lib/db/migrations.ts) 被 **app 启动**（[`db/index.ts`](src/lib/db/index.ts)）与 **`npm run db:migrate`**（[`src/scripts/migrate.ts`](src/scripts/migrate.ts)）共用——行为一致；Turso 用 `.env.local` 跑 `npm run db:migrate`。
+
+### 0a. `applyMigrations` 流程
+
+```typescript
+async function applyMigrations(client, db) {
+  await safeDropIsPinnedIfExists(client);
+  await migrate(db, { migrationsFolder });           // journal 内仅 no-op 0000
+  await addRecurrenceColumnsIfMissing(client);
+}
+```
+
+### 0b. `safeDropIsPinnedIfExists`
+
+`PRAGMA table_info(tasks)` 含 `is_pinned` → `ALTER TABLE tasks DROP COLUMN is_pinned`。
+
+### 0c. init-sql 与 JS ADD
+
+| 场景 | recurrence 列 |
+|------|----------------|
+| **全新库** | init-sql `CREATE TABLE tasks` **已含**三列 |
+| **已有库（无列）** | `addRecurrenceColumnsIfMissing` |
+| **列已存在** | PRAGMA 跳过（不 double ADD） |
+
+### 0d. 验证
+
+1. 删 `data/northstar.db` → 启动 app → `PRAGMA table_info` 含 `recurrence_*`
+2. 旧库无 recurrence 列 → `npm run db:migrate`（本地或 Turso）→ 列出现
+3. 重复 migrate / 重启 **不报错**
+4. Turso prod：deploy 前跑 `npm run db:migrate`
+
+### 0e. 0000 journal 修复（**必做，防新库失败**）
+
+**问题**：fresh DB 上 `migrate()` 仍会执行 journal 内 0000；裸 `DROP COLUMN is_pinned` 失败。
+
+**修复**（二步）：
+
+1. 将 [`drizzle/0000_drop_is_pinned.sql`](drizzle/0000_drop_is_pinned.sql) **替换为 no-op**：
+   ```sql
+   -- legacy no-op: is_pinned drop handled by safeDropIsPinnedIfExists()
+   SELECT 1;
+   ```
+2. 真实 drop 仅由 **`safeDropIsPinnedIfExists`**（在 `migrate()` **之前**）执行。
+
+已 stamp 0000 的库：`migrate()` 跳过 SQL；若仍有 `is_pinned`，靠 `safeDrop` 兜底（若 stamp 了但列还在——仅 legacy 环境）。
 
 ---
 
 ## 1. 数据模型
 
-在 `tasks` 表新增字段（Drizzle + [`init-sql.ts`](src/lib/db/init-sql.ts) + 新 migration `drizzle/0001_add_recurrence.sql`）：
+[`schema.ts`](src/lib/db/schema.ts) + init-sql（Drizzle：`recurrenceType: text("recurrence_type")` 等）：
 
-| 字段 | 类型 | 默认 | 含义 |
-|------|------|------|------|
-| `recurrence_type` | TEXT | `'none'` | `none` \| `daily` \| `weekly` |
-| `recurrence_days` | TEXT | null | JSON `[1,3,5]`，ISO 周几 1=Mon … 7=Sun；仅 `weekly` 使用 |
-| `recurrence_carry_over` | INTEGER | 0 | 错过是否补做；**默认 false（不补做）** |
+| 字段 | 类型 | 默认 |
+|------|------|------|
+| `recurrence_type` | TEXT | `'none'` |
+| `recurrence_days` | TEXT | null — JSON `[1,3,5]` ISO 1=Mon…7=Sun |
+| `recurrence_carry_over` | INTEGER | 0 |
 
-新增纯函数模块 [`src/lib/tasks/recurrence.ts`](src/lib/tasks/recurrence.ts)：
+### 类型与映射
 
 ```typescript
-type RecurrenceType = "none" | "daily" | "weekly";
+// src/lib/tasks/recurrence-types.ts — isomorphic，无 drizzle
+export type RecurrenceType = "none" | "daily" | "weekly";
+export type RecurrenceTaskFields = {
+  recurrenceType: RecurrenceType;
+  recurrenceDays: string | null;
+  recurrenceCarryOver: boolean;
+  status: string;
+  completedAt: string | null;
+};
 
-function matchesRecurrenceDay(task, date: Date): boolean;
-function isCompletedForToday(task, date: Date): boolean;
-function shouldShowOnToday(task, date: Date): boolean;
-function needsOccurrenceReset(task, date: Date): boolean;
+export function parseRecurrenceDays(json: string | null): number[] | null;
+
+/** Drizzle Task / API row → RecurrenceTaskFields；filter/openOcc/rerank 边界统一调用 */
+export function toRecurrenceFields(task: {
+  recurrenceType: RecurrenceType;
+  recurrenceDays: string | null;
+  recurrenceCarryOver: boolean;
+  status: string;
+  completedAt: string | null;
+}): RecurrenceTaskFields;
 ```
 
-**日/周匹配规则**：
+[`recurrence.ts`](src/lib/tasks/recurrence.ts) 只接受 `RecurrenceTaskFields`；**不 import** `@/lib/db/schema`。
 
-- `daily`：每天都匹配
-- `weekly`：`recurrence_days` 包含当天 weekday（至少选 1 天）
-- `none`：行为与现在一致（非 done 即 active）
+[`enrich-tasks.ts`](src/lib/tasks/enrich-tasks.ts) `TaskRow` 扩展三字段；[`test-fixtures.ts`](src/lib/test-fixtures.ts) `makeTask` 同步。
 
-**补做逻辑**（`recurrence_carry_over`）：
+### 纯函数（`recurrence.ts` 再 export 或 re-export timezone helpers）
 
-- `false`（默认）：只在 `matchesRecurrenceDay` 为 true 的日子出现在 Today；错过则等到下一个选定周几
-- `true`：若未完成且已过最近一次应做日，则在之后每天都继续出现在 Today，直到完成
+`matchesRecurrenceDay`, `lastScheduledOnOrBefore`, `nextScheduledAfter`, `isCompletedForToday`, `isOccurrenceOverdue`, `needsOccurrenceReset`, `shouldShowOnToday`, `virtualDeadlineForPriority`
 
-**Reset 内容**（`openRecurringOccurrences`）：
+### 核心定义
 
-- `status → "todo"`，`completedAt → null`
-- 该 task 下所有 subtasks `isDone → false`（保留 subtask 定义与 sort order）
-- 不改动 `createdAt`、time entries、priority 字段（recalc 时自然更新）
+**`isCompletedForToday`**：
+
+```
+status === 'done' && completedAt != null
+&& Date.parse(completedAt) >= startOfLocalDay(now, tz).getTime()
+```
+
+**`needsOccurrenceReset`**（**仅** `status === 'done'`）：
+
+```
+if recurrenceType === 'none' || status !== 'done': return false
+if !matchesRecurrenceDay(task, now, tz): return false
+if isCompletedForToday: return false
+if completedAt != null && Date.parse(completedAt) < startOfLocalDay(now, tz).getTime(): return true
+return false
+```
+
+**`shouldShowOnToday`**（`in_progress` ≡ `todo`）：
+
+```
+if recurrenceType === 'none': return status not in ('done', 'deferred')
+if status === 'deferred': return false
+if isCompletedForToday: return false
+if matchesRecurrenceDay: return true
+if weekly && recurrenceCarryOver && status !== 'done' && isOccurrenceOverdue: return true
+return false
+```
+
+**`isOccurrenceOverdue`**（`status !== 'done'`）：
+
+```
+last = lastScheduledOnOrBefore(now, tz)
+if !last: return false
+if completedAt && Date.parse(completedAt) >= last.getTime(): return false
+return now.getTime() >= last.getTime()
+```
+
+**`nextScheduledAfter`**（用 `addLocalDays`，非 +86400000ms）：
+
+```
+if recurrenceType === 'none': return null
+cursor = startOfLocalDay(now, tz)
+if status === 'done' && isCompletedForToday: cursor = addLocalDays(cursor, tz, 1)
+for i in 0..365:
+  if matchesRecurrenceDay(task, cursor, tz): return startOfLocalDay(cursor, tz)
+  cursor = addLocalDays(cursor, tz, 1)
+return null
+```
+
+**`virtualDeadlineForPriority`**：
+
+```
+if recurrenceType === 'none' || status === 'done': return null
+if !shouldShowOnToday(task, now, tz): return null
+return endOfLocalDay(now, tz)
+```
+
+**Validation**（[`src/lib/api/tasks/schemas.ts`](src/lib/api/tasks/schemas.ts) Zod）：weekly days ≥1；非法 JSON → 400；daily 强制 `recurrenceCarryOver=false`；PATCH daily 时清零 carryOver。
 
 ---
 
 ## 2. Service 层
 
-修改 [`src/lib/services/tasks.ts`](src/lib/services/tasks.ts)：
+[`tasks.ts`](src/lib/services/tasks.ts)（server-only）：
 
-- **`createTask`**：接受 `recurrenceType?`, `recurrenceDays?`, `recurrenceCarryOver?`
-- **`updateTask`**：允许 PATCH recurrence 字段（编辑已有任务）
-- **`openRecurringOccurrences(db, now?)`**：扫描 `recurrence_type != 'none'` 且 `needsOccurrenceReset` 的任务，批量 reset（在 transaction 内）
-- **`listTasks` / `getTodayTasks`**：开头调用 `openRecurringOccurrences`
+```typescript
+openRecurringOccurrences(db, tz, now?)
+// 全表 recurring；toRecurrenceFields + needsOccurrenceReset；transaction reset
 
-修改 [`src/lib/services/task-sorting.ts`](src/lib/services/task-sorting.ts)：
+listDueTodayTasksWithSubtasks(tz, now?)
+// openOcc → filterTasksDueToday → sortTasks(priority) → attach subtasks
 
-- 新增 `filterTasksDueToday(tasks, now?)` 替代 Today 用的单纯 `filterActiveTasks`
-- `takeTopTasks` 改为：先 `filterTasksDueToday`，再 priority sort + slice
+listTasksWithSubtasks(status?, sort?, tz?)
+// openOcc → 全量
 
-**Complete 行为不变**：仍 `PATCH { status: "done" }`；Today 侧通过 `isCompletedForToday` 隐藏，下一周期由 lazy reset 重新打开。
+recalculatePriorities(tz)
+// openOcc → persistPriorities(tz)
+```
+
+**删除**旧 `getTodayTasks(limit)` 或改为 `listDueTodayTasksWithSubtasks` 的 alias（无 slice）。
+
+### Sorting
+
+[`task-sorting.ts`](src/lib/services/task-sorting.ts)：
+
+```typescript
+filterTasksDueToday(tasks, tz, now?)  // map toRecurrenceFields → shouldShowOnToday
+rankAndLimit(tasks, limit)              // sortTasks(priority) + slice；不过滤 status
+takeTopTasks(tasks, limit)              // 保留：filterActiveTasks + rankAndLimit（旧 server/测试）
+```
+
+**Today client**：API due-pool 已无「今日已完成」→ **`rankAndLimit(filtered, 5)`**（非 `takeTopTasks`）。
+
+> **测试说明**：`rankAndLimit` 单测可含 `done` 行以区分 `takeTopTasks`；**生产 Today 路径不会传入 done**。
 
 ---
 
-## 3. Priority 引擎微调
+## 3. Priority
 
-修改 [`src/lib/priority/index.ts`](src/lib/priority/index.ts)：
+[`persistPriorities(tz)`](src/lib/services/task-priority-sync.ts) → `rerankAll(..., tz)`：
 
-- 对 **今天该做的 recurring task**，若 `dueAt` 为空，临时用 **当天 end-of-day** 参与 `deadlinePressure`（让 recurring 在 Today 有合理 urgency）
-- 可选：实现 `recentlyDonePenalty`——今日已完成的不进入 rerank（与 Today filter 一致，主要防 Tasks 板误排）
+```typescript
+const virtualDue = virtualDeadlineForPriority(toRecurrenceFields(task), now, tz);
+deadlinePressure(virtualDue?.toISOString() ?? task.dueAt, now);
+```
 
-`rerankAll` 仍排除 `status === "done"`；reset 后任务重新进入 active 集合。
+`rerankAll` 仍排除 `status === 'done'`（openOcc 在 recalculate 前已 reset 该出现的任务）。
 
 ---
 
 ## 4. API
 
-| 端点 | 变更 |
-|------|------|
-| `POST /api/tasks` | body 增加 recurrence 字段 |
-| `PATCH /api/tasks/[id]` | 允许更新 recurrence 字段 |
-| `GET /api/tasks` | 无新参数；服务端已 open occurrences |
-| `GET /api/tasks/today`（推荐） | 封装 `getTodayTasks`，避免 Today 页双端逻辑漂移 |
+| 端点 | 读 `tz` | 行为 |
+|------|---------|------|
+| `GET /api/tasks?tz=` | ✓ | openOcc → listTasksWithSubtasks |
+| **`GET /api/tasks/today?tz=`** | ✓ | openOcc → listDueTodayTasksWithSubtasks |
+| **`POST .../recalculate-priorities?tz=`** | ✓ | openOcc → persistPriorities(tz) |
+| POST/PATCH `/api/tasks` | — | Zod recurrence；ignore 多余 tz |
+| classify / reorder / breakdown / … | — | ignore 多余 tz |
+
+**Today 页**：`GET /api/tasks/today?tz=...` → enrich → pillar filter → `rankAndLimit(5)`。
 
 ---
 
 ## 5. UI / i18n
 
-### 创建任务（[`src/app/tasks/page.tsx`](src/app/tasks/page.tsx)）
-
-在标题输入下方增加轻量 recurrence 控件：
-
-- Select：**不重复 / 每天 / 每周**
-- 选「每周」时显示 weekday chips（Mon–Sun，多选）
-- Toggle：**错过补做**（默认关），附简短说明
-
-### TaskCard（[`src/components/task-card/`](src/components/task-card/)）
-
-- [`task-metadata-badges.tsx`](src/components/task-card/task-metadata-badges.tsx)：显示 badge，如 `Daily`、`Mon, Wed`、可选 `补做`
-- 编辑区（header 或 expandable）：允许修改 recurrence（复用同一组件）
-
-### Today 页（[`src/app/today/page.tsx`](src/app/today/page.tsx)）
-
-- 改用 `filterTasksDueToday` 或调用 `GET /api/tasks/today`
-
-### i18n
-
-更新 [`src/lib/i18n/messages/en.ts`](src/lib/i18n/messages/en.ts)、[`zh.ts`](src/lib/i18n/messages/zh.ts)、[`types.ts`](src/lib/i18n/types.ts)：`recurrence.daily`、`recurrence.weekly`、`recurrence.carryOver`、weekday 缩写等。
+- **创建**（[`tasks/page.tsx`](src/app/tasks/page.tsx)）：不重复 / 每天 / 每周 + weekday chips；**carryOver 仅 weekly**
+- **编辑**（TaskCard）：recurrence 控件 + PATCH；badge 用 `nextScheduledAfter` + `clientTimezone()`
+- done recurring：「本周期已完成 · 下次 …」
+- i18n：`recurrence.*`, `weekday.*`, `recurrence.subtaskResetHint`, `recurrence.carryOverWeeklyOnly`
 
 ---
 
 ## 6. 测试
 
-新增 [`src/lib/tasks/recurrence.test.ts`](src/lib/tasks/recurrence.test.ts)：
+[`recurrence.test.ts`](src/lib/tasks/recurrence.test.ts) — `tz=America/New_York`，冻结 `now`：
 
-- daily：完成当天隐藏；次日 reset 并出现
-- weekly Mon/Wed：周二不出现；周三 reset；默认不补做
-- carryOver=true：周一未完成，周二仍出现
-- weekly 无选中日：validation 拒绝创建
+| 场景 | 期望 |
+|------|------|
+| daily，当天 complete | 不 show；次日 reset + show |
+| daily，todo 跨日 | show，不 reset |
+| daily，昨日 done、今日 openOcc 前 | badge next=今天；openOcc 后 todo |
+| weekly Mon/Wed，周二 | 不 show |
+| weekly Mon/Wed，周一 complete | 周一 hide；周三 reset + show |
+| weekly Mon/Wed，Mon todo，Wed | Wed show |
+| carryOver weekly Mon-only，Mon todo 周二 | 周二 show |
+| `needsOccurrenceReset` + `status=todo` | never reset |
+| 同日 openOcc 两次 | 仅首次 write |
+| `nextScheduledAfter` Mon done → Tue 看 | next = Wed 00:00 local |
+| `virtualDeadline` recurring todo 非 due 日 | null |
+| `virtualDeadline` due 日 todo | endOfLocalDay |
+| `completedAt` ISO vs startOfLocalDay | 跨 UTC 边界 |
+| invalid `recurrence_days` | API 400 |
+| invalid/missing `tz` | 400 / DEFAULT NY |
+| `rankAndLimit` vs `takeTopTasks` | **单测**：前者可含 done；后者排除 |
+| Today pillar → rankAndLimit(5) | 条数正确 |
+| recalculate 前 openOcc | Wed schedule 当日 reset |
+| migrate 新库 / 旧库 / Turso | §0d 四条 |
 
-扩展 tasks service / sorting 集成测试（mock db 或现有 vitest 模式）。
+[`task-sorting.test.ts`](src/lib/services/task-sorting.test.ts)：保留 `takeTopTasks`；新增 `rankAndLimit`。
 
 ---
 
-## 7. 迁移与部署
+## 7. 部署
 
-- 新 SQL migration + [`migrations.ts`](src/lib/db/migrations.ts) 兼容逻辑
-- 本地：`npm run db:migrate`；Turso 同步 migrate
-- 现有任务默认 `recurrence_type = 'none'`，行为不变
+1. §0e 0000 no-op + `applyMigrations` 三步骤
+2. schema + init-sql
+3. `npm run db:migrate`（**本地 + Turso**）
+4. `npm test` + `npm run build`
 
 ---
 
-## 不在 MVP 范围内
+## 不在 MVP
 
-- Cron 午夜批量 reset（lazy reset 已足够；Vercel Cron 可后续加）
-- 每 occurrence 独立 task 实例 / 完成历史页
-- recurrence 结束日期、次数上限
-- 子任务按 occurrence 独立进度（MVP 统一 reset）
+defer UI、occurrence 历史、one-off due Today 过滤、optimistic UI、DST 专项测试（实现仍须 DST-safe day 算术）
 
 ---
 
 ## 实现顺序
 
-1. Schema + migration + `recurrence.ts` 纯函数 + 单元测试
-2. Service（open/reset/create/update）+ sorting/Today filter
-3. API + priority 微调
-4. UI（创建表单 + badge + 编辑）+ i18n
-5. `npm test` + `npm run build` 验证
+1. `timezone.ts`（含 `addLocalDays`）+ `recurrence-types.ts` + §0 migration
+2. `recurrence.ts` + tests
+3. `openRecurringOccurrences` + services + 删旧 `getTodayTasks`
+4. `rankAndLimit` + APIs + api-client tz + Today 页
+5. `rerankAll(tz)` + fixtures/TaskRow
+6. UI（create + edit + badges）+ Zod + i18n
+7. 验证 §0d + test + build
 
 ---
 
 ## Checklist
 
-- [ ] Add recurrence columns to schema, init-sql, drizzle migration
-- [ ] Implement `src/lib/tasks/recurrence.ts` + unit tests (daily/weekly/carryOver)
-- [ ] `openRecurringOccurrences` + create/update/listTasks/getTodayTasks integration
-- [ ] `filterTasksDueToday` + `takeTopTasks`; optional `GET /api/tasks/today`
-- [ ] Recurring due-today deadline pressure in priority engine
-- [ ] Create/edit recurrence UI, badges, en/zh strings
-- [ ] Run `npm test` and `npm run build`
+- [ ] §0e：0000.sql → no-op；`safeDrop` + `addRecurrenceColumnsIfMissing`；migrate 脚本与 startup 共用
+- [ ] `timezone.ts`：`addLocalDays`, `startOfLocalDay`, `endOfLocalDay`, `resolveTimezone`
+- [ ] schema + init-sql + `recurrence-types.ts` + `toRecurrenceFields`
+- [ ] `recurrence.ts` + full unit tests（§6 全表）
+- [ ] `openRecurringOccurrences` on list / today / recalculate
+- [ ] `listDueTodayTasksWithSubtasks`；移除旧 `getTodayTasks(limit)` slice
+- [ ] `GET /api/tasks/today` + `rankAndLimit` on Today client
+- [ ] api-client auto `tz`；list/today/recalc 读 tz，其它 ignore
+- [ ] `persistPriorities(tz)` + `virtualDeadlineForPriority`
+- [ ] `src/lib/api/tasks/schemas.ts` Zod
+- [ ] UI：create + TaskCard edit recurrence + badges
+- [ ] `makeTask` / `TaskRow`；migrate **本地 + Turso**；`npm test`；`npm run build`

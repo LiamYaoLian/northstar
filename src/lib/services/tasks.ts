@@ -30,26 +30,81 @@ import {
 } from "@/lib/services/task-priority-sync";
 import {
   sortTasks,
-  takeTopTasks,
+  filterTasksDueToday,
   type TaskSortMode,
 } from "@/lib/services/task-sorting";
+import {
+  subtaskIdsForResetPlan,
+} from "@/lib/services/occurrence-reset-plan";
+import { toRecurrenceFields } from "@/lib/tasks/recurrence-types";
+import { needsOccurrenceReset } from "@/lib/tasks/recurrence";
+import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
+import { resolveTimezone } from "@/lib/tasks/timezone";
 import { id, nowIso } from "@/lib/utils";
 import { eq, inArray } from "drizzle-orm";
 import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
 
 export type { TaskSortMode };
 
-export async function recalculatePriorities() {
-  const computedAt = await persistPriorities();
+export async function recalculatePriorities(tz?: string) {
+  await ensureDbReady();
+  const db = getDb();
+  const resolvedTz = resolveTimezone(tz);
+  await openRecurringOccurrences(db, resolvedTz);
+  const computedAt = await persistPriorities(resolvedTz);
   return { computedAt };
+}
+
+export async function openRecurringOccurrences(
+  db: ReturnType<typeof getDb>,
+  tz: string,
+  now = new Date(),
+) {
+  const all = await db.select().from(tasks);
+  const plan = all
+    .filter(
+      (task) =>
+        task.recurrenceType !== "none" &&
+        needsOccurrenceReset(toRecurrenceFields(task), now, tz),
+    )
+    .map((task) => task.id);
+
+  if (plan.length === 0) return;
+
+  const allSubtasks = await db.select().from(subtasks);
+  const subtaskIds = subtaskIdsForResetPlan(plan, allSubtasks);
+  const ts = nowIso();
+
+  await db.transaction(async (tx) => {
+    for (const taskId of plan) {
+      await tx
+        .update(tasks)
+        .set({
+          status: "todo",
+          completedAt: null,
+          updatedAt: ts,
+        })
+        .where(eq(tasks.id, taskId));
+    }
+    for (const subtaskId of subtaskIds) {
+      await tx
+        .update(subtasks)
+        .set({ isDone: false })
+        .where(eq(subtasks.id, subtaskId));
+    }
+  });
 }
 
 export async function listTasks(
   status?: string,
   sort: TaskSortMode = "priority",
+  tz?: string,
 ) {
   await ensureDbReady();
   const db = getDb();
+  const resolvedTz = resolveTimezone(tz);
+  await openRecurringOccurrences(db, resolvedTz);
+
   const all = await db.select().from(tasks);
   const filtered = status ? all.filter((t) => t.status === status) : all;
 
@@ -59,13 +114,34 @@ export async function listTasks(
   return sortTasks(rows, sort);
 }
 
-export async function listTasksWithSubtasks(
-  status?: string,
-  sort: TaskSortMode = "priority",
+export async function listDueTodayTasksWithSubtasks(
+  tz?: string,
+  now = new Date(),
 ) {
   await ensureDbReady();
   const db = getDb();
-  const taskList = await listTasks(status, sort);
+  const resolvedTz = resolveTimezone(tz);
+  await openRecurringOccurrences(db, resolvedTz, now);
+
+  const all = await db.select().from(tasks);
+  const dueToday = filterTasksDueToday(all, resolvedTz, now);
+  const sorted = sortTasks(dueToday, "priority");
+  const allSubtasks = await db.select().from(subtasks);
+  const byParent = groupSubtasksByParent(allSubtasks);
+  return sorted.map((t) => ({
+    ...t,
+    subtasks: (byParent.get(t.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
+  }));
+}
+
+export async function listTasksWithSubtasks(
+  status?: string,
+  sort: TaskSortMode = "priority",
+  tz?: string,
+) {
+  await ensureDbReady();
+  const db = getDb();
+  const taskList = await listTasks(status, sort, tz);
   const allSubtasks = await db.select().from(subtasks);
   const byParent = groupSubtasksByParent(allSubtasks);
   return taskList.map((t) => ({
@@ -84,12 +160,6 @@ function groupSubtasksByParent(allSubtasks: Subtask[]) {
   return byParent;
 }
 
-export async function getTodayTasks(limit = 5) {
-  await ensureDbReady();
-  const all = await getDb().select().from(tasks);
-  return takeTopTasks(all, limit);
-}
-
 export async function createTask(input: {
   title: string;
   description?: string;
@@ -99,6 +169,9 @@ export async function createTask(input: {
   dueAt?: string;
   intimidationScore?: number;
   autoBreakdown?: boolean;
+  recurrenceType?: RecurrenceType;
+  recurrenceDays?: number[] | null;
+  recurrenceCarryOver?: boolean;
 }) {
   await ensureDbReady();
   const db = getDb();
@@ -121,6 +194,14 @@ export async function createTask(input: {
     0,
   );
 
+  const recurrenceType = input.recurrenceType ?? "none";
+  const recurrenceDays =
+    recurrenceType === "weekly" && input.recurrenceDays?.length
+      ? JSON.stringify(input.recurrenceDays)
+      : null;
+  const recurrenceCarryOver =
+    recurrenceType === "weekly" ? Boolean(input.recurrenceCarryOver) : false;
+
   await db.insert(tasks).values({
     id: taskId,
     title: input.title,
@@ -131,7 +212,10 @@ export async function createTask(input: {
     intimidationScore: input.intimidationScore ?? 2,
     priorityScore: 0,
     estimatedMin: input.estimatedMin ?? estimate.estimatedMin ?? null,
-    dueAt: input.dueAt ?? null,
+    dueAt: recurrenceType !== "none" ? null : (input.dueAt ?? null),
+    recurrenceType,
+    recurrenceDays,
+    recurrenceCarryOver,
     manualSortOrder: maxOrder + 1,
     postponedCount: 0,
     createdAt: ts,
@@ -381,6 +465,9 @@ export async function updateTask(
     postponedCount: number;
     intimidationScore: number;
     estimatedMin: number | null;
+    recurrenceType: RecurrenceType;
+    recurrenceDays: number[] | null;
+    recurrenceCarryOver: boolean;
   }>,
 ) {
   await ensureDbReady();
@@ -392,11 +479,18 @@ export async function updateTask(
   const safePatch = await buildTaskPatch(db, existing, patch);
   if (safePatch === null) return null;
 
+  let completedAt = existing.completedAt;
+  if (patch.status === "done") {
+    completedAt = ts;
+  } else if (patch.status !== undefined && patch.status !== "done") {
+    completedAt = null;
+  }
+
   await db
     .update(tasks)
     .set({
       ...safePatch,
-      completedAt: patch.status === "done" ? ts : existing.completedAt,
+      completedAt,
       updatedAt: ts,
     })
     .where(eq(tasks.id, taskId));
@@ -409,7 +503,16 @@ async function buildTaskPatch(
   existing: Task,
   patch: Parameters<typeof updateTask>[1],
 ) {
-  const { intimidationScore, estimatedMin, pillarId, focusTrack, ...rest } = patch;
+  const {
+    intimidationScore,
+    estimatedMin,
+    pillarId,
+    focusTrack,
+    recurrenceType,
+    recurrenceDays,
+    recurrenceCarryOver,
+    ...rest
+  } = patch;
   const safePatch: Record<string, unknown> = {
     ...rest,
     ...(intimidationScore != null
@@ -423,6 +526,33 @@ async function buildTaskPatch(
       (Number.isInteger(estimatedMin) && estimatedMin > 0)
     ) {
       safePatch.estimatedMin = estimatedMin;
+    }
+  }
+
+  const nextRecurrenceType =
+    recurrenceType ?? existing.recurrenceType ?? "none";
+  if (recurrenceType !== undefined) {
+    safePatch.recurrenceType = recurrenceType;
+  }
+  if (recurrenceDays !== undefined) {
+    safePatch.recurrenceDays =
+      nextRecurrenceType === "weekly" && recurrenceDays?.length
+        ? JSON.stringify(recurrenceDays)
+        : null;
+  }
+  if (recurrenceCarryOver !== undefined || recurrenceType !== undefined) {
+    safePatch.recurrenceCarryOver =
+      nextRecurrenceType === "weekly"
+        ? Boolean(recurrenceCarryOver ?? existing.recurrenceCarryOver)
+        : false;
+  }
+  if (
+    recurrenceType !== undefined ||
+    recurrenceDays !== undefined ||
+    recurrenceCarryOver !== undefined
+  ) {
+    if (nextRecurrenceType !== "none") {
+      safePatch.dueAt = null;
     }
   }
 

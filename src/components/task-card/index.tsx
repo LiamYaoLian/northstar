@@ -3,8 +3,14 @@
 import { useState } from "react";
 import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
+import { TaskRecurrenceBadge } from "@/components/task-recurrence-badge";
+import {
+  TaskRecurrenceForm,
+  type RecurrenceFormValue,
+} from "@/components/task-recurrence-form";
 import { useLocale } from "@/lib/i18n/context";
 import { parseJson } from "@/lib/utils";
+import { parseRecurrenceDays } from "@/lib/tasks/recurrence-types";
 import { TaskBreakdownDiff } from "./task-breakdown-diff";
 import { TaskActionBar } from "./task-action-bar";
 import { TaskAiBreakdownForm } from "./task-ai-breakdown-form";
@@ -35,9 +41,16 @@ export function TaskCard({
   onToggleIntimidating,
   onChangePillar,
   onUpdateEstimatedMin,
+  onUpdateRecurrence,
 }: TaskCardProps) {
   const { t } = useLocale();
   const [showWhy, setShowWhy] = useState(false);
+  const [showRecurrence, setShowRecurrence] = useState(false);
+  const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceFormValue>(() => ({
+    recurrenceType: task.recurrenceType as RecurrenceFormValue["recurrenceType"],
+    recurrenceDays: parseRecurrenceDays(task.recurrenceDays) ?? [],
+    recurrenceCarryOver: task.recurrenceCarryOver,
+  }));
   const factors = parseJson<PriorityFactors | null>(task.priorityFactors, null);
   const subtaskList = task.subtasks ?? [];
   const canEditCategory = Boolean(pillars && onChangePillar);
@@ -77,6 +90,41 @@ export function TaskCard({
           }
         />
       </TaskCardHeader>
+
+      <TaskRecurrenceBadge task={task} />
+
+      {onUpdateRecurrence && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setShowRecurrence((v) => !v)}
+            className="text-xs text-accent hover:underline"
+          >
+            {t.recurrence.editRecurrence}
+          </button>
+          {showRecurrence && (
+            <>
+              <TaskRecurrenceForm
+                compact
+                value={recurrenceDraft}
+                onChange={setRecurrenceDraft}
+              />
+              <button
+                type="button"
+                className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
+                onClick={() =>
+                  onUpdateRecurrence(task.id, recurrenceDraft)
+                }
+              >
+                {t.common.add}
+              </button>
+              {task.recurrenceType !== "none" && (
+                <p className="text-xs text-muted">{t.recurrence.subtaskResetHint}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {subtaskList.length > 0 && onReorderSubtasks && (
         <SortableSubtasks

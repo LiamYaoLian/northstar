@@ -9,6 +9,10 @@ import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
 import {
+  TaskRecurrenceForm,
+  defaultRecurrenceFormValue,
+} from "@/components/task-recurrence-form";
+import {
   enrichTasksWithPillars,
   filterTasksByPillar,
   mergeFilteredTaskReorder,
@@ -36,6 +40,7 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
   const [autoEstimate, setAutoEstimate] = useState<EstimatePreview | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -164,10 +169,21 @@ export default function TasksPage() {
           title: title.trim(),
           autoBreakdown: true,
           ...(newTaskPillarId ? { pillarId: newTaskPillarId } : {}),
+          ...(recurrence.recurrenceType !== "none"
+            ? {
+                recurrenceType: recurrence.recurrenceType,
+                recurrenceDays:
+                  recurrence.recurrenceType === "weekly"
+                    ? recurrence.recurrenceDays
+                    : null,
+                recurrenceCarryOver: recurrence.recurrenceCarryOver,
+              }
+            : {}),
         }),
       });
       setTitle("");
       setNewTaskPillarId("");
+      setRecurrence(defaultRecurrenceFormValue);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errors.addTaskFailed);
@@ -258,6 +274,7 @@ export default function TasksPage() {
             {t.common.add}
           </button>
         </div>
+        <TaskRecurrenceForm value={recurrence} onChange={setRecurrence} />
         {title.trim() && (
           <p className="text-xs text-muted">
             {analyzing ? (
@@ -324,6 +341,16 @@ export default function TasksPage() {
               }
               onComplete={(id) => void patchTask(id, { status: "done" })}
               onLogTime={(id, minutes) => void logTime(id, minutes)}
+              onUpdateRecurrence={(id, value) =>
+                void patchTask(id, {
+                  recurrenceType: value.recurrenceType,
+                  recurrenceDays:
+                    value.recurrenceType === "weekly"
+                      ? value.recurrenceDays
+                      : null,
+                  recurrenceCarryOver: value.recurrenceCarryOver,
+                })
+              }
             />
           );
         }}

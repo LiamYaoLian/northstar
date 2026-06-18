@@ -18,12 +18,28 @@ function devServerHint(status: number, url: string): string {
   return "";
 }
 
+import { clientTimezone } from "@/lib/tasks/timezone";
+
+function withTaskTimezone(url: string): string {
+  if (!url.startsWith("/api/tasks")) return url;
+  try {
+    const parsed = new URL(url, "http://local");
+    if (!parsed.searchParams.has("tz")) {
+      parsed.searchParams.set("tz", clientTimezone());
+    }
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
 export async function apiFetch<T>(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<T> {
-  const url = typeof input === "string" ? input : input.url;
-  const res = await fetch(input, init);
+  const rawUrl = typeof input === "string" ? input : input.url;
+  const url = withTaskTimezone(rawUrl);
+  const res = await fetch(typeof input === "string" ? url : new Request(url, input), init);
   let data: unknown;
   try {
     data = await res.json();

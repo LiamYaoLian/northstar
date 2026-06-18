@@ -8,12 +8,15 @@ import {
 } from "@/lib/db/schema";
 import type { Task } from "@/lib/db/schema";
 import { priorityScoreFromRank, rerankAll } from "@/lib/priority";
+import { resolveTimezone } from "@/lib/tasks/timezone";
 import { nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 
-export async function persistPriorities(): Promise<string> {
+export async function persistPriorities(tz?: string): Promise<string> {
   await ensureDbReady();
   const db = getDb();
+  const resolvedTz = resolveTimezone(tz);
+  const now = new Date();
   const [allTasks, pillars, entries, stars, allSubtasks] = await Promise.all([
     db.select().from(tasks),
     db.select().from(strategicPillars),
@@ -28,6 +31,8 @@ export async function persistPriorities(): Promise<string> {
     entries,
     stars[0]?.workPrimaryTrack,
     allSubtasks,
+    now,
+    resolvedTz,
   );
   const ts = nowIso();
 

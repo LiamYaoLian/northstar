@@ -140,4 +140,16 @@ export type Messages = {
     start: string;
   };
   language: { label: string; zh: string; en: string };
+  recurrence: {
+    none: string;
+    daily: string;
+    weekly: string;
+    carryOver: string;
+    carryOverWeeklyOnly: string;
+    subtaskResetHint: string;
+    completedThisCycle: string;
+    nextOccurrence: string;
+    editRecurrence: string;
+  };
+  weekday: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
 };

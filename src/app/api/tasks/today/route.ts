@@ -1,20 +1,21 @@
 import { NextResponse } from "next/server";
-import { recalculatePriorities } from "@/lib/services/tasks";
+import { listDueTodayTasksWithSubtasks } from "@/lib/services/tasks";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const tz = parseTzFromSearchParams(searchParams);
-    const result = await recalculatePriorities(tz);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      tasks: await listDueTodayTasksWithSubtasks(tz),
+    });
   } catch (err) {
     const tzErr = tzErrorResponse(err);
     if (tzErr) return tzErr;
-    console.error("POST /api/tasks/recalculate-priorities", err);
+    console.error("GET /api/tasks/today", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Recalculate failed" },
+      { error: err instanceof Error ? err.message : "Failed to list today tasks" },
       { status: 500 },
     );
   }

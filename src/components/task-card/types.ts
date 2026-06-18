@@ -45,6 +45,14 @@ export type TaskCardProps = {
     focusTrack?: string | null,
   ) => void;
   onUpdateEstimatedMin?: (taskId: string, minutes: number | null) => void;
+  onUpdateRecurrence?: (
+    taskId: string,
+    value: {
+      recurrenceType: "none" | "daily" | "weekly";
+      recurrenceDays: number[];
+      recurrenceCarryOver: boolean;
+    },
+  ) => void;
 };
 
 export type { PriorityFactors };
