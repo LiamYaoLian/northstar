@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { updateTask } from "@/lib/services/tasks";
 import { patchTaskRecurrenceSchema } from "@/lib/api/tasks/schemas";
+import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
+import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
 
 export async function PATCH(
   request: Request,
@@ -8,6 +10,8 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    const url = new URL(request.url);
+    const tz = parseTzFromSearchParams(url.searchParams);
     const body = await request.json();
     const patch: Record<string, unknown> = { ...body };
 
@@ -26,10 +30,16 @@ export async function PATCH(
       );
     }
 
-    const task = await updateTask(id, patch as Parameters<typeof updateTask>[1]);
+    const task = await updateTask(
+      id,
+      patch as Parameters<typeof updateTask>[1],
+      { tz },
+    );
     if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ task });
   } catch (err) {
+    const tzErr = tzErrorResponse(err);
+    if (tzErr) return tzErr;
     console.error("PATCH /api/tasks/[id]", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Update failed" },

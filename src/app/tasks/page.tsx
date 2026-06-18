@@ -4,10 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CategoryFilter } from "@/components/category-filter";
 import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
+import { TaskStatusFilterBar } from "@/components/task-status-filter";
 import { apiFetch } from "@/lib/api-client";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
+import {
+  filterTasksByStatus,
+  sortDoneTasksByCompletedAt,
+  type TaskStatusFilter,
+} from "@/lib/services/task-sorting";
 import {
   TaskRecurrenceForm,
   defaultRecurrenceFormValue,
@@ -40,6 +46,7 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
   const [autoEstimate, setAutoEstimate] = useState<EstimatePreview | null>(null);
@@ -190,10 +197,14 @@ export default function TasksPage() {
     }
   }
 
-  const filteredTasks = useMemo(
-    () => filterTasksByPillar(tasks, categoryFilter),
-    [tasks, categoryFilter],
-  );
+  const filteredTasks = useMemo(() => {
+    const byStatus = filterTasksByStatus(tasks, statusFilter);
+    const byPillar = filterTasksByPillar(byStatus, categoryFilter);
+    if (statusFilter === "done") {
+      return sortDoneTasksByCompletedAt(byPillar);
+    }
+    return byPillar;
+  }, [tasks, categoryFilter, statusFilter]);
 
   const handleReorder = useCallback(
     async (orderedIds: string[]) => {
@@ -314,47 +325,91 @@ export default function TasksPage() {
         onChange={setCategoryFilter}
       />
 
-      <SortableTaskList
-        taskIds={filteredTasks.map((task) => task.id)}
-        onReorder={handleReorder}
-      >
-        {(taskId) => {
-          const task = taskMap.get(taskId);
-          if (!task) return null;
-          return (
-            <TaskCard
-              task={task}
-              pillars={pillars}
-              onChangePillar={changePillar}
-              onBreakdown={breakdownTask}
-              onApplyBreakdown={applyBreakdown}
-              onAddSubtask={addSubtask}
-              onDeleteSubtask={(id) => void deleteSubtask(id)}
-              onReorderSubtasks={reorderSubtasks}
-              onToggleSubtask={toggleSubtask}
-              onUpdateSubtaskTitle={updateSubtaskTitle}
-              onUpdateEstimatedMin={(id, minutes) =>
-                void patchTask(id, { estimatedMin: minutes })
-              }
-              onToggleIntimidating={(id, intimidating) =>
-                void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
-              }
-              onComplete={(id) => void patchTask(id, { status: "done" })}
-              onLogTime={(id, minutes) => void logTime(id, minutes)}
-              onUpdateRecurrence={(id, value) =>
-                void patchTask(id, {
-                  recurrenceType: value.recurrenceType,
-                  recurrenceDays:
-                    value.recurrenceType === "weekly"
-                      ? value.recurrenceDays
-                      : null,
-                  recurrenceCarryOver: value.recurrenceCarryOver,
-                })
-              }
-            />
-          );
-        }}
-      </SortableTaskList>
+      <TaskStatusFilterBar value={statusFilter} onChange={setStatusFilter} />
+
+      {statusFilter === "done" ? (
+        <div className="space-y-3">
+          {filteredTasks.length === 0 ? (
+            <p className="text-sm text-muted">{t.completed.empty}</p>
+          ) : (
+            filteredTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                pillars={pillars}
+                onChangePillar={changePillar}
+                onBreakdown={breakdownTask}
+                onApplyBreakdown={applyBreakdown}
+                onAddSubtask={addSubtask}
+                onDeleteSubtask={(id) => void deleteSubtask(id)}
+                onReorderSubtasks={reorderSubtasks}
+                onToggleSubtask={toggleSubtask}
+                onUpdateSubtaskTitle={updateSubtaskTitle}
+                onUpdateEstimatedMin={(id, minutes) =>
+                  void patchTask(id, { estimatedMin: minutes })
+                }
+                onToggleIntimidating={(id, intimidating) =>
+                  void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
+                }
+                onReopen={(id) => void patchTask(id, { status: "todo" })}
+                onLogTime={(id, minutes) => void logTime(id, minutes)}
+                onUpdateRecurrence={(id, value) =>
+                  void patchTask(id, {
+                    recurrenceType: value.recurrenceType,
+                    recurrenceDays:
+                      value.recurrenceType === "weekly"
+                        ? value.recurrenceDays
+                        : null,
+                    recurrenceCarryOver: value.recurrenceCarryOver,
+                  })
+                }
+              />
+            ))
+          )}
+        </div>
+      ) : (
+        <SortableTaskList
+          taskIds={filteredTasks.map((task) => task.id)}
+          onReorder={handleReorder}
+        >
+          {(taskId) => {
+            const task = taskMap.get(taskId);
+            if (!task) return null;
+            return (
+              <TaskCard
+                task={task}
+                pillars={pillars}
+                onChangePillar={changePillar}
+                onBreakdown={breakdownTask}
+                onApplyBreakdown={applyBreakdown}
+                onAddSubtask={addSubtask}
+                onDeleteSubtask={(id) => void deleteSubtask(id)}
+                onReorderSubtasks={reorderSubtasks}
+                onToggleSubtask={toggleSubtask}
+                onUpdateSubtaskTitle={updateSubtaskTitle}
+                onUpdateEstimatedMin={(id, minutes) =>
+                  void patchTask(id, { estimatedMin: minutes })
+                }
+                onToggleIntimidating={(id, intimidating) =>
+                  void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
+                }
+                onComplete={(id) => void patchTask(id, { status: "done" })}
+                onLogTime={(id, minutes) => void logTime(id, minutes)}
+                onUpdateRecurrence={(id, value) =>
+                  void patchTask(id, {
+                    recurrenceType: value.recurrenceType,
+                    recurrenceDays:
+                      value.recurrenceType === "weekly"
+                        ? value.recurrenceDays
+                        : null,
+                    recurrenceCarryOver: value.recurrenceCarryOver,
+                  })
+                }
+              />
+            );
+          }}
+        </SortableTaskList>
+      )}
     </div>
   );
 }

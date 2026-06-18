@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CategoryFilter } from "@/components/category-filter";
+import { CompletionListItem } from "@/components/completion-list-item";
 import { TaskCard } from "@/components/task-card";
 import { apiFetch } from "@/lib/api-client";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
@@ -17,6 +18,9 @@ import {
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
 import { rankAndLimit } from "@/lib/services/task-sorting";
+import { completionQueryForToday } from "@/lib/tasks/completion-ranges";
+import type { TaskCompletionEvent } from "@/lib/tasks/completion-events";
+import { clientTimezone } from "@/lib/tasks/timezone";
 
 export default function TodayPage() {
   const router = useRouter();
@@ -25,15 +29,22 @@ export default function TodayPage() {
   const [pillars, setPillars] = useState<PillarOption[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string>("");
+  const [completedEvents, setCompletedEvents] = useState<TaskCompletionEvent[]>([]);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [tasksData, strategyData] = await Promise.all([
+      const tz = clientTimezone();
+      const todayQuery = completionQueryForToday(tz, new Date());
+      const [tasksData, strategyData, completionsData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks/today"),
         apiFetch<{ hasStrategy: boolean; strategy: { pillars: { id: string; name: string; color: string; focusTracks: string | null }[] } | null }>(
           "/api/strategy",
+        ),
+        apiFetch<{ events: TaskCompletionEvent[] }>(
+          `/api/completions?since=${todayQuery.since}&until=${todayQuery.until}`,
         ),
       ]);
 
@@ -49,6 +60,7 @@ export default function TodayPage() {
 
       const enriched = enrichTasksWithPillars(tasksData.tasks, strategyPillars);
       setAllTasks(enriched);
+      setCompletedEvents(completionsData.events);
       setUpdatedAt(
         enriched[0]?.priorityComputedAt
           ? new Date(enriched[0].priorityComputedAt).toLocaleTimeString(
@@ -167,6 +179,31 @@ export default function TodayPage() {
             }
           />
         ))
+      )}
+
+      {completedEvents.length > 0 && (
+        <section className="space-y-2 border-t border-border pt-4">
+          <button
+            type="button"
+            onClick={() => setShowCompleted((v) => !v)}
+            className="flex w-full items-center justify-between text-sm font-medium"
+          >
+            <span>
+              {t.today.completedToday} · {completedEvents.length}
+            </span>
+            <span className="text-muted">{showCompleted ? "−" : "+"}</span>
+          </button>
+          {showCompleted && (
+            <div className="space-y-2">
+              {completedEvents.map((event) => (
+                <CompletionListItem key={event.id} event={event} />
+              ))}
+              <Link href="/completed?range=today" className="text-sm text-accent">
+                {t.today.viewAll}
+              </Link>
+            </div>
+          )}
+        </section>
       )}
 
       <Link href="/tasks" className="text-sm text-accent">

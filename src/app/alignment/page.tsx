@@ -4,12 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { PillarBar } from "@/components/pillar-bar";
+import { apiFetch } from "@/lib/api-client";
 import { useLocale } from "@/lib/i18n/context";
 import {
   translateFocusTrack,
+  translatePillar,
   translateProcrastinationReason,
 } from "@/lib/i18n/entities";
 import type { AlignmentResult, FocusTrackAlignment, ProcrastinationSignal } from "@/lib/alignment";
+import { completionQueryForAlignmentWeek } from "@/lib/tasks/completion-ranges";
+import { clientTimezone } from "@/lib/tasks/timezone";
+import type { CompletionSummaryRow } from "@/lib/tasks/completion-events";
 
 export default function AlignmentPage() {
   const router = useRouter();
@@ -17,19 +22,31 @@ export default function AlignmentPage() {
   const [alignment, setAlignment] = useState<AlignmentResult | null>(null);
   const [workTracks, setWorkTracks] = useState<FocusTrackAlignment[]>([]);
   const [procrastination, setProcrastination] = useState<ProcrastinationSignal[]>([]);
+  const [weeklyCompletions, setWeeklyCompletions] = useState<CompletionSummaryRow[]>([]);
+  const [pillars, setPillars] = useState<{ id: string; name: string; color: string }[]>([]);
 
   useEffect(() => {
-    fetch("/api/alignment")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.alignment) {
-          router.replace("/onboarding");
-          return;
-        }
-        setAlignment(data.alignment);
-        setWorkTracks(data.workTracks ?? []);
-        setProcrastination(data.procrastination ?? []);
-      });
+    const tz = clientTimezone();
+    const weekQuery = completionQueryForAlignmentWeek(tz, new Date());
+    Promise.all([
+      fetch("/api/alignment").then((r) => r.json()),
+      apiFetch<{ summary: CompletionSummaryRow[] }>(
+        `/api/completions/summary?since=${weekQuery.since}&until=${weekQuery.until}`,
+      ),
+      apiFetch<{ strategy: { pillars: { id: string; name: string; color: string }[] } | null }>(
+        "/api/strategy",
+      ),
+    ]).then(([data, completions, strategy]) => {
+      if (!data.alignment) {
+        router.replace("/onboarding");
+        return;
+      }
+      setAlignment(data.alignment);
+      setWorkTracks(data.workTracks ?? []);
+      setProcrastination(data.procrastination ?? []);
+      setWeeklyCompletions(completions.summary);
+      setPillars(strategy.strategy?.pillars ?? []);
+    });
   }, [router]);
 
   if (!alignment) {
@@ -53,6 +70,36 @@ export default function AlignmentPage() {
             ` · ${t.alignment.unallocated} ${alignment.unallocatedPct}%`}
         </p>
       </Card>
+
+      {weeklyCompletions.length > 0 && (
+        <Card className="space-y-3">
+          <div>
+            <h3 className="font-medium">{t.alignment.weeklyCompletions}</h3>
+            <p className="text-xs text-muted">{t.alignment.didVsLogged}</p>
+          </div>
+          {weeklyCompletions.map((row) => {
+            const pillar = pillars.find((p) => p.id === row.pillarId);
+            const label = row.pillarId
+              ? translatePillar(pillar?.name ?? row.pillarId, locale)
+              : t.completed.unassigned;
+            return (
+              <div key={String(row.pillarId)} className="space-y-1 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{label}</span>
+                  <span className="text-muted">{row.count}</span>
+                </div>
+                {row.topTitles.length > 0 && (
+                  <ul className="list-inside list-disc text-xs text-muted">
+                    {row.topTitles.map((title) => (
+                      <li key={title}>{title}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       <Card className="space-y-4">
         <h3 className="font-medium">{t.alignment.pillarDrift}</h3>

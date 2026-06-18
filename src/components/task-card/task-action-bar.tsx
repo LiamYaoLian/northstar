@@ -12,6 +12,7 @@ type TaskActionBarProps = {
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onLogTime?: (id: string, minutes: number) => void;
   onComplete?: (id: string) => void;
+  onReopen?: (id: string) => void;
   hasAddSubtask?: boolean;
   hasBreakdown?: boolean;
 };
@@ -26,6 +27,7 @@ export function TaskActionBar({
   onToggleIntimidating,
   onLogTime,
   onComplete,
+  onReopen,
   hasAddSubtask,
   hasBreakdown,
 }: TaskActionBarProps) {
@@ -74,6 +76,11 @@ export function TaskActionBar({
       {onComplete && task.status !== "done" && (
         <ActionButton onClick={() => onComplete(task.id)}>
           {t.taskCard.complete}
+        </ActionButton>
+      )}
+      {onReopen && task.status === "done" && (
+        <ActionButton onClick={() => onReopen(task.id)}>
+          {t.taskCard.reopen}
         </ActionButton>
       )}
     </div>

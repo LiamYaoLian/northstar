@@ -296,12 +296,25 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 
 | 页面 | 数据源 | 客户端过滤 |
 |------|--------|------------|
-| **Today** | `GET /api/tasks/today?tz=` | pillar filter → `rankAndLimit(5)` |
-| **Tasks** | `GET /api/tasks?sort=manual&tz=` | pillar filter → 手动拖拽排序 |
+| **Today** | `GET /api/tasks/today?tz=` + `GET /api/completions?since=today&until=today` | pillar filter → Top 5 `rankAndLimit(5)`；底部折叠「今日已完成」 |
+| **Tasks** | `GET /api/tasks?sort=manual&tz=` | **状态分段**（默认进行中）+ pillar filter；已完成 tab 禁拖拽、`completedAt` 降序 |
+| **Completed** | `GET /api/completions?since=&until=` | pillar + 今天/本周/全部；按 `occurrence_date` 分组 |
+| **Alignment** | `GET /api/completions/summary?since=weekStart&until=today` | 按 pillar 计数 + Top 3 标题 |
 
 Today API 返回 **priority 预排序**的 due-today 全量 + subtasks；客户端不再用 `takeTopTasks`（后者会额外排除 done，Today 路径不需要）。
 
-Tasks 板**不做日历过滤**，展示全量 active/done 任务。
+Tasks 板**不做日历过滤**；**进行中** tab 排除 `status=done`；**已完成** tab 仅当前仍为 done 的行（recurring reset 后不在此 tab，但 **completion event 保留**）。
+
+完成写入：`task_completion_events` 表（不可变快照）；仅 `status` 非 done → done 时 INSERT；reopen / recurring reset **不删** event。
+
+### 7.6 Completion events API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/completions?since=&until=&pillarId=&tz=` | 按 `occurrence_date` 闭区间列表 |
+| GET | `/api/completions/summary?since=&until=&tz=` | Alignment 本周完成摘要 |
+
+`api-client.ts` 对 `/api/tasks`、`/api/subtasks`、`/api/completions` 前缀 **自动 append `?tz=`**。`PATCH /api/tasks/[id]` 与 `PATCH /api/subtasks/[id]` 解析 `tz` 用于 `occurrence_date` 计算。
 
 ---
 

@@ -11,6 +11,7 @@ import {
 import { useLocale } from "@/lib/i18n/context";
 import { parseJson } from "@/lib/utils";
 import { parseRecurrenceDays } from "@/lib/tasks/recurrence-types";
+import { cn } from "@/lib/utils";
 import { TaskBreakdownDiff } from "./task-breakdown-diff";
 import { TaskActionBar } from "./task-action-bar";
 import { TaskAiBreakdownForm } from "./task-ai-breakdown-form";
@@ -30,6 +31,7 @@ export function TaskCard({
   rank,
   pillars,
   onComplete,
+  onReopen,
   onLogTime,
   onBreakdown,
   onApplyBreakdown,
@@ -63,7 +65,12 @@ export function TaskCard({
   });
 
   return (
-    <Card className="space-y-3">
+    <Card
+      className={cn(
+        "space-y-3",
+        task.status === "done" && "border-neutral-200 bg-neutral-50/80 opacity-90",
+      )}
+    >
       <TaskCardHeader
         task={task}
         rank={rank}
@@ -176,6 +183,7 @@ export function TaskCard({
         onToggleIntimidating={onToggleIntimidating}
         onLogTime={onLogTime}
         onComplete={onComplete}
+        onReopen={onReopen}
         hasAddSubtask={Boolean(onAddSubtask)}
         hasBreakdown={Boolean(onBreakdown)}
       />

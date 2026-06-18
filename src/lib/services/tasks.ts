@@ -40,6 +40,8 @@ import { toRecurrenceFields } from "@/lib/tasks/recurrence-types";
 import { needsOccurrenceReset } from "@/lib/tasks/recurrence";
 import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
 import { resolveTimezone } from "@/lib/tasks/timezone";
+import { shouldRecordCompletionTransition } from "@/lib/tasks/completion-events";
+import { recordCompletionEvent } from "@/lib/services/completions";
 import { id, nowIso } from "@/lib/utils";
 import { eq, inArray } from "drizzle-orm";
 import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
@@ -414,6 +416,7 @@ export async function applyBreakdownPreview(
 export async function updateSubtask(
   subtaskId: string,
   patch: { title?: string; isDone?: boolean },
+  options?: { tz?: string },
 ) {
   await ensureDbReady();
   const db = getDb();
@@ -436,7 +439,7 @@ export async function updateSubtask(
   if (patch.isDone !== undefined) {
     const siblings = await listSubtasks(existing.parentTaskId);
     if (siblings.length > 0 && siblings.every((s) => s.isDone)) {
-      await updateTask(existing.parentTaskId, { status: "done" });
+      await updateTask(existing.parentTaskId, { status: "done" }, options);
     }
   }
 
@@ -468,10 +471,13 @@ export async function updateTask(
     recurrenceDays: number[] | null;
     recurrenceCarryOver: boolean;
   }>,
+  options?: { tz?: string },
 ) {
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
+  const resolvedTz = resolveTimezone(options?.tz);
+  const now = new Date();
   const existing = await fetchTaskById(taskId);
   if (!existing) return null;
 
@@ -485,14 +491,42 @@ export async function updateTask(
     completedAt = null;
   }
 
-  await db
-    .update(tasks)
-    .set({
-      ...safePatch,
-      completedAt,
-      updatedAt: ts,
-    })
-    .where(eq(tasks.id, taskId));
+  try {
+    await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId));
+      if (!current) return;
+
+      await tx
+        .update(tasks)
+        .set({
+          ...safePatch,
+          completedAt,
+          updatedAt: ts,
+        })
+        .where(eq(tasks.id, taskId));
+
+      const recordEvent =
+        patch.status === "done" &&
+        shouldRecordCompletionTransition(current.status, "done");
+
+      if (recordEvent) {
+        const updatedTask = {
+          ...current,
+          ...safePatch,
+          status: "done",
+          completedAt,
+          updatedAt: ts,
+        } as Task;
+        await recordCompletionEvent(tx, updatedTask, resolvedTz, now);
+      }
+    });
+  } catch (err) {
+    console.error("updateTask failed", { taskId, patch, err });
+    throw err;
+  }
 
   return fetchTaskById(taskId);
 }

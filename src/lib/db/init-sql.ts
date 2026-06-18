@@ -76,6 +76,20 @@ CREATE TABLE IF NOT EXISTS time_entries (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS task_completion_events (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  completed_at TEXT NOT NULL,
+  occurrence_date TEXT NOT NULL,
+  task_title TEXT NOT NULL,
+  pillar_id TEXT,
+  pillar_name TEXT,
+  pillar_color TEXT,
+  focus_track TEXT,
+  recurrence_type TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS review_snapshots (
   id TEXT PRIMARY KEY,
   period_start TEXT NOT NULL,

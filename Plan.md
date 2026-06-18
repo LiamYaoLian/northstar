@@ -75,6 +75,8 @@ flowchart LR
 | `occurrence_date` | TEXT NOT NULL | 本地日 `YYYY-MM-DD`（分组 / 去重展示键，见 §1.2） |
 | `task_title` | TEXT NOT NULL | 快照 |
 | `pillar_id` | TEXT | 快照，可 null |
+| `pillar_name` | TEXT | 快照，可 null；避免策略改名/删除后历史漂移 |
+| `pillar_color` | TEXT | 快照，可 null；历史列表无需依赖当前 strategy |
 | `focus_track` | TEXT | 快照，可 null |
 | `recurrence_type` | TEXT NOT NULL | 完成时 `none` \| `daily` \| `weekly` |
 | `created_at` | TEXT NOT NULL | 写入时间 |
@@ -86,6 +88,8 @@ flowchart LR
 - `(task_id, completed_at DESC)`
 
 **不做 UNIQUE**：同一天 reopen 后再完成 → **两条 event**（诚实审计；UI 可合并展示「最后一次」optional，MVP 全展示）。
+
+**快照原则**：event 展示优先用 `pillar_name` / `pillar_color` 快照；当前 strategy 只作为缺失快照时的 fallback。这样 `/completed` 是历史记录，不会因为后续 strategy 调整而改写过去。
 
 ### 1.2 `occurrence_date` 计算（定稿）
 
@@ -101,9 +105,11 @@ if recurrenceType === 'weekly':
 
  weekly 用 **schedule 日** 而非完成点击日，避免「Wed 补点 Mon 任务」在历史里归错天。
 
+**MVP 限制（需测试覆盖）**：多日 weekly + carry-over 无法从当前 `tasks` 行精确知道用户补的是哪一个历史 occurrence。MVP 采用 `lastScheduledOnOrBefore(...)`，即归到点击时刻之前最近一个 scheduled day；若未来要支持选择补哪天，需要在 UI/API 传 `occurrenceDate`。
+
 ### 1.3 写入时机与幂等
 
-**仅**在 `status` **从非 done → done** 时 INSERT（同一 transaction 内更新 task 后）：
+**仅**在 `status` **从非 done → done** 时 INSERT；判断旧状态、更新 task、写 event 必须在 **同一 transaction** 内完成：
 
 | 路径 | 位置 |
 |------|------|
@@ -112,12 +118,15 @@ if recurrenceType === 'weekly':
 
 **不写入**：`openRecurringOccurrences` reset、reopen（`done → todo`）、已是 done 的重复 PATCH。
 
+**并发/重复点击语义**：transaction 内先读当前 task；只有读到的 `existing.status !== 'done' && patch.status === 'done'` 才 insert。重复 PATCH done、双击 Complete、子任务 auto-done 重入都不得产生第二条 event。
+
 **reopen 语义**：当前 task 行回到 todo；**历史 event 保留**（含误操作记录）。UI 文案说明即可。
 
 ### 1.4 迁移
 
-- [`init-sql.ts`](src/lib/db/init-sql.ts) 新库含全表
-- [`migrations.ts`](src/lib/db/migrations.ts) 新增 `addCompletionEventsTableIfMissing`（与 recurrence 列同模式）
+- [`schema.ts`](src/lib/db/schema.ts) 新增 Drizzle table + `TaskCompletionEvent` type
+- [`init-sql.ts`](src/lib/db/init-sql.ts) 新库含全表 + indexes
+- [`migrations.ts`](src/lib/db/migrations.ts) 新增 idempotent `addCompletionEventsTableIfMissing`（`CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`，与 recurrence 列同模式）
 - **不回填** 无 event 的旧历史
 - **可选 deploy 脚本**：对当前 `status=done && completedAt IS NOT NULL` 补一条 event（跑一次，`occurrence_date` 按 §1.2 推算）
 
@@ -128,7 +137,7 @@ if recurrenceType === 'weekly':
 新模块 [`src/lib/services/completions.ts`](src/lib/services/completions.ts)（server-only）：
 
 ```typescript
-recordCompletionEvent(db, task, tz, now?)  // 内部：算 occurrence_date + insert
+recordCompletionEvent(tx, task, tz, now?)  // 内部：算 occurrence_date + insert；只在 updateTask transaction 内调用
 listCompletionEvents({ since, until, pillarId?, tz, limit? })
 summarizeCompletionsByPillar({ since, until, tz })  // Alignment
 ```
@@ -145,6 +154,19 @@ summarizeCompletionsByPillar({ since, until, tz })  // Alignment
 | `GET /api/tasks?status=done` | Tasks **已完成** 分段：当前仍为 done 的行（含 recurring 本周期） |
 | `GET /api/completions?...` | `/completed`、Today 折叠、Alignment：**不可变** event log |
 
+### 2.1 `tz` 传递链（必须补齐）
+
+completion event 的 `occurrence_date` 依赖用户时区，所以所有可能触发完成的写路径都要带 `tz`：
+
+| 路径 | 调整 |
+|------|------|
+| `PATCH /api/tasks/[id]?tz=` | route 解析 `tz`，调用 `updateTask(id, patch, { tz })` |
+| `PATCH /api/subtasks/[id]?tz=` | route 解析 `tz`，调用 `updateSubtask(id, patch, { tz })`，用于子任务 auto-done |
+| `api-client.ts` | auto-append `tz` 的前缀从 `/api/tasks` 扩展到 `/api/tasks`、`/api/subtasks`、`/api/completions` |
+| service 内部调用 | `updateSubtask(..., { tz })` 自动完成时继续传给 `updateTask(..., { tz })` |
+
+非法 `tz` 的错误映射复用 `tzErrorResponse`；没有传时仍 fallback `DEFAULT_TIMEZONE`。
+
 ---
 
 ## 3. API
@@ -157,6 +179,8 @@ summarizeCompletionsByPillar({ since, until, tz })  // Alignment
 **Client**：[`api-client.ts`](src/lib/api-client.ts) 对 `/api/completions` 前缀同样 auto-append `tz`（与 `/api/tasks` 一致）。
 
 非法 `tz` → 400（复用 [`parse-tz-query.ts`](src/lib/api/tasks/parse-tz-query.ts) + [`tz-error.ts`](src/lib/api/tasks/tz-error.ts)）。
+
+**查询校验**：`since/until` 必须是 `YYYY-MM-DD`；`until < since` 返回 400；`limit` 设置上限（建议 200）避免全量历史一次拉爆。
 
 ---
 
@@ -178,13 +202,15 @@ summarizeCompletionsByPillar({ since, until, tz })  // Alignment
 - **全部**：现有 manual 行为
 - [`task-action-bar.tsx`](src/components/task-card/task-action-bar.tsx)：`done` 时显示 **重新打开** → `PATCH { status: 'todo' }`
 
+实现建议：Tasks 页先继续拉 `/api/tasks?sort=manual` 全量，在客户端按 status 分段；`已完成` tab 不使用 [`SortableTaskList`](src/components/sortable-task-list.tsx)，直接普通列表渲染。若后续数据量变大，再新增 `status=active` 服务端过滤。
+
 ### 4.3 `/completed` — 完成记录
 
 - 新页 [`src/app/completed/page.tsx`](src/app/completed/page.tsx)
 - Nav：[`app-nav.tsx`](src/components/app-nav.tsx) 增加 **完成 / Completed**（独立入口，符合 full_history 预期）
 - 过滤：pillar（`CategoryFilter`）+ 时间 **今天 \| 本周 \| 全部**（默认本周；`since=startOfLocalWeek`）
 - 列表：按 `occurrence_date` 分组降序；行用 [`completion-list-item.tsx`](src/components/completion-list-item.tsx)
-- Pillar 名称/颜色：`GET /api/strategy` + [`enrich-tasks.ts`](src/lib/tasks/enrich-tasks.ts) 模式 enrich event 行（或 API 返回 `pillarName`/`pillarColor` 快照，MVP 客户端 enrich 即可）
+- Pillar 名称/颜色：API 直接返回 event 快照 `pillarName` / `pillarColor`；当前 strategy 只作缺失快照 fallback
 - 只读；标题链到 `/tasks`（可选 hash / query 高亮，MVP 仅 nav 到 Tasks）
 - 空态 + i18n
 
@@ -238,26 +264,47 @@ sequenceDiagram
 | reopen → 再 done | 2 events |
 | recurring Mon done → Wed reset | event 仍在；Tasks 已完成 tab 空（已 todo） |
 | weekly occurrence_date | 按 schedule 日，非点击日 |
+| weekly 多日 carry-over | MVP 归到最近 scheduled day；行为有测试固定 |
 | `/api/completions` tz 边界 | NY 午夜前后 occurrence_date 正确 |
+| subtask auto-done tz | `/api/subtasks/[id]?tz=` 自动完成写入正确 occurrence_date |
+| 并发/重复 done | transaction 语义下不重复写 event |
 | summary by pillar | 计数与 topTitles 正确 |
 | Tasks 默认 | 不展示 done |
 | reopen | event 不删 |
 
 TDD 优先：[`completions.test.ts`](src/lib/services/completions.test.ts)（`recordCompletionEvent` + 查询）；[`timezone.test.ts`](src/lib/tasks/timezone.test.ts) 补 `startOfLocalWeek` / `localDateString`。
 
+### 6.1 测试文件（TDD 红状态）
+
+| 文件 | 覆盖 |
+|------|------|
+| [`completion-events.test.ts`](src/lib/tasks/completion-events.test.ts) | `shouldRecordCompletionTransition`、`computeOccurrenceDate`、`buildCompletionEventPayload`、filter/summary/group、§6 场景模拟 |
+| [`completions.test.ts`](src/lib/services/completions.test.ts) | service 层 DB 写入/查询（stub） |
+| [`parse-completions-query.test.ts`](src/lib/api/completions/parse-completions-query.test.ts) | since/until/limit/tz 校验 |
+| [`with-tz-query.test.ts`](src/lib/api/with-tz-query.test.ts) | `/api/tasks` / `/api/subtasks` / `/api/completions` auto tz |
+| [`timezone.test.ts`](src/lib/tasks/timezone.test.ts) | `localDateString`、`startOfLocalWeek` |
+| [`task-sorting.test.ts`](src/lib/services/task-sorting.test.ts) | `filterTasksByStatus`、`sortDoneTasksByCompletedAt`、done tab 工作流 |
+| [`completion-ranges.test.ts`](src/lib/tasks/completion-ranges.test.ts) | Today/Completed/Alignment 日期区间 query |
+| [`completion-workflows.test.ts`](src/lib/tasks/completion-workflows.test.ts) | Today 折叠 / Completed 分组 / Alignment 摘要 / 子任务 auto-done 端到端纯函数流 |
+
+纯函数模块：[`completion-events.ts`](src/lib/tasks/completion-events.ts)、[`completion-ranges.ts`](src/lib/tasks/completion-ranges.ts)（isomorphic，无 DB）。helpers：[`completion-test-helpers.ts`](src/lib/tasks/completion-test-helpers.ts)。
+
+**仍留实现阶段**：`completions.ts` 真实 DB/transaction 集成测试；HTTP route handler 可选。
+
 ---
 
 ## 7. 实现顺序
 
 1. §1 表 + migration + timezone helpers
-2. `recordCompletionEvent` 接入 `updateTask` / subtask auto-done
-3. `GET /api/completions` + summary
-4. **Tasks 状态分段 + Reopen**（最小可用）
-5. `/completed` + nav
-6. Today 折叠区
-7. Alignment 本周 Card
-8. 更新 [`design.md`](design.md) §7.5–7.6
-9. `npm test` + `npm run build`
+2. `updateTask` / `updateSubtask` 补 `{ tz }` 参数与 route 解析；`api-client` 补 tz 前缀
+3. transaction 内接入 `recordCompletionEvent`
+4. `GET /api/completions` + summary
+5. **Tasks 状态分段 + Reopen**（最小可用）
+6. `/completed` + nav
+7. Today 折叠区
+8. Alignment 本周 Card
+9. 更新 [`design.md`](design.md) §7.5–7.6
+10. `npm test` + `npm run build`
 
 ---
 
@@ -274,10 +321,13 @@ TDD 优先：[`completions.test.ts`](src/lib/services/completions.test.ts)（`re
 ## 9. Checklist
 
 - [ ] `task_completion_events` + migration + 索引
+- [ ] `schema.ts` / `init-sql.ts` / `migrations.ts` 三处同步
 - [ ] `localDateString` / `startOfLocalWeek`
 - [ ] `recordCompletionEvent` 幂等 + weekly occurrence_date
+- [ ] `updateTask` transaction 写入 event，重复 done 不重复 insert
+- [ ] `updateTask` / `updateSubtask` / routes 补 `{ tz }` 传递链
 - [ ] `GET /api/completions` + `/summary`
-- [ ] `api-client` 对 `/api/completions` auto `tz`
+- [ ] `api-client` 对 `/api/tasks` / `/api/subtasks` / `/api/completions` auto `tz`
 - [ ] Tasks `TaskStatusFilter` + done 样式 + Reopen + 已完成禁用拖拽
 - [ ] `/completed` 页 + nav + pillar/时间过滤
 - [ ] Today「今日已完成」折叠
@@ -326,5 +376,16 @@ TDD 优先：[`completions.test.ts`](src/lib/services/completions.test.ts)（`re
 | `/api/completions` 缺 tz 自动注入 | §3 补充 `api-client` 前缀规则 |
 | Completed 页 pillar 展示 | §4.3 客户端 enrich 或 API 快照 |
 | 子任务 auto-done 是否算「完成」？ | **算**；与手动 Complete 同写 event（用户已完成该 task） |
+
+### 第 5 轮：实现风险补强
+
+| 问题 | 修订 |
+|------|------|
+| `updateTask` 当前没有 `tz` 参数 | §2.1 补完整 `tz` 传递链，写路径 route 都解析 `tz` |
+| 子任务 auto-done 走 `/api/subtasks`，原 `api-client` 不加 `tz` | §2.1 / Checklist 扩展 auto-append 前缀 |
+| 幂等如果不在 transaction 内，重复点击可能重复 event | §1.3 明确 transaction 内读旧状态 + update + insert |
+| Tasks `active = status !== done` 不是现有 API filter | §4.2 明确 MVP 客户端分段，done tab 普通列表禁拖拽 |
+| 多日 weekly carry-over 归属无法精确 | §1.2 明确 MVP 归最近 scheduled day，未来再传 `occurrenceDate` |
+| 历史事件依赖当前 strategy enrich 会漂移 | §1.1 / §4.3 增加 pillar name/color 快照 |
 
 **结论**：方案在 product / data / API / UI 四层闭环，可进入实现。

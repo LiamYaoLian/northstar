@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   filterActiveTasks,
+  filterTasksByStatus,
   filterTasksDueToday,
   rankAndLimit,
+  sortDoneTasksByCompletedAt,
   sortTasks,
   takeTopTasks,
 } from "./task-sorting";
@@ -186,5 +188,86 @@ describe("Today flow: pillar filter then rankAndLimit", () => {
     const workOnly = filterTasksByPillar(pool, "p-work");
     expect(rankAndLimit(workOnly, 5).map((t) => t.id)).toEqual(["w1", "w2"]);
     expect(rankAndLimit(workOnly, 1).map((t) => t.id)).toEqual(["w1"]);
+  });
+});
+
+describe("filterTasksByStatus", () => {
+  const rows = [
+    makeTask({ id: "open", status: "todo" }),
+    makeTask({ id: "wip", status: "in_progress" }),
+    makeTask({
+      id: "closed",
+      status: "done",
+      completedAt: "2025-01-07T01:00:00.000Z",
+    }),
+    makeTask({ id: "later", status: "deferred" }),
+  ];
+
+  it("active excludes done tasks (default Tasks tab)", () => {
+    expect(filterTasksByStatus(rows, "active").map((t) => t.id)).toEqual([
+      "open",
+      "wip",
+      "later",
+    ]);
+  });
+
+  it("done includes only done tasks", () => {
+    expect(filterTasksByStatus(rows, "done").map((t) => t.id)).toEqual([
+      "closed",
+    ]);
+  });
+
+  it("all returns every task", () => {
+    expect(filterTasksByStatus(rows, "all")).toHaveLength(4);
+  });
+});
+
+describe("sortDoneTasksByCompletedAt", () => {
+  it("sorts done tasks by completedAt descending", () => {
+    const sorted = sortDoneTasksByCompletedAt([
+      makeTask({
+        id: "old",
+        status: "done",
+        completedAt: "2025-01-06T01:00:00.000Z",
+      }),
+      makeTask({
+        id: "new",
+        status: "done",
+        completedAt: "2025-01-08T01:00:00.000Z",
+      }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual(["new", "old"]);
+  });
+
+  it("treats null completedAt as oldest", () => {
+    const sorted = sortDoneTasksByCompletedAt([
+      makeTask({ id: "no-date", status: "done", completedAt: null }),
+      makeTask({
+        id: "dated",
+        status: "done",
+        completedAt: "2025-01-08T01:00:00.000Z",
+      }),
+    ]);
+    expect(sorted[0]!.id).toBe("dated");
+  });
+});
+
+describe("Tasks done tab workflow", () => {
+  it("filters done then sorts by completedAt for display", () => {
+    const rows = [
+      makeTask({ id: "open", status: "todo" }),
+      makeTask({
+        id: "done-old",
+        status: "done",
+        completedAt: "2025-01-06T01:00:00.000Z",
+      }),
+      makeTask({
+        id: "done-new",
+        status: "done",
+        completedAt: "2025-01-08T01:00:00.000Z",
+      }),
+    ];
+    const done = sortDoneTasksByCompletedAt(filterTasksByStatus(rows, "done"));
+    expect(done.map((t) => t.id)).toEqual(["done-new", "done-old"]);
   });
 });

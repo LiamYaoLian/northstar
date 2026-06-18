@@ -4,6 +4,8 @@ import { shouldShowOnToday } from "@/lib/tasks/recurrence";
 
 export type TaskSortMode = "priority" | "manual";
 
+export type TaskStatusFilter = "active" | "done" | "all";
+
 export function sortTasks(rows: Task[], sort: TaskSortMode): Task[] {
   if (sort === "manual") {
     return [...rows].sort((a, b) => {
@@ -41,4 +43,25 @@ export function filterTasksDueToday(
   return tasks.filter((task) =>
     shouldShowOnToday(toRecurrenceFields(task), now, tz),
   );
+}
+
+export function filterTasksByStatus(
+  tasks: Task[],
+  filter: TaskStatusFilter,
+): Task[] {
+  if (filter === "active") {
+    return tasks.filter((t) => t.status !== "done");
+  }
+  if (filter === "done") {
+    return tasks.filter((t) => t.status === "done");
+  }
+  return tasks;
+}
+
+export function sortDoneTasksByCompletedAt(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    const aTime = a.completedAt ? Date.parse(a.completedAt) : 0;
+    const bTime = b.completedAt ? Date.parse(b.completedAt) : 0;
+    return bTime - aTime;
+  });
 }

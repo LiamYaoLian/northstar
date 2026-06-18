@@ -7,6 +7,7 @@ export const en: Messages = {
     alignment: "Alignment",
     tasks: "Tasks",
     strategy: "Strategy",
+    completed: "Completed",
   },
   common: {
     loading: "Loading...",
@@ -47,6 +48,8 @@ export const en: Messages = {
     viewAll: "View all tasks →",
     recalculatePriority: "Recalculate priority",
     recalculating: "Recalculating...",
+    completedToday: "Completed today",
+    completedCount: "{count} completed",
   },
   tasks: {
     title: "Tasks",
@@ -64,6 +67,18 @@ export const en: Messages = {
     manualOverride: "Manual",
     autoEstimated: "Est.",
     analyzing: "Analyzing...",
+    statusActive: "Active",
+    statusDone: "Done",
+    statusAll: "All",
+  },
+  completed: {
+    title: "Completion log",
+    today: "Today",
+    thisWeek: "This week",
+    all: "All time",
+    empty: "No completions in this range.",
+    groupDate: "Completed on {date}",
+    unassigned: "Unassigned",
   },
   alignment: {
     title: "Alignment",
@@ -74,6 +89,8 @@ export const en: Messages = {
     pillarDrift: "Pillar drift",
     workSubTracks: "Work · sub-tracks",
     procrastinationRadar: "Procrastination radar",
+    weeklyCompletions: "Completed this week",
+    didVsLogged: "Tasks marked done (not time logged)",
   },
   strategy: {
     title: "Strategy",
@@ -110,6 +127,7 @@ export const en: Messages = {
     markIntimidating: "Mark intimidating",
     logTime: "Log time",
     complete: "Complete",
+    reopen: "Reopen",
     factorStrategic: "Strategic urgency",
     factorDeadline: "Deadline pressure",
     factorIntimidation: "Intimidation boost",

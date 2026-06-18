@@ -1,8 +1,17 @@
 import type { Client } from "@libsql/client";
 import { type LibSQLDatabase } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import { eq } from "drizzle-orm";
 import path from "path";
 import * as schema from "./schema";
+import {
+  buildCompletionEventPayload,
+  resolvePillarSnapshotForCompletion,
+} from "@/lib/tasks/completion-events";
+import { DEFAULT_TIMEZONE } from "@/lib/tasks/timezone";
+import { id, nowIso } from "@/lib/utils";
+
+const { tasks, taskCompletionEvents, strategicPillars } = schema;
 
 type Db = LibSQLDatabase<typeof schema>;
 
@@ -45,9 +54,93 @@ export async function addRecurrenceColumnsIfMissing(
   }
 }
 
+export async function addCompletionEventsTableIfMissing(
+  client: Client,
+): Promise<void> {
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS task_completion_events (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      completed_at TEXT NOT NULL,
+      occurrence_date TEXT NOT NULL,
+      task_title TEXT NOT NULL,
+      pillar_id TEXT,
+      pillar_name TEXT,
+      pillar_color TEXT,
+      focus_track TEXT,
+      recurrence_type TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_completion_events_occurrence_date
+    ON task_completion_events (occurrence_date DESC)
+  `);
+  await client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_completion_events_pillar_occurrence
+    ON task_completion_events (pillar_id, occurrence_date DESC)
+  `);
+  await client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_completion_events_task_completed
+    ON task_completion_events (task_id, completed_at DESC)
+  `);
+}
+
+/** One-time style backfill: done tasks without a matching completion event. */
+export async function backfillCompletionEventsIfMissing(
+  db: Db,
+  tz = DEFAULT_TIMEZONE,
+): Promise<void> {
+  const pillars = await db.select().from(strategicPillars);
+  const doneTasks = await db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.status, "done"));
+  if (doneTasks.length === 0) return;
+
+  const existing = await db.select().from(taskCompletionEvents);
+  const existingKeys = new Set(
+    existing.map((row) => `${row.taskId}:${row.completedAt}`),
+  );
+
+  for (const task of doneTasks) {
+    if (!task.completedAt) continue;
+    const key = `${task.id}:${task.completedAt}`;
+    if (existingKeys.has(key)) continue;
+
+    const snapshot = resolvePillarSnapshotForCompletion(task, pillars);
+    const completedAt = new Date(task.completedAt);
+    const payload = buildCompletionEventPayload(
+      task,
+      tz,
+      completedAt,
+      snapshot,
+      id(),
+      nowIso(),
+    );
+
+    await db.insert(taskCompletionEvents).values({
+      id: payload.id,
+      taskId: payload.taskId,
+      completedAt: payload.completedAt,
+      occurrenceDate: payload.occurrenceDate,
+      taskTitle: payload.taskTitle,
+      pillarId: payload.pillarId,
+      pillarName: payload.pillarName,
+      pillarColor: payload.pillarColor,
+      focusTrack: payload.focusTrack,
+      recurrenceType: payload.recurrenceType,
+      createdAt: payload.createdAt,
+    });
+    existingKeys.add(key);
+  }
+}
+
 export async function applyMigrations(client: Client, db: Db) {
   await safeDropIsPinnedIfExists(client);
   await dropIsEntryPointIfExists(client);
   await migrate(db, { migrationsFolder });
   await addRecurrenceColumnsIfMissing(client);
+  await addCompletionEventsTableIfMissing(client);
+  await backfillCompletionEventsIfMissing(db);
 }

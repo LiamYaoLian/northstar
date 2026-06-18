@@ -7,10 +7,12 @@ import {
   endOfLocalDay,
   isValidTimezone,
   isoWeekdayInTz,
+  localDateString,
   resolveTimezone,
   startOfLocalDay,
+  startOfLocalWeek,
 } from "./timezone";
-import { TEST_TZ, MONDAY_10AM_NY, TUESDAY_10AM_NY } from "./recurrence-test-helpers";
+import { TEST_TZ, MONDAY_10AM_NY, TUESDAY_10AM_NY, WEDNESDAY_10AM_NY } from "./recurrence-test-helpers";
 
 describe("resolveTimezone", () => {
   it("returns America/New_York when tz is missing", () => {
@@ -101,5 +103,35 @@ describe("DST edge (America/New_York spring forward)", () => {
   it("startOfLocalDay on spring-forward Sunday is stable UTC instant", () => {
     const start = startOfLocalDay(sundayBeforeDst, TEST_TZ);
     expect(start.toISOString()).toBe("2025-03-09T05:00:00.000Z");
+  });
+});
+
+describe("localDateString", () => {
+  it("returns YYYY-MM-DD in tz", () => {
+    expect(localDateString(MONDAY_10AM_NY, TEST_TZ)).toBe("2025-01-06");
+    expect(localDateString(TUESDAY_10AM_NY, TEST_TZ)).toBe("2025-01-07");
+  });
+
+  it("uses local calendar day near UTC midnight boundary", () => {
+    const mondayNightNy = new Date("2025-01-07T03:00:00.000Z");
+    expect(localDateString(mondayNightNy, TEST_TZ)).toBe("2025-01-06");
+  });
+});
+
+describe("startOfLocalWeek", () => {
+  it("returns Monday 00:00 local for a Wednesday instant", () => {
+    const weekStart = startOfLocalWeek(WEDNESDAY_10AM_NY, TEST_TZ);
+    expect(weekStart.toISOString()).toBe("2025-01-06T05:00:00.000Z");
+    expect(isoWeekdayInTz(weekStart, TEST_TZ)).toBe(1);
+  });
+
+  it("returns same Monday when instant is already Monday", () => {
+    const weekStart = startOfLocalWeek(MONDAY_10AM_NY, TEST_TZ);
+    expect(weekStart.toISOString()).toBe("2025-01-06T05:00:00.000Z");
+  });
+
+  it("localDateString at UTC Tuesday 04:00 still Monday in NY", () => {
+    const utcTuesdayEarly = new Date("2025-01-07T04:00:00.000Z");
+    expect(localDateString(utcTuesdayEarly, TEST_TZ)).toBe("2025-01-06");
   });
 });

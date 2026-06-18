@@ -140,3 +140,15 @@ export function addLocalDays(instant: Date, tz: string, days: number): Date {
     tz,
   );
 }
+
+export function localDateString(instant: Date, tz: string): string {
+  const { year, month, day } = getLocalParts(instant, tz);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Monday 00:00 local in tz. */
+export function startOfLocalWeek(instant: Date, tz: string): Date {
+  const weekday = isoWeekdayInTz(instant, tz);
+  const monday = addLocalDays(instant, tz, -(weekday - 1));
+  return startOfLocalDay(monday, tz);
+}

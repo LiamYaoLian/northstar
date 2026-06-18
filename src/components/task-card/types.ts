@@ -21,6 +21,7 @@ export type TaskCardProps = {
   pillars?: PillarOption[];
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
+  onReopen?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;
   onBreakdown?: (id: string, userPrompt?: string) => Promise<BreakdownPreviewResult | null>;
   onApplyBreakdown?: (

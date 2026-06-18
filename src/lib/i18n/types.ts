@@ -2,7 +2,7 @@ export type Locale = "zh" | "en";
 
 export type Messages = {
   header: { tagline: string };
-  nav: { today: string; alignment: string; tasks: string; strategy: string };
+  nav: { today: string; alignment: string; tasks: string; strategy: string; completed: string };
   common: {
     loading: string;
     retry: string;
@@ -42,6 +42,8 @@ export type Messages = {
     viewAll: string;
     recalculatePriority: string;
     recalculating: string;
+    completedToday: string;
+    completedCount: string;
   };
   tasks: {
     title: string;
@@ -59,6 +61,18 @@ export type Messages = {
     manualOverride: string;
     autoEstimated: string;
     analyzing: string;
+    statusActive: string;
+    statusDone: string;
+    statusAll: string;
+  };
+  completed: {
+    title: string;
+    today: string;
+    thisWeek: string;
+    all: string;
+    empty: string;
+    groupDate: string;
+    unassigned: string;
   };
   alignment: {
     title: string;
@@ -69,6 +83,8 @@ export type Messages = {
     pillarDrift: string;
     workSubTracks: string;
     procrastinationRadar: string;
+    weeklyCompletions: string;
+    didVsLogged: string;
   };
   strategy: {
     title: string;
@@ -104,6 +120,7 @@ export type Messages = {
     markIntimidating: string;
     logTime: string;
     complete: string;
+    reopen: string;
     factorStrategic: string;
     factorDeadline: string;
     factorIntimidation: string;

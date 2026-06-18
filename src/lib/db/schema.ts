@@ -81,6 +81,20 @@ export const timeEntries = sqliteTable("time_entries", {
   createdAt: text("created_at").notNull(),
 });
 
+export const taskCompletionEvents = sqliteTable("task_completion_events", {
+  id: text("id").primaryKey(),
+  taskId: text("task_id").notNull(),
+  completedAt: text("completed_at").notNull(),
+  occurrenceDate: text("occurrence_date").notNull(),
+  taskTitle: text("task_title").notNull(),
+  pillarId: text("pillar_id"),
+  pillarName: text("pillar_name"),
+  pillarColor: text("pillar_color"),
+  focusTrack: text("focus_track"),
+  recurrenceType: text("recurrence_type").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const reviewSnapshots = sqliteTable("review_snapshots", {
   id: text("id").primaryKey(),
   periodStart: text("period_start").notNull(),
@@ -98,6 +112,7 @@ export type StrategicPillar = typeof strategicPillars.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type Subtask = typeof subtasks.$inferSelect;
+export type TaskCompletionEventRow = typeof taskCompletionEvents.$inferSelect;
 
 export type FocusTrack = {
   name: string;

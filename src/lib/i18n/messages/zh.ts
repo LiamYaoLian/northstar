@@ -7,6 +7,7 @@ export const zh: Messages = {
     alignment: "对齐",
     tasks: "任务",
     strategy: "战略",
+    completed: "完成",
   },
   common: {
     loading: "加载中...",
@@ -47,6 +48,8 @@ export const zh: Messages = {
     viewAll: "查看全部待办 →",
     recalculatePriority: "重算优先级",
     recalculating: "重算中...",
+    completedToday: "今日已完成",
+    completedCount: "已完成 {count} 项",
   },
   tasks: {
     title: "任务",
@@ -64,6 +67,18 @@ export const zh: Messages = {
     manualOverride: "手动指定",
     autoEstimated: "估",
     analyzing: "分析中...",
+    statusActive: "进行中",
+    statusDone: "已完成",
+    statusAll: "全部",
+  },
+  completed: {
+    title: "完成记录",
+    today: "今天",
+    thisWeek: "本周",
+    all: "全部",
+    empty: "该时间范围内没有完成记录。",
+    groupDate: "{date} 完成",
+    unassigned: "未归类",
   },
   alignment: {
     title: "对齐",
@@ -74,6 +89,8 @@ export const zh: Messages = {
     pillarDrift: "Pillar 偏离",
     workSubTracks: "工作 · 子赛道",
     procrastinationRadar: "拖延雷达",
+    weeklyCompletions: "本周完成",
+    didVsLogged: "标记完成的任务（非投入时间）",
   },
   strategy: {
     title: "战略",
@@ -110,6 +127,7 @@ export const zh: Messages = {
     markIntimidating: "标记恐吓",
     logTime: "记录时间",
     complete: "完成",
+    reopen: "重新打开",
     factorStrategic: "战略纠偏",
     factorDeadline: "截止压力",
     factorIntimidation: "恐吓加成",
