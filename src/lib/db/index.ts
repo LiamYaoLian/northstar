@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import * as schema from "./schema";
 import { INIT_SQL } from "./init-sql";
+import { applyMigrations } from "./migrations";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "northstar.db");
@@ -29,12 +30,13 @@ function createDbClient(): Client {
   return createClient({ url: `file:${DB_PATH}` });
 }
 
-async function initSchema(client: Client) {
+async function initSchema(client: Client, db: Db) {
   if (!process.env.TURSO_DATABASE_URL) {
     await client.execute("PRAGMA busy_timeout = 5000");
   }
 
   await client.executeMultiple(INIT_SQL);
+  await applyMigrations(client, db);
 
   if (!process.env.TURSO_DATABASE_URL) {
     const cols = await client.execute("PRAGMA table_info(tasks)");
@@ -52,7 +54,7 @@ async function initSchema(client: Client) {
 const client = createDbClient();
 const db = drizzle(client, { schema });
 
-const ready = initSchema(client);
+const ready = initSchema(client, db);
 
 export type Db = LibSQLDatabase<typeof schema>;
 

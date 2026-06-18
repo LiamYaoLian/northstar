@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node --env-file=.env.local --import tsx src/scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:sync-turso": "node --env-file=.env.local --import tsx src/scripts/sync-local-to-turso.ts",
     "db:seed": "tsx src/scripts/seed.ts",
