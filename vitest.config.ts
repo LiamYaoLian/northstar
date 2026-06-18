@@ -4,6 +4,11 @@ import path from "path";
 export default defineConfig({
   test: {
     environment: "node",
+    environmentMatchGlobs: [
+      ["src/components/**/*.test.tsx", "happy-dom"],
+      ["src/components/**/*.test.ts", "happy-dom"],
+    ],
+    setupFiles: ["./src/test/setup.ts"],
   },
   resolve: {
     alias: {
