@@ -45,3 +45,29 @@ export function enrichTasksWithPillars<T extends Task>(
     };
   });
 }
+
+export function filterTasksByPillar<T extends Task>(
+  taskList: T[],
+  pillarId: string | null,
+): T[] {
+  if (!pillarId) return taskList;
+  return taskList.filter((task) => task.pillarId === pillarId);
+}
+
+export function mergeFilteredTaskReorder(
+  allIds: string[],
+  filteredIds: string[],
+  reorderedFilteredIds: string[],
+): string[] {
+  if (reorderedFilteredIds.length !== filteredIds.length) {
+    return allIds;
+  }
+
+  const filteredSet = new Set(filteredIds);
+  let filteredIndex = 0;
+
+  return allIds.map((id) => {
+    if (!filteredSet.has(id)) return id;
+    return reorderedFilteredIds[filteredIndex++] ?? id;
+  });
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CategoryFilter } from "@/components/category-filter";
 import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
 import { apiFetch } from "@/lib/api-client";
@@ -9,6 +10,8 @@ import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
 import {
   enrichTasksWithPillars,
+  filterTasksByPillar,
+  mergeFilteredTaskReorder,
   parseStrategyPillars,
   type PillarOption,
   type TaskRow,
@@ -27,6 +30,7 @@ export default function TasksPage() {
   const [newTaskPillarId, setNewTaskPillarId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
   const [classifying, setClassifying] = useState(false);
 
@@ -140,7 +144,29 @@ export default function TasksPage() {
     }
   }
 
-  const taskMap = new Map(tasks.map((task) => [task.id, task]));
+  const filteredTasks = useMemo(
+    () => filterTasksByPillar(tasks, categoryFilter),
+    [tasks, categoryFilter],
+  );
+
+  const handleReorder = useCallback(
+    async (orderedIds: string[]) => {
+      if (categoryFilter) {
+        await reorderTasks(
+          mergeFilteredTaskReorder(
+            tasks.map((task) => task.id),
+            filteredTasks.map((task) => task.id),
+            orderedIds,
+          ),
+        );
+        return;
+      }
+      await reorderTasks(orderedIds);
+    },
+    [categoryFilter, filteredTasks, reorderTasks, tasks],
+  );
+
+  const taskMap = new Map(filteredTasks.map((task) => [task.id, task]));
 
   return (
     <div className="space-y-4">
@@ -227,6 +253,12 @@ export default function TasksPage() {
         )}
       </form>
 
+      <CategoryFilter
+        pillars={pillars}
+        selectedPillarId={categoryFilter}
+        onChange={setCategoryFilter}
+      />
+
       <p className="text-xs text-muted">
         {t.tasks.hint}
         {pillars.length > 0 &&
@@ -234,8 +266,8 @@ export default function TasksPage() {
       </p>
 
       <SortableTaskList
-        taskIds={tasks.map((task) => task.id)}
-        onReorder={reorderTasks}
+        taskIds={filteredTasks.map((task) => task.id)}
+        onReorder={handleReorder}
       >
         {(taskId) => {
           const task = taskMap.get(taskId);

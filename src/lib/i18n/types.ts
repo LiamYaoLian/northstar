@@ -18,6 +18,8 @@ export type Messages = {
     underFloor: string;
     perWeek: string;
     subTracks: string;
+    allCategories: string;
+    filterByCategory: string;
   };
   errors: {
     loadFailed: string;

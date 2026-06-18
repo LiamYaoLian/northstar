@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CategoryFilter } from "@/components/category-filter";
 import { TaskCard } from "@/components/task-card";
 import { apiFetch } from "@/lib/api-client";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
@@ -10,6 +11,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { localeTag } from "@/lib/i18n/entities";
 import {
   enrichTasksWithPillars,
+  filterTasksByPillar,
   parseStrategyPillars,
   type PillarOption,
   type TaskRow,
@@ -19,8 +21,9 @@ import { takeTopTasks } from "@/lib/services/task-sorting";
 export default function TodayPage() {
   const router = useRouter();
   const { locale, t } = useLocale();
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [allTasks, setAllTasks] = useState<TaskRow[]>([]);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
@@ -44,14 +47,11 @@ export default function TodayPage() {
       );
       setPillars(strategyPillars);
 
-      const today = enrichTasksWithPillars(
-        takeTopTasks(tasksData.tasks, 5),
-        strategyPillars,
-      );
-      setTasks(today);
+      const enriched = enrichTasksWithPillars(tasksData.tasks, strategyPillars);
+      setAllTasks(enriched);
       setUpdatedAt(
-        today[0]?.priorityComputedAt
-          ? new Date(today[0].priorityComputedAt).toLocaleTimeString(
+        enriched[0]?.priorityComputedAt
+          ? new Date(enriched[0].priorityComputedAt).toLocaleTimeString(
               localeTag(locale),
               { hour: "2-digit", minute: "2-digit" },
             )
@@ -61,6 +61,11 @@ export default function TodayPage() {
       setError(e instanceof Error ? e.message : t.errors.loadFailed);
     }
   }, [router, locale, t.errors.loadFailed]);
+
+  const tasks = useMemo(() => {
+    const filtered = filterTasksByPillar(allTasks, categoryFilter);
+    return takeTopTasks(filtered, 5);
+  }, [allTasks, categoryFilter]);
 
   useEffect(() => {
     void load();
@@ -109,6 +114,12 @@ export default function TodayPage() {
           {error}
         </div>
       )}
+
+      <CategoryFilter
+        pillars={pillars}
+        selectedPillarId={categoryFilter}
+        onChange={setCategoryFilter}
+      />
 
       {tasks.length === 0 ? (
         <p className="text-sm text-muted">

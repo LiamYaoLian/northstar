@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   enrichTasksWithPillars,
+  filterTasksByPillar,
+  mergeFilteredTaskReorder,
   parseStrategyPillars,
 } from "./enrich-tasks";
 import { makeTask } from "@/lib/test-fixtures";
@@ -35,5 +37,29 @@ describe("enrichTasksWithPillars", () => {
     );
     expect(task.pillarName).toBe("工作");
     expect(task.pillarColor).toBe("#3b82f6");
+  });
+});
+
+describe("filterTasksByPillar", () => {
+  it("returns only tasks in the selected pillar", () => {
+    const tasks = [
+      makeTask({ id: "t1", pillarId: "p-work" }),
+      makeTask({ id: "t2", pillarId: "p-health" }),
+    ];
+    expect(filterTasksByPillar(tasks, "p-work").map((task) => task.id)).toEqual([
+      "t1",
+    ]);
+    expect(filterTasksByPillar(tasks, null)).toHaveLength(2);
+  });
+});
+
+describe("mergeFilteredTaskReorder", () => {
+  it("reorders only filtered ids within the full task order", () => {
+    const merged = mergeFilteredTaskReorder(
+      ["a", "b", "c", "d"],
+      ["b", "d"],
+      ["d", "b"],
+    );
+    expect(merged).toEqual(["a", "d", "c", "b"]);
   });
 });

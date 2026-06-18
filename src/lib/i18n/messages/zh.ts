@@ -23,6 +23,8 @@ export const zh: Messages = {
     underFloor: "低于 floor",
     perWeek: "min/周",
     subTracks: "子赛道",
+    allCategories: "全部",
+    filterByCategory: "按类别筛选",
   },
   errors: {
     loadFailed: "加载失败",

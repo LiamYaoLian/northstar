@@ -23,6 +23,8 @@ export const en: Messages = {
     underFloor: "under floor",
     perWeek: "min/wk",
     subTracks: "Sub-tracks",
+    allCategories: "All",
+    filterByCategory: "Filter by category",
   },
   errors: {
     loadFailed: "Failed to load",
