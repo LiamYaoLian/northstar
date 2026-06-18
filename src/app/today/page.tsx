@@ -99,14 +99,17 @@ export default function TodayPage() {
             {t.today.subtitle} {updatedAt}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={recalculating}
-          onClick={() => void recalculatePriority()}
-          className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
-        >
-          {recalculating ? t.today.recalculating : t.today.recalculatePriority}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            disabled={recalculating}
+            onClick={() => void recalculatePriority()}
+            className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+          >
+            {recalculating ? t.today.recalculating : t.today.recalculatePriority}
+          </button>
+          <p className="text-xs text-muted">{t.tasks.hint}</p>
+        </div>
       </div>
 
       {error && (
