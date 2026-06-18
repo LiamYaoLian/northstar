@@ -33,7 +33,7 @@ import {
   type TaskSortMode,
 } from "@/lib/services/task-sorting";
 import { id, nowIso } from "@/lib/utils";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
 
 export type { TaskSortMode };
@@ -241,55 +241,81 @@ export async function applyBreakdownPreview(
   breakdown?: Awaited<ReturnType<typeof generateBreakdown>>,
 ): Promise<BreakdownAppliedResponse> {
   await ensureDbReady();
+  const db = getDb();
   const task = await fetchTaskById(taskId);
   if (!task) {
     return { preview: false, task: null, subtasks: [], breakdown: breakdown as never };
   }
 
   const existing = await listSubtasks(taskId);
+  const existingById = new Map(existing.map((subtask) => [subtask.id, subtask]));
   const keepIds = new Set(
     proposed.map((item) => item.existingId).filter(Boolean) as string[],
   );
+  const deleteIds = existing
+    .filter((subtask) => !keepIds.has(subtask.id))
+    .map((subtask) => subtask.id);
 
-  for (const subtask of existing) {
-    if (!keepIds.has(subtask.id)) {
-      await deleteSubtask(subtask.id);
-    }
-  }
+  const ts = nowIso();
+  const inserts: (typeof subtasks.$inferInsert)[] = [];
+  const updates: { id: string; patch: Partial<typeof subtasks.$inferInsert> }[] = [];
 
-  const finalIds: string[] = [];
-  for (const item of proposed) {
+  for (const [sortOrder, item] of proposed.entries()) {
+    const title = item.title.trim();
     if (item.existingId && keepIds.has(item.existingId)) {
-      const current = existing.find((subtask) => subtask.id === item.existingId);
-      if (current && current.title !== item.title) {
-        await updateSubtask(item.existingId, { title: item.title });
+      const current = existingById.get(item.existingId);
+      if (!current) continue;
+
+      const patch: Partial<typeof subtasks.$inferInsert> = {};
+      if (current.sortOrder !== sortOrder) {
+        patch.sortOrder = sortOrder;
       }
-      finalIds.push(item.existingId);
+      if (current.title !== title) {
+        patch.title = title;
+      }
+      if (Object.keys(patch).length > 0) {
+        updates.push({ id: item.existingId, patch });
+      }
       continue;
     }
 
-    const created = await createSubtask(taskId, {
-      title: item.title,
+    inserts.push({
+      id: id(),
+      parentTaskId: taskId,
+      title,
+      sortOrder,
       isEntryPoint: false,
+      isDone: false,
+      createdAt: ts,
     });
-    if (created) finalIds.push(created.id);
   }
 
-  if (finalIds.length > 0) {
-    await reorderSubtasks(taskId, finalIds);
-  }
+  await db.transaction(async (tx) => {
+    if (deleteIds.length > 0) {
+      await tx.delete(subtasks).where(inArray(subtasks.id, deleteIds));
+    }
 
-  const ts = nowIso();
-  if (breakdown) {
-    await getDb()
-      .update(tasks)
-      .set({
-        intimidationScore: breakdown.intimidationScore ?? task.intimidationScore,
-        estimatedMin: task.estimatedMin ?? breakdown.estimatedMinTotal ?? null,
-        updatedAt: ts,
-      })
-      .where(eq(tasks.id, taskId));
-  }
+    for (const { id: subtaskId, patch } of updates) {
+      await tx.update(subtasks).set(patch).where(eq(subtasks.id, subtaskId));
+    }
+
+    if (inserts.length > 0) {
+      await tx.insert(subtasks).values(inserts);
+    }
+
+    if (breakdown) {
+      await tx
+        .update(tasks)
+        .set({
+          intimidationScore: breakdown.intimidationScore ?? task.intimidationScore,
+          estimatedMin: task.estimatedMin ?? breakdown.estimatedMinTotal ?? null,
+          updatedAt: ts,
+        })
+        .where(eq(tasks.id, taskId));
+    } else {
+      await tx.update(tasks).set({ updatedAt: ts }).where(eq(tasks.id, taskId));
+    }
+  });
 
   return {
     preview: false,
