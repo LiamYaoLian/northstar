@@ -4,6 +4,23 @@
 
 ---
 
+## 0. 当前状态（2026-06-18）
+
+MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Today、对齐、Tasks、Strategy；旧的 Completed / Review 页面保留为 thin redirect，分别跳到 Alignment 的完成记录与快照锚点。
+
+| 能力 | 最新状态 |
+|------|----------|
+| 战略 / Onboarding | 5 步模板化建模；Strategy 页可编辑 North Star、horizon、每周小时与 Work 主赛道 |
+| 任务 / 优先级 | 创建、AI/规则分类与估时、自动拆解、手动排序、Top 5 Today、defer、recurring lazy reset 均已接入 |
+| 完成可见性 | `task_completion_events` 不可变快照已落库；Today 有「今日已完成」折叠；Alignment 有周期完成记录 |
+| Alignment | `?period=today\|week\|month\|all` 驱动 KPI、pillar drift、Work sub-tracks、完成记录与 CSV 导出 |
+| Review 快照 | week/month 周期可在 Alignment 顶部保存；`#snapshots` 展示最近历史 |
+| CSV 导出 | Alignment 支持 completions CSV 与 time entries CSV；导出使用当前 period 与 pillar 筛选 |
+| UX 收尾 | Today 筛选空状态、Tasks 进行中空状态、错误重试与 i18n 文案已补齐 |
+| 非 MVP 债务 | optimistic UI、多用户 auth、拖延雷达周期化仍保留为后续可选 |
+
+---
+
 ## 1. 产品定位
 
 ### 1.1 核心问题
@@ -175,7 +192,7 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 
 ### 3.3 回顾层
 
-**`review_snapshots`** — 周期回顾快照（`/review` 页可保存）
+**`review_snapshots`** — 周期回顾快照（Alignment 页 week/month 可保存；`/review` 仅重定向到 `#snapshots`）
 
 | 字段 | 说明 |
 |------|------|
@@ -183,7 +200,7 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 | `plannedPct` / `actualPct` | JSON map pillarId → % |
 | `driftScore` | 各 pillar \|drift\| 之和 |
 | `alignmentScore` | 与 Alignment 同公式 |
-| `aiSummary` | JSON highlights（完成摘要、记录分钟） |
+| `aiSummary` | JSON highlights（完成摘要、记录分钟；当前为规则汇总，不调用 LLM） |
 
 ---
 
@@ -239,7 +256,7 @@ Onboarding 结束时 seed 4 条示例任务（LC、投资复盘、晨跑、家�
 | `staleness` | 0.10 | 创建越久轻微升高 |
 | `recentlyDonePenalty` | 0.10 | 当前恒为 0（预留） |
 
-Recurring 任务的 `effectiveDue` 来自 `virtualDeadlineForPriority()`（见 §6.6）。
+Recurring 任务的 `effectiveDue` 来自 `virtualDeadlineForPriority()`（见 §8.3）。
 
 ### 5.2 重算与手动排序
 
@@ -258,6 +275,8 @@ Recurring 任务的 `effectiveDue` 来自 `virtualDeadlineForPriority()`（见 �
 实现于 `src/lib/alignment/index.ts`，`GET /api/alignment?period=&tz=` 聚合返回。
 
 **周期范围**：顶部 `?period=today|week|month|all`（默认 week）同时驱动 pillar 对齐、Work focus tracks、KPI 记时与完成记录列表。`time_entries` 在 `all` 时不做日期过滤；其余档位按用户时区闭区间过滤。拖延雷达仍基于全量任务与时间记录。
+
+Alignment 顶部同时提供两个导出入口：完成记录 CSV 复用当前 period 与 pillar filter；时间记录 CSV 复用当前 period，但不受 pillar filter 影响（按任务快照补 pillar / focusTrack 信息）。
 
 ### 6.1 Pillar 对齐
 
@@ -283,6 +302,10 @@ Recurring 任务的 `effectiveDue` 来自 `virtualDeadlineForPriority()`（见 �
 - `postponedCount ≥ 3`
 
 最多返回 5 条，供 Alignment 页展示。
+
+### 6.4 Review 快照
+
+Alignment 的 `week` / `month` period 映射到 review period，可保存当前 live dashboard 为 `review_snapshots`。保存时同一周期更新既有快照；`#snapshots` 展示最近 12 条历史。`today` / `all` 不展示保存按钮。
 
 ---
 
@@ -450,7 +473,8 @@ Classify 对 Work pillar 额外推断 `focusTrack`（`suggestFocusTrack` 规则 
 | GET/POST | `/api/time-entries` | — | 时间记录 |
 | GET | `/api/time-entries/export?since=&until=&tz=` | ✓ | 周期内 time log CSV |
 | GET/POST | `/api/strategy` | — | 策略读 / 全量写（onboarding） |
-| GET/POST | `/api/reviews?period=&tz=` | ✓ | 周期回顾 live 数据 / 保存快照 |
+| GET | `/api/reviews?period=&tz=` | ✓ | 周期回顾 live 数据 + saved/history |
+| POST | `/api/reviews` | ✓ body `tz` | 保存 week/month 快照（body.period） |
 | PATCH | `/api/strategy` | — | North Star + Work 主赛道编辑 |
 | GET | `/api/alignment?period=&tz=` | ✓ | 对齐仪表盘 + 拖延；`period` 默认 week |
 | POST | `/api/critique` | — | Brain dump 分析 |
@@ -593,6 +617,7 @@ Turso 空库时可 `npm run db:sync-turso` 从本地同步。
 | 无 optimistic UI | 完成/ PATCH 后 full reload |
 | Defer 恢复 | 「回到今日」仅改 status，不重置 postponedCount（供拖延雷达） |
 | One-off due Today | 非 recurring 任务不做「仅 due 日显示」过滤 |
+| Review save tz | `POST /api/reviews` 当前读 body.tz；客户端自动 append 的 query `tz` 不参与保存请求 |
 | DST 测试 | 实现 DST-safe，无专项 transition 测试套件 |
 
 ---
