@@ -1,5 +1,7 @@
 import type { FocusTrack, PriorityFactors, Subtask, Task } from "@/lib/db/schema";
 
+import type { BreakdownPreviewResult } from "@/lib/tasks/subtask-diff";
+
 export type PillarOption = {
   id: string;
   name: string;
@@ -21,7 +23,11 @@ export type TaskCardProps = {
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;
-  onBreakdown?: (id: string, userPrompt?: string) => Promise<void>;
+  onBreakdown?: (id: string, userPrompt?: string) => Promise<BreakdownPreviewResult | null>;
+  onApplyBreakdown?: (
+    taskId: string,
+    proposed: BreakdownPreviewResult["proposed"],
+  ) => Promise<void>;
   onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
   onUpdateSubtaskTitle?: (subtaskId: string, title: string) => void;
   onAddSubtask?: (

@@ -13,6 +13,14 @@ import {
   shouldAutoBreakdown,
 } from "@/lib/ai/breakdown";
 import { findWorkPillar, isWorkPillar } from "@/lib/pillars";
+import {
+  computeSubtaskDiff,
+  hasSubtaskDiffChanges,
+  resolveProposedSubtasks,
+  type BreakdownPreviewResult,
+  type ProposedSubtask,
+  type SubtaskDiffLine,
+} from "@/lib/tasks/subtask-diff";
 import { classifyTaskTitle, type ClassifyResult } from "@/lib/tasks/classify";
 import {
   applyManualReorderScores,
@@ -165,11 +173,32 @@ export async function breakdownTask(
   taskId: string,
   options?: { userPrompt?: string },
 ) {
+  const preview = await previewBreakdownTask(taskId, options);
+  if (preview.preview) {
+    throw new Error("Breakdown requires confirmation when subtasks already exist");
+  }
+  return preview;
+}
+
+export type BreakdownPreviewResponse = BreakdownPreviewResult;
+
+export type BreakdownAppliedResponse = {
+  preview: false;
+  task: Task | null | undefined;
+  subtasks: Subtask[];
+  breakdown: Awaited<ReturnType<typeof generateBreakdown>>;
+};
+
+export async function previewBreakdownTask(
+  taskId: string,
+  options?: { userPrompt?: string },
+): Promise<BreakdownPreviewResponse | BreakdownAppliedResponse> {
   await ensureDbReady();
   const db = getDb();
   const task = await fetchTaskById(taskId);
-  if (!task) return null;
+  if (!task) return { preview: false, task: null, subtasks: [], breakdown: null as never };
 
+  const existing = await listSubtasks(taskId);
   const stars = await db.select().from(northStars);
   const pillar = task.pillarId
     ? (await db
@@ -178,40 +207,95 @@ export async function breakdownTask(
         .where(eq(strategicPillars.id, task.pillarId)))[0]
     : null;
 
-  const result = await generateBreakdown(task.title, task.description, {
+  const breakdown = await generateBreakdown(task.title, task.description, {
     northStar: stars[0]?.statement,
     pillar: pillar?.name,
     userPrompt: options?.userPrompt,
+    existingSubtasks: existing.map((subtask) => ({
+      id: subtask.id,
+      title: subtask.title,
+      isDone: subtask.isDone,
+    })),
   });
 
-  const existing = await listSubtasks(taskId);
+  const proposed = resolveProposedSubtasks(existing, breakdown.subtasks);
+  const diff = computeSubtaskDiff(existing, proposed);
 
-  const ts = nowIso();
-  for (const [i, item] of result.subtasks.entries()) {
-    await db.insert(subtasks).values({
-      id: id(),
-      parentTaskId: taskId,
-      title: item.title,
-      sortOrder: existing.length + i,
-      isEntryPoint: false,
-      isDone: false,
-      createdAt: ts,
-    });
+  if (existing.length === 0 || !hasSubtaskDiffChanges(diff)) {
+    return applyBreakdownPreview(taskId, proposed, breakdown);
   }
 
-  await db
-    .update(tasks)
-    .set({
-      intimidationScore: result.intimidationScore ?? task.intimidationScore,
-      estimatedMin: task.estimatedMin ?? result.estimatedMinTotal ?? null,
-      updatedAt: ts,
-    })
-    .where(eq(tasks.id, taskId));
+  return {
+    preview: true,
+    diff,
+    proposed,
+    summary: breakdown.summary,
+    source: breakdown.source,
+    noChanges: !hasSubtaskDiffChanges(diff),
+  };
+}
+
+export async function applyBreakdownPreview(
+  taskId: string,
+  proposed: ProposedSubtask[],
+  breakdown?: Awaited<ReturnType<typeof generateBreakdown>>,
+): Promise<BreakdownAppliedResponse> {
+  await ensureDbReady();
+  const task = await fetchTaskById(taskId);
+  if (!task) {
+    return { preview: false, task: null, subtasks: [], breakdown: breakdown as never };
+  }
+
+  const existing = await listSubtasks(taskId);
+  const keepIds = new Set(
+    proposed.map((item) => item.existingId).filter(Boolean) as string[],
+  );
+
+  for (const subtask of existing) {
+    if (!keepIds.has(subtask.id)) {
+      await deleteSubtask(subtask.id);
+    }
+  }
+
+  const finalIds: string[] = [];
+  for (const item of proposed) {
+    if (item.existingId && keepIds.has(item.existingId)) {
+      const current = existing.find((subtask) => subtask.id === item.existingId);
+      if (current && current.title !== item.title) {
+        await updateSubtask(item.existingId, { title: item.title });
+      }
+      finalIds.push(item.existingId);
+      continue;
+    }
+
+    const created = await createSubtask(taskId, {
+      title: item.title,
+      isEntryPoint: false,
+    });
+    if (created) finalIds.push(created.id);
+  }
+
+  if (finalIds.length > 0) {
+    await reorderSubtasks(taskId, finalIds);
+  }
+
+  const ts = nowIso();
+  if (breakdown) {
+    await getDb()
+      .update(tasks)
+      .set({
+        intimidationScore: breakdown.intimidationScore ?? task.intimidationScore,
+        estimatedMin: task.estimatedMin ?? breakdown.estimatedMinTotal ?? null,
+        updatedAt: ts,
+      })
+      .where(eq(tasks.id, taskId));
+  }
 
   return {
+    preview: false,
     task: await fetchTaskById(taskId),
     subtasks: await listSubtasks(taskId),
-    breakdown: result,
+    breakdown: breakdown ?? (null as never),
   };
 }
 

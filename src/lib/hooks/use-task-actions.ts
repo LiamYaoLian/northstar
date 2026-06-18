@@ -1,6 +1,10 @@
 import { useCallback, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { Messages } from "@/lib/i18n/types";
+import type {
+  BreakdownPreviewResult,
+  ProposedSubtask,
+} from "@/lib/tasks/subtask-diff";
 
 type TaskActionErrors = Messages["errors"];
 
@@ -55,12 +59,35 @@ export function useTaskActions({
   }, [reload, errors.recalculateFailed, onError]);
 
   const breakdownTask = useCallback(
-    async (taskId: string, userPrompt?: string) => {
+    async (taskId: string, userPrompt?: string): Promise<BreakdownPreviewResult | null> => {
       try {
-        await apiFetch(`/api/tasks/${taskId}/breakdown`, {
+        const result = await apiFetch<
+          BreakdownPreviewResult | { preview: false }
+        >(`/api/tasks/${taskId}/breakdown`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: userPrompt ?? "" }),
+        });
+        if (result.preview) {
+          return result;
+        }
+        await reload();
+        return null;
+      } catch (err) {
+        onError(err instanceof Error ? err.message : errors.breakdownFailed);
+        throw err;
+      }
+    },
+    [reload, errors.breakdownFailed, onError],
+  );
+
+  const applyBreakdown = useCallback(
+    async (taskId: string, proposed: ProposedSubtask[]) => {
+      try {
+        await apiFetch(`/api/tasks/${taskId}/breakdown/apply`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ proposed }),
         });
         await reload();
       } catch (err) {
@@ -186,6 +213,7 @@ export function useTaskActions({
     changePillar,
     recalculatePriority,
     breakdownTask,
+    applyBreakdown,
     toggleSubtask,
     updateSubtaskTitle,
     addSubtask,

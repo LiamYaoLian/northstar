@@ -72,6 +72,7 @@ export default function TodayPage() {
     changePillar,
     recalculatePriority,
     breakdownTask,
+    applyBreakdown,
     toggleSubtask,
     updateSubtaskTitle,
     addSubtask,
@@ -126,6 +127,7 @@ export default function TodayPage() {
             pillars={pillars}
             onChangePillar={changePillar}
             onBreakdown={breakdownTask}
+            onApplyBreakdown={applyBreakdown}
             onAddSubtask={addSubtask}
             onDeleteSubtask={(id) => void deleteSubtask(id)}
             onReorderSubtasks={reorderSubtasks}

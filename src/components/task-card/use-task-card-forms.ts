@@ -1,8 +1,13 @@
 import { useCallback, useState } from "react";
+import type { BreakdownPreviewResult } from "@/lib/tasks/subtask-diff";
 
 type UseTaskCardFormsOptions = {
   taskId: string;
-  onBreakdown?: (id: string, userPrompt?: string) => Promise<void>;
+  onBreakdown?: (id: string, userPrompt?: string) => Promise<BreakdownPreviewResult | null>;
+  onApplyBreakdown?: (
+    taskId: string,
+    proposed: BreakdownPreviewResult["proposed"],
+  ) => Promise<void>;
   onAddSubtask?: (
     taskId: string,
     title: string,
@@ -13,6 +18,7 @@ type UseTaskCardFormsOptions = {
 export function useTaskCardForms({
   taskId,
   onBreakdown,
+  onApplyBreakdown,
   onAddSubtask,
 }: UseTaskCardFormsOptions) {
   const [showManual, setShowManual] = useState(false);
@@ -21,7 +27,10 @@ export function useTaskCardForms({
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [asEntryPoint, setAsEntryPoint] = useState(false);
   const [breaking, setBreaking] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [pendingPreview, setPendingPreview] =
+    useState<BreakdownPreviewResult | null>(null);
 
   const toggleManual = useCallback(() => setShowManual((v) => !v), []);
   const toggleAiBreakdown = useCallback(() => setShowAiBreakdown((v) => !v), []);
@@ -32,8 +41,12 @@ export function useTaskCardForms({
       if (!onBreakdown) return;
       setBreaking(true);
       try {
-        await onBreakdown(taskId, aiPrompt.trim() || undefined);
+        const preview = await onBreakdown(taskId, aiPrompt.trim() || undefined);
         setAiPrompt("");
+        if (preview?.preview) {
+          setPendingPreview(preview);
+          return;
+        }
         setShowAiBreakdown(false);
       } finally {
         setBreaking(false);
@@ -41,6 +54,22 @@ export function useTaskCardForms({
     },
     [aiPrompt, onBreakdown, taskId],
   );
+
+  const handleConfirmBreakdown = useCallback(async () => {
+    if (!onApplyBreakdown || !pendingPreview) return;
+    setApplying(true);
+    try {
+      await onApplyBreakdown(taskId, pendingPreview.proposed);
+      setPendingPreview(null);
+      setShowAiBreakdown(false);
+    } finally {
+      setApplying(false);
+    }
+  }, [onApplyBreakdown, pendingPreview, taskId]);
+
+  const handleCancelBreakdown = useCallback(() => {
+    setPendingPreview(null);
+  }, []);
 
   const handleAddSubtask = useCallback(
     async (e: React.FormEvent) => {
@@ -68,10 +97,14 @@ export function useTaskCardForms({
     asEntryPoint,
     setAsEntryPoint,
     breaking,
+    applying,
     adding,
+    pendingPreview,
     toggleManual,
     toggleAiBreakdown,
     handleBreakdown,
+    handleConfirmBreakdown,
+    handleCancelBreakdown,
     handleAddSubtask,
   };
 }

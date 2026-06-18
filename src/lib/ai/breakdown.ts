@@ -189,7 +189,12 @@ export function ruleBasedBreakdown(
 async function openAiBreakdown(
   title: string,
   description: string | null | undefined,
-  context?: { northStar?: string; pillar?: string; userPrompt?: string },
+  context?: {
+    northStar?: string;
+    pillar?: string;
+    userPrompt?: string;
+    existingSubtasks?: { id: string; title: string; isDone: boolean }[];
+  },
 ): Promise<BreakdownResult | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -198,10 +203,11 @@ async function openAiBreakdown(
 
 优先级（必须遵守）：
 1. 若 userInstructions 有内容，严格按用户指令生成——包括子任务数量、命名、结构。禁止套用「明确完成标准 / 收集材料 / 核心步骤 / 收尾」等通用模板。
-2. 若用户要求「每个 X 一个子任务」、列出 N 项、或给出枚举/清单，逐项生成对应子任务（2-${MAX_BREAKDOWN_SUBTASKS} 步均可）。
-3. 仅当用户没有特殊要求时，才拆成 3-6 步；所有子任务 isEntryPoint 均为 false。
-4. 子任务标题用中文；专有名词（如 Amazon Leadership Principles 名称）可保留英文。
-5. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
+2. 若 existingSubtasks 非空，在 userInstructions 允许时可直接修改/替换/重排现有子任务；尽量保留仍适用的现有 title（便于用户确认 diff）。
+3. 若用户要求「每个 X 一个子任务」、列出 N 项、或给出枚举/清单，逐项生成对应子任务（2-${MAX_BREAKDOWN_SUBTASKS} 步均可）。
+4. 仅当用户没有特殊要求时，才拆成 3-6 步；所有子任务 isEntryPoint 均为 false。
+5. 子任务标题用中文；专有名词（如 Amazon Leadership Principles 名称）可保留英文。
+6. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
 
   const user = JSON.stringify({
     title,
@@ -209,6 +215,9 @@ async function openAiBreakdown(
     northStar: context?.northStar,
     pillar: context?.pillar,
     userInstructions: context?.userPrompt?.trim() || undefined,
+    existingSubtasks: context?.existingSubtasks?.length
+      ? context.existingSubtasks
+      : undefined,
   });
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -248,7 +257,12 @@ async function openAiBreakdown(
 export async function generateBreakdown(
   title: string,
   description?: string | null,
-  context?: { northStar?: string; pillar?: string; userPrompt?: string },
+  context?: {
+    northStar?: string;
+    pillar?: string;
+    userPrompt?: string;
+    existingSubtasks?: { id: string; title: string; isDone: boolean }[];
+  },
 ): Promise<BreakdownResult & { source: "openai" | "rules" }> {
   const userPrompt = context?.userPrompt?.trim() ?? "";
 

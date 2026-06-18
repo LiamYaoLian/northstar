@@ -92,6 +92,10 @@ export type Messages = {
     collapseAiBreakdown: string;
     breakdownPromptPlaceholder: string;
     runAiBreakdown: string;
+    breakdownDiffTitle: string;
+    breakdownConfirm: string;
+    breakdownCancel: string;
+    breakdownApplying: string;
     whyRanked: string;
     unpin: string;
     pin: string;

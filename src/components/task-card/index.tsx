@@ -5,6 +5,7 @@ import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
 import { useLocale } from "@/lib/i18n/context";
 import { parseJson } from "@/lib/utils";
+import { TaskBreakdownDiff } from "./task-breakdown-diff";
 import { TaskActionBar } from "./task-action-bar";
 import { TaskAiBreakdownForm } from "./task-ai-breakdown-form";
 import {
@@ -26,6 +27,7 @@ export function TaskCard({
   onComplete,
   onLogTime,
   onBreakdown,
+  onApplyBreakdown,
   onToggleSubtask,
   onUpdateSubtaskTitle,
   onAddSubtask,
@@ -43,6 +45,7 @@ export function TaskCard({
   const forms = useTaskCardForms({
     taskId: task.id,
     onBreakdown,
+    onApplyBreakdown,
     onAddSubtask,
   });
 
@@ -81,13 +84,24 @@ export function TaskCard({
         />
       )}
 
-      {forms.showAiBreakdown && onBreakdown && (
-        <TaskAiBreakdownForm
-          aiPrompt={forms.aiPrompt}
-          breaking={forms.breaking}
-          onPromptChange={forms.setAiPrompt}
-          onSubmit={forms.handleBreakdown}
+      {forms.pendingPreview && onApplyBreakdown ? (
+        <TaskBreakdownDiff
+          diff={forms.pendingPreview.diff}
+          summary={forms.pendingPreview.summary}
+          applying={forms.applying}
+          onConfirm={() => void forms.handleConfirmBreakdown()}
+          onCancel={forms.handleCancelBreakdown}
         />
+      ) : (
+        forms.showAiBreakdown &&
+        onBreakdown && (
+          <TaskAiBreakdownForm
+            aiPrompt={forms.aiPrompt}
+            breaking={forms.breaking}
+            onPromptChange={forms.setAiPrompt}
+            onSubmit={forms.handleBreakdown}
+          />
+        )
       )}
 
       {forms.showManual && onAddSubtask && (

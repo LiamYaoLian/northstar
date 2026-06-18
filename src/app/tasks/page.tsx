@@ -104,6 +104,7 @@ export default function TasksPage() {
     changePillar,
     recalculatePriority,
     breakdownTask,
+    applyBreakdown,
     toggleSubtask,
     updateSubtaskTitle,
     addSubtask,
@@ -245,6 +246,7 @@ export default function TasksPage() {
               pillars={pillars}
               onChangePillar={changePillar}
               onBreakdown={breakdownTask}
+              onApplyBreakdown={applyBreakdown}
               onAddSubtask={addSubtask}
               onDeleteSubtask={(id) => void deleteSubtask(id)}
               onReorderSubtasks={reorderSubtasks}

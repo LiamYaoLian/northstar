@@ -98,6 +98,10 @@ export const en: Messages = {
     breakdownPromptPlaceholder:
       "Optional: add context or constraints, e.g. \"pitch is tomorrow, first 3 steps only\" or \"keep each step under 15 min\"",
     runAiBreakdown: "Break down",
+    breakdownDiffTitle: "Review subtask changes",
+    breakdownConfirm: "Apply changes",
+    breakdownCancel: "Cancel",
+    breakdownApplying: "Applying...",
     whyRanked: "Why ranked here?",
     unpin: "Unpin",
     pin: "Pin",

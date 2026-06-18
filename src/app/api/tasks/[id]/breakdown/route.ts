@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { breakdownTask } from "@/lib/services/tasks";
+import { previewBreakdownTask } from "@/lib/services/tasks";
+import { BreakdownError } from "@/lib/ai/breakdown";
 
 export async function POST(
   request: Request,
@@ -16,16 +17,20 @@ export async function POST(
     } catch {
       // empty body is fine
     }
-    const result = await breakdownTask(id, { userPrompt });
-    if (!result) {
+
+    const result = await previewBreakdownTask(id, { userPrompt });
+    if (!result.preview && !result.task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     return NextResponse.json(result);
   } catch (err) {
     console.error("POST /api/tasks/[id]/breakdown", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Breakdown failed" },
-      { status: 500 },
-    );
+    const message =
+      err instanceof BreakdownError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "Breakdown failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

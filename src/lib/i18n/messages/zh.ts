@@ -98,6 +98,10 @@ export const zh: Messages = {
     breakdownPromptPlaceholder:
       "可选：补充背景或要求，如「我明天要路演，先拆前 3 步」「每步控制在 15min 内」",
     runAiBreakdown: "开始拆解",
+    breakdownDiffTitle: "确认子任务变更",
+    breakdownConfirm: "应用变更",
+    breakdownCancel: "取消",
+    breakdownApplying: "应用中...",
     whyRanked: "为什么排这里？",
     unpin: "取消置顶",
     pin: "置顶",

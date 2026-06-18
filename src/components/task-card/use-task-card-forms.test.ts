@@ -7,7 +7,7 @@ import { useTaskCardForms } from "./use-task-card-forms";
 
 describe("useTaskCardForms", () => {
   it("submits breakdown with trimmed prompt", async () => {
-    const onBreakdown = vi.fn().mockResolvedValue(undefined);
+    const onBreakdown = vi.fn().mockResolvedValue(null);
     const { result } = renderHook(() =>
       useTaskCardForms({ taskId: "t1", onBreakdown }),
     );
@@ -25,6 +25,27 @@ describe("useTaskCardForms", () => {
     expect(onBreakdown).toHaveBeenCalledWith("t1", "focus on step 1");
     expect(result.current.aiPrompt).toBe("");
     expect(result.current.showAiBreakdown).toBe(false);
+  });
+
+  it("stores preview instead of closing when breakdown returns diff", async () => {
+    const preview = {
+      preview: true as const,
+      diff: [{ type: "added" as const, title: "New step" }],
+      proposed: [{ title: "New step" }],
+      source: "rules" as const,
+    };
+    const onBreakdown = vi.fn().mockResolvedValue(preview);
+    const { result } = renderHook(() =>
+      useTaskCardForms({ taskId: "t1", onBreakdown }),
+    );
+
+    await act(async () => {
+      await result.current.handleBreakdown({
+        preventDefault: vi.fn(),
+      } as unknown as React.FormEvent);
+    });
+
+    expect(result.current.pendingPreview).toEqual(preview);
   });
 
   it("submits manual subtask and resets form", async () => {
