@@ -8,11 +8,7 @@ type UseTaskCardFormsOptions = {
     taskId: string,
     proposed: BreakdownPreviewResult["proposed"],
   ) => Promise<void>;
-  onAddSubtask?: (
-    taskId: string,
-    title: string,
-    isEntryPoint: boolean,
-  ) => Promise<void>;
+  onAddSubtask?: (taskId: string, title: string) => Promise<void>;
 };
 
 export function useTaskCardForms({
@@ -25,7 +21,6 @@ export function useTaskCardForms({
   const [showAiBreakdown, setShowAiBreakdown] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [subtaskTitle, setSubtaskTitle] = useState("");
-  const [asEntryPoint, setAsEntryPoint] = useState(false);
   const [breaking, setBreaking] = useState(false);
   const [applying, setApplying] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -77,14 +72,13 @@ export function useTaskCardForms({
       if (!onAddSubtask || !subtaskTitle.trim()) return;
       setAdding(true);
       try {
-        await onAddSubtask(taskId, subtaskTitle.trim(), asEntryPoint);
+        await onAddSubtask(taskId, subtaskTitle.trim());
         setSubtaskTitle("");
-        setAsEntryPoint(false);
       } finally {
         setAdding(false);
       }
     },
-    [asEntryPoint, onAddSubtask, subtaskTitle, taskId],
+    [onAddSubtask, subtaskTitle, taskId],
   );
 
   return {
@@ -94,8 +88,6 @@ export function useTaskCardForms({
     setAiPrompt,
     subtaskTitle,
     setSubtaskTitle,
-    asEntryPoint,
-    setAsEntryPoint,
     breaking,
     applying,
     adding,

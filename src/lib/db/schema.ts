@@ -67,9 +67,6 @@ export const subtasks = sqliteTable("subtasks", {
   parentTaskId: text("parent_task_id").notNull(),
   title: text("title").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
-  isEntryPoint: integer("is_entry_point", { mode: "boolean" })
-    .notNull()
-    .default(false),
   isDone: integer("is_done", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
 });

@@ -29,7 +29,6 @@ export async function POST(
     }
     const subtask = await createSubtask(id, {
       title: body.title,
-      isEntryPoint: body.isEntryPoint,
     });
     if (!subtask) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });

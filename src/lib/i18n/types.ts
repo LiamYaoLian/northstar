@@ -86,7 +86,6 @@ export type Messages = {
     intimidating: string;
     priority: string;
     subtaskPlaceholder: string;
-    entryPoint: string;
     addingSubtask: string;
     addSubtask: string;
     collapseBreakdown: string;
@@ -115,7 +114,6 @@ export type Messages = {
     addEstimatedMin: string;
     dragTask: string;
     dragSubtask: string;
-    entryPointBadge: string;
     category: string;
     uncategorized: string;
     focusTrack: string;

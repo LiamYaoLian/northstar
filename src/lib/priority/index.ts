@@ -2,7 +2,6 @@ import type {
   StrategicPillar,
   Task,
   TimeEntry,
-  Subtask,
   PriorityFactors,
   FocusTrack,
 } from "@/lib/db/schema";
@@ -133,21 +132,11 @@ export function computeTaskPriority(
   };
 }
 
-function subtaskProgressBoost(task: Task, subtaskList: Subtask[]): number {
-  if (subtaskList.length === 0) return 0;
-  const entry = subtaskList.find((s) => s.isEntryPoint);
-  if (entry && !entry.isDone) return 0.15;
-  const doneRatio = subtaskList.filter((s) => s.isDone).length / subtaskList.length;
-  if (doneRatio > 0 && doneRatio < 1) return 0.1;
-  return 0;
-}
-
 export function rerankAll(
   taskList: Task[],
   pillars: StrategicPillar[],
   entries: TimeEntry[],
   workPrimaryTrack?: string | null,
-  allSubtasks: Subtask[] = [],
   now = new Date(),
   tz?: string,
 ): PriorityResult[] {
@@ -168,13 +157,6 @@ export function rerankAll(
 
   const active = taskList.filter((t) => t.status !== "done");
 
-  const subtasksByTask = new Map<string, Subtask[]>();
-  for (const s of allSubtasks) {
-    const list = subtasksByTask.get(s.parentTaskId) ?? [];
-    list.push(s);
-    subtasksByTask.set(s.parentTaskId, list);
-  }
-
   const results = active.map((task) => {
     const { score, factors, reason } = computeTaskPriority(
       task,
@@ -186,12 +168,11 @@ export function rerankAll(
       now,
       tz,
     );
-    const boost = subtaskProgressBoost(task, subtasksByTask.get(task.id) ?? []);
     return {
       taskId: task.id,
-      priorityScore: Math.min(1, score + boost),
+      priorityScore: score,
       factors,
-      reason: boost > 0 ? `${reason} · 入口步骤待完成` : reason,
+      reason,
       rank: 0,
     };
   });

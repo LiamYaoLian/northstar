@@ -7,10 +7,9 @@ import {
 } from "./breakdown";
 
 describe("ruleBasedBreakdown", () => {
-  it("breaks down leetcode tasks with entry point", () => {
+  it("breaks down leetcode tasks with a short first step", () => {
     const result = ruleBasedBreakdown("刷 LC 题");
     expect(result.subtasks.length).toBeGreaterThanOrEqual(3);
-    expect(result.subtasks[0].isEntryPoint).toBe(true);
     expect(result.subtasks[0].estimatedMin).toBeLessThanOrEqual(2);
   });
 
@@ -23,7 +22,6 @@ describe("ruleBasedBreakdown", () => {
   it("generic breakdown for unknown tasks", () => {
     const result = ruleBasedBreakdown("整理衣柜");
     expect(result.subtasks).toHaveLength(4);
-    expect(result.subtasks[0].isEntryPoint).toBe(true);
   });
 
   it("uses description for template matching", () => {
@@ -43,7 +41,6 @@ describe("promptDrivenBreakdown", () => {
     expect(result!.subtasks.map((s) => s.title)).toEqual([
       ...AMAZON_LEADERSHIP_PRINCIPLES,
     ]);
-    expect(result!.subtasks.every((s) => !s.isEntryPoint)).toBe(true);
   });
 
   it("returns null for unrelated prompts", () => {

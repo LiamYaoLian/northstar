@@ -2,19 +2,15 @@ import { useLocale } from "@/lib/i18n/context";
 
 type TaskManualSubtaskFormProps = {
   subtaskTitle: string;
-  asEntryPoint: boolean;
   adding: boolean;
   onTitleChange: (value: string) => void;
-  onEntryPointChange: (checked: boolean) => void;
   onSubmit: (e: React.FormEvent) => void;
 };
 
 export function TaskManualSubtaskForm({
   subtaskTitle,
-  asEntryPoint,
   adding,
   onTitleChange,
-  onEntryPointChange,
   onSubmit,
 }: TaskManualSubtaskFormProps) {
   const { t } = useLocale();
@@ -30,14 +26,6 @@ export function TaskManualSubtaskForm({
         value={subtaskTitle}
         onChange={(e) => onTitleChange(e.target.value)}
       />
-      <label className="flex items-center gap-2 text-xs text-muted">
-        <input
-          type="checkbox"
-          checked={asEntryPoint}
-          onChange={(e) => onEntryPointChange(e.target.checked)}
-        />
-        {t.taskCard.entryPoint}
-      </label>
       <button
         type="submit"
         disabled={adding || !subtaskTitle.trim()}

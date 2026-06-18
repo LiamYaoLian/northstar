@@ -129,12 +129,12 @@ export function useTaskActions({
   );
 
   const addSubtask = useCallback(
-    async (taskId: string, title: string, isEntryPoint: boolean) => {
+    async (taskId: string, title: string) => {
       try {
         await apiFetch(`/api/tasks/${taskId}/subtasks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, isEntryPoint }),
+          body: JSON.stringify({ title }),
         });
         await reload();
       } catch (err) {

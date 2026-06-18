@@ -160,10 +160,8 @@ export function TaskCard({
       {forms.showManual && onAddSubtask && (
         <TaskManualSubtaskForm
           subtaskTitle={forms.subtaskTitle}
-          asEntryPoint={forms.asEntryPoint}
           adding={forms.adding}
           onTitleChange={forms.setSubtaskTitle}
-          onEntryPointChange={forms.setAsEntryPoint}
           onSubmit={forms.handleAddSubtask}
         />
       )}

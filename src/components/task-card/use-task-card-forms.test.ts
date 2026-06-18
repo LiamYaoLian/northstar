@@ -56,7 +56,6 @@ describe("useTaskCardForms", () => {
 
     act(() => {
       result.current.setSubtaskTitle("Draft outline");
-      result.current.setAsEntryPoint(true);
     });
 
     await act(async () => {
@@ -65,9 +64,8 @@ describe("useTaskCardForms", () => {
       } as unknown as React.FormEvent);
     });
 
-    expect(onAddSubtask).toHaveBeenCalledWith("t1", "Draft outline", true);
+    expect(onAddSubtask).toHaveBeenCalledWith("t1", "Draft outline");
     expect(result.current.subtaskTitle).toBe("");
-    expect(result.current.asEntryPoint).toBe(false);
   });
 
   it("ignores empty subtask title", async () => {

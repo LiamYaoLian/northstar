@@ -30,7 +30,6 @@ function SortableSubtaskRow({
   dragLabel,
   deleteLabel,
   editLabel,
-  entryPointBadge,
 }: {
   subtask: Subtask;
   onToggle?: (id: string, isDone: boolean) => void;
@@ -39,7 +38,6 @@ function SortableSubtaskRow({
   dragLabel: string;
   deleteLabel: string;
   editLabel: string;
-  entryPointBadge: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: subtask.id });
@@ -57,9 +55,7 @@ function SortableSubtaskRow({
 
   const titleClassName = subtask.isDone
     ? "flex-1 text-muted line-through"
-    : subtask.isEntryPoint
-      ? "flex-1 font-medium text-accent"
-      : "flex-1";
+    : "flex-1";
 
   function commitTitle() {
     const trimmed = title.trim();
@@ -94,9 +90,6 @@ function SortableSubtaskRow({
         className="mt-0.5"
       />
       <div className={titleClassName}>
-        {subtask.isEntryPoint && !subtask.isDone && (
-          <span className="mr-1 text-xs text-accent">{entryPointBadge}</span>
-        )}
         {onUpdateTitle ? (
           <input
             type="text"
@@ -203,7 +196,6 @@ export function SortableSubtasks({
               dragLabel={t.taskCard.dragSubtask}
               deleteLabel={t.taskCard.deleteSubtask}
               editLabel={t.taskCard.editSubtask}
-              entryPointBadge={t.taskCard.entryPointBadge}
             />
           ))}
         </ul>

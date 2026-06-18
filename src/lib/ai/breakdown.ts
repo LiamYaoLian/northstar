@@ -3,7 +3,6 @@ import { z } from "zod";
 export const BreakdownItemSchema = z.object({
   title: z.string(),
   estimatedMin: z.number().optional(),
-  isEntryPoint: z.boolean().optional(),
 });
 
 export type BreakdownItem = z.infer<typeof BreakdownItemSchema>;
@@ -42,7 +41,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
   {
     pattern: /leetcode|lc|算法|刷题/i,
     build: () => [
-      { title: "选 1 道中等题（2min）", estimatedMin: 2, isEntryPoint: true },
+      { title: "选 1 道中等题（2min）", estimatedMin: 2 },
       { title: "读题 + 写暴力思路", estimatedMin: 10 },
       { title: "实现并通过样例", estimatedMin: 25 },
       { title: "复盘最优解与复杂度", estimatedMin: 10 },
@@ -51,7 +50,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
   {
     pattern: /system design|sd|系统设计|mock/i,
     build: () => [
-      { title: "列出需求与规模假设（2min）", estimatedMin: 2, isEntryPoint: true },
+      { title: "列出需求与规模假设（2min）", estimatedMin: 2 },
       { title: "画高层架构图", estimatedMin: 20 },
       { title: "深入 1 个核心组件", estimatedMin: 25 },
       { title: "口头 mock 15min 并记录 gap", estimatedMin: 20 },
@@ -60,7 +59,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
   {
     pattern: /deck|路演|投资人|presentation/i,
     build: (title) => [
-      { title: "列出 3 个核心信息点（2min）", estimatedMin: 2, isEntryPoint: true },
+      { title: "列出 3 个核心信息点（2min）", estimatedMin: 2 },
       { title: "写大纲（问题-方案-牵引力）", estimatedMin: 30 },
       { title: "做 5 页关键 slide", estimatedMin: 60 },
       { title: `演练 ${title} 一遍并计时`, estimatedMin: 20 },
@@ -69,7 +68,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
   {
     pattern: /投资|理财|复盘|仓位|研报/i,
     build: () => [
-      { title: "打开持仓表（2min）", estimatedMin: 2, isEntryPoint: true },
+      { title: "打开持仓表（2min）", estimatedMin: 2 },
       { title: "记录本周市场变化", estimatedMin: 15 },
       { title: "检查仓位是否符合策略", estimatedMin: 20 },
       { title: "写下 1 条下周行动", estimatedMin: 10 },
@@ -78,7 +77,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
   {
     pattern: /面试|投递|内推|resume|简历/i,
     build: () => [
-      { title: "更新目标公司清单（2min）", estimatedMin: 2, isEntryPoint: true },
+      { title: "更新目标公司清单（2min）", estimatedMin: 2 },
       { title: "改一版简历 bullet", estimatedMin: 30 },
       { title: "写定制化 cover / 内推消息", estimatedMin: 20 },
       { title: "提交 1 个申请", estimatedMin: 15 },
@@ -87,7 +86,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
   {
     pattern: /design doc|rfc|跨团队|staff|影响力/i,
     build: () => [
-      { title: "写 3 句问题陈述（2min）", estimatedMin: 2, isEntryPoint: true },
+      { title: "写 3 句问题陈述（2min）", estimatedMin: 2 },
       { title: "列 stakeholders 并发异步对齐", estimatedMin: 30 },
       { title: "完成初版 design doc", estimatedMin: 90 },
       { title: "约 review 会议", estimatedMin: 15 },
@@ -97,7 +96,7 @@ const TEMPLATES: { pattern: RegExp; build: (title: string) => BreakdownItem[] }[
 
 function genericBreakdown(title: string): BreakdownItem[] {
   return [
-    { title: `明确「${title}」的完成标准（2min）`, estimatedMin: 2, isEntryPoint: true },
+    { title: `明确「${title}」的完成标准（2min）`, estimatedMin: 2 },
     { title: "收集所需材料 / 上下文", estimatedMin: 15 },
     { title: "完成核心执行步骤", estimatedMin: 45 },
     { title: "检查质量并收尾", estimatedMin: 15 },
@@ -171,7 +170,7 @@ export function ruleBasedBreakdown(
         subtasks,
         intimidationScore: estimateIntimidation(title, subtasks.length),
         estimatedMinTotal,
-        summary: `已按「${title}」类型模板拆解为 ${subtasks.length} 步，第一步 ≤2min 可立即启动。`,
+        summary: `已按「${title}」类型模板拆解为 ${subtasks.length} 步。`,
       };
     }
   }
@@ -182,7 +181,7 @@ export function ruleBasedBreakdown(
     subtasks,
     intimidationScore: estimateIntimidation(title, subtasks.length),
     estimatedMinTotal,
-    summary: `已将任务拆解为 ${subtasks.length} 步，第一步是 2 分钟入口动作。`,
+    summary: `已将任务拆解为 ${subtasks.length} 步。`,
   };
 }
 
@@ -205,9 +204,9 @@ async function openAiBreakdown(
 1. 若 userInstructions 有内容，严格按用户指令生成——包括子任务数量、命名、结构。禁止套用「明确完成标准 / 收集材料 / 核心步骤 / 收尾」等通用模板。
 2. 若 existingSubtasks 非空，在 userInstructions 允许时可直接修改/替换/重排现有子任务；尽量保留仍适用的现有 title（便于用户确认 diff）。
 3. 若用户要求「每个 X 一个子任务」、列出 N 项、或给出枚举/清单，逐项生成对应子任务（2-${MAX_BREAKDOWN_SUBTASKS} 步均可）。
-4. 仅当用户没有特殊要求时，才拆成 3-6 步；所有子任务 isEntryPoint 均为 false。
+4. 仅当用户没有特殊要求时，才拆成 3-6 步。
 5. 子任务标题用中文；专有名词（如 Amazon Leadership Principles 名称）可保留英文。
-6. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10,"isEntryPoint":false}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
+6. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
 
   const user = JSON.stringify({
     title,
@@ -244,11 +243,7 @@ async function openAiBreakdown(
   if (!content) return null;
 
   try {
-    const parsed = BreakdownResultSchema.parse(JSON.parse(content));
-    for (const subtask of parsed.subtasks) {
-      subtask.isEntryPoint = false;
-    }
-    return parsed;
+    return BreakdownResultSchema.parse(JSON.parse(content));
   } catch {
     return null;
   }

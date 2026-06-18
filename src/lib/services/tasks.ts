@@ -371,7 +371,6 @@ export async function applyBreakdownPreview(
       parentTaskId: taskId,
       title,
       sortOrder,
-      isEntryPoint: false,
       isDone: false,
       createdAt: ts,
     });
@@ -623,7 +622,7 @@ export async function listSubtasks(taskId: string) {
 
 export async function createSubtask(
   taskId: string,
-  input: { title: string; isEntryPoint?: boolean },
+  input: { title: string },
 ) {
   await ensureDbReady();
   const db = getDb();
@@ -638,7 +637,6 @@ export async function createSubtask(
     parentTaskId: taskId,
     title: input.title.trim(),
     sortOrder: existing.length,
-    isEntryPoint: input.isEntryPoint ?? existing.length === 0,
     isDone: false,
     createdAt: ts,
   });

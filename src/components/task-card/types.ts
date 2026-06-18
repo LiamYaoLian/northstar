@@ -29,11 +29,7 @@ export type TaskCardProps = {
   ) => Promise<void>;
   onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
   onUpdateSubtaskTitle?: (subtaskId: string, title: string) => void;
-  onAddSubtask?: (
-    taskId: string,
-    title: string,
-    isEntryPoint: boolean,
-  ) => Promise<void>;
+  onAddSubtask?: (taskId: string, title: string) => Promise<void>;
   onDeleteSubtask?: (subtaskId: string) => void;
   onReorderSubtasks?: (
     taskId: string,

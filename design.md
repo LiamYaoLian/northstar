@@ -17,7 +17,6 @@
 | 战略先行 | 无策略则引导 onboarding；所有任务归属 pillar，Work 可细分 focus track |
 | 自动排序 | 优先级由多因子加权计算，用户可手动拖拽微调，二者通过 `manualSortOrder` 与 `priorityScore` 联动 |
 | 轻量 AI | LLM 可选（`OPENAI_API_KEY`）；无 key 时规则 fallback，不阻塞核心流程 |
-| 同构纯函数 | 时区、重复规则、对齐计算等放在 `src/lib/**`，client / server / test 共用 |
 | 单用户本地优先 | SQLite（Turso 或本地 `data/northstar.db`），无多租户 auth |
 
 ### 1.3 页面与导航
@@ -60,7 +59,7 @@ flowchart TB
     alignmentSvc["services/alignment.ts"]
   end
 
-  subgraph domain [Domain — isomorphic]
+  subgraph domain [Domain]
     priority["priority/"]
     alignment["alignment/"]
     recurrence["tasks/recurrence*"]
@@ -80,22 +79,13 @@ flowchart TB
   drizzle --> turso
 ```
 
-### 2.1 技术栈
-
-- **框架**：Next.js 15（App Router）、React 19
-- **数据库**：Turso / libSQL + Drizzle ORM
-- **样式**：Tailwind CSS 4
-- **拖拽**：`@dnd-kit`（任务板排序、子任务排序）
-- **校验**：Zod（API body / query）
-- **测试**：Vitest + Testing Library
-
-### 2.2 分层约定
+### 2.1 分层约定
 
 | 层 | 路径 | 约束 |
 |----|------|------|
 | API | `src/app/api/**/route.ts` | HTTP 入口、参数解析、错误映射 |
 | Service | `src/lib/services/*.ts` | `import "server-only"`，DB 读写与事务 |
-| Domain | `src/lib/priority`, `alignment`, `tasks/*` | 纯函数，不 import DB |
+| Domain | `src/lib/priority`, `alignment`, `tasks/*` | 业务逻辑，不直接访问 DB |
 | UI | `src/app/**`, `src/components/**` | Client components + `apiFetch` |
 | DB | `src/lib/db/` | schema、init-sql、migrations |
 
@@ -151,7 +141,6 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 | 字段 | 说明 |
 |------|------|
 | `sortOrder` | 排序 |
-| `isEntryPoint` | 入口步骤标记（未完成时 +0.15 优先级 boost） |
 | `isDone` | 勾选状态；recurring reset 时清除 |
 
 **`time_entries`**
@@ -222,12 +211,7 @@ Onboarding 结束时 seed 4 条示例任务（LC、投资复盘、晨跑、家�
 
 Recurring 任务的 `effectiveDue` 来自 `virtualDeadlineForPriority()`（见 §6.6）。
 
-### 5.2 子任务 Boost
-
-- 存在 `isEntryPoint` 且未完成：+0.15
-- 部分子任务已完成（0 < ratio < 1）：+0.10
-
-### 5.3 重算与手动排序
+### 5.2 重算与手动排序
 
 **全量重算**：`POST /api/tasks/recalculate-priorities?tz=` → `recalculatePriorities(tz)` → `openRecurringOccurrences` → `persistPriorities(tz)` → `rerankAll(..., tz)` → 写回每条 active 任务的 score / factors / manualSortOrder。
 
@@ -335,7 +319,7 @@ Tasks 板**不做日历过滤**，展示全量 active/done 任务。
 
 ### 8.2 时区
 
-`src/lib/tasks/timezone.ts`（isomorphic）：
+`src/lib/tasks/timezone.ts`：
 
 - `DEFAULT_TIMEZONE = "America/New_York"`
 - `clientTimezone()` — 浏览器 IANA
@@ -344,7 +328,7 @@ Tasks 板**不做日历过滤**，展示全量 active/done 任务。
 
 `api-client.ts` 对 `/api/tasks` 前缀 URL **自动 append `?tz=`**。
 
-### 8.3 核心纯函数
+### 8.3 重复规则逻辑
 
 `src/lib/tasks/recurrence.ts`（输入 `RecurrenceTaskFields + instant + tz`）：
 
@@ -503,7 +487,7 @@ Zod schemas：`src/lib/api/tasks/schemas.ts`；tz 解析：`parse-tz-query.ts` +
 
 ## 14. 测试
 
-Vitest 覆盖核心纯函数与服务逻辑：
+Vitest 覆盖核心逻辑与服务：
 
 | 区域 | 代表测试文件 |
 |------|-------------|
@@ -575,7 +559,7 @@ src/lib/
   priority/index.ts        # 优先级引擎
   alignment/index.ts       # 对齐 + 拖延
   tasks/
-    recurrence.ts          # 重复规则纯函数
+    recurrence.ts          # 重复规则
     recurrence-types.ts
     timezone.ts
     classify.ts, analyze.ts, enrich-tasks.ts, subtask-diff.ts

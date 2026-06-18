@@ -16,6 +16,14 @@ export async function safeDropIsPinnedIfExists(client: Client): Promise<void> {
   }
 }
 
+export async function dropIsEntryPointIfExists(client: Client): Promise<void> {
+  const cols = await client.execute("PRAGMA table_info(subtasks)");
+  const hasIsEntryPoint = cols.rows.some((row) => row.name === "is_entry_point");
+  if (hasIsEntryPoint) {
+    await client.execute("ALTER TABLE subtasks DROP COLUMN is_entry_point");
+  }
+}
+
 export async function addRecurrenceColumnsIfMissing(
   client: Client,
 ): Promise<void> {
@@ -39,6 +47,7 @@ export async function addRecurrenceColumnsIfMissing(
 
 export async function applyMigrations(client: Client, db: Db) {
   await safeDropIsPinnedIfExists(client);
+  await dropIsEntryPointIfExists(client);
   await migrate(db, { migrationsFolder });
   await addRecurrenceColumnsIfMissing(client);
 }

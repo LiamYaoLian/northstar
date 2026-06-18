@@ -2,7 +2,6 @@ import { ensureDbReady, getDb, type Db } from "@/lib/db";
 import {
   northStars,
   strategicPillars,
-  subtasks,
   tasks,
   timeEntries,
 } from "@/lib/db/schema";
@@ -17,12 +16,11 @@ export async function persistPriorities(tz?: string): Promise<string> {
   const db = getDb();
   const resolvedTz = resolveTimezone(tz);
   const now = new Date();
-  const [allTasks, pillars, entries, stars, allSubtasks] = await Promise.all([
+  const [allTasks, pillars, entries, stars] = await Promise.all([
     db.select().from(tasks),
     db.select().from(strategicPillars),
     db.select().from(timeEntries),
     db.select().from(northStars),
-    db.select().from(subtasks),
   ]);
 
   const results = rerankAll(
@@ -30,7 +28,6 @@ export async function persistPriorities(tz?: string): Promise<string> {
     pillars,
     entries,
     stars[0]?.workPrimaryTrack,
-    allSubtasks,
     now,
     resolvedTz,
   );
