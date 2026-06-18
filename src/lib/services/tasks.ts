@@ -184,7 +184,8 @@ export async function breakdownTask(
     userPrompt: options?.userPrompt,
   });
 
-  await db.delete(subtasks).where(eq(subtasks.parentTaskId, taskId));
+  const existing = await listSubtasks(taskId);
+  const hasEntryPoint = existing.some((s) => s.isEntryPoint);
 
   const ts = nowIso();
   for (const [i, item] of result.subtasks.entries()) {
@@ -192,8 +193,8 @@ export async function breakdownTask(
       id: id(),
       parentTaskId: taskId,
       title: item.title,
-      sortOrder: i,
-      isEntryPoint: item.isEntryPoint ?? i === 0,
+      sortOrder: existing.length + i,
+      isEntryPoint: hasEntryPoint ? false : (item.isEntryPoint ?? i === 0),
       isDone: false,
       createdAt: ts,
     });
