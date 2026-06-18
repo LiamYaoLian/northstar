@@ -19,7 +19,6 @@ import {
   resolveProposedSubtasks,
   type BreakdownPreviewResult,
   type ProposedSubtask,
-  type SubtaskDiffLine,
 } from "@/lib/tasks/subtask-diff";
 import { analyzeTaskTitle } from "@/lib/tasks/analyze";
 import type { ClassifyResult } from "@/lib/tasks/classify";
@@ -118,6 +117,7 @@ export async function listTasks(
 
 export async function listDueTodayTasksWithSubtasks(
   tz?: string,
+  sort: TaskSortMode = "priority",
   now = new Date(),
 ) {
   await ensureDbReady();
@@ -127,7 +127,7 @@ export async function listDueTodayTasksWithSubtasks(
 
   const all = await db.select().from(tasks);
   const dueToday = filterTasksDueToday(all, resolvedTz, now);
-  const sorted = sortTasks(dueToday, "priority");
+  const sorted = sortTasks(dueToday, sort);
   const allSubtasks = await db.select().from(subtasks);
   const byParent = groupSubtasksByParent(allSubtasks);
   return sorted.map((t) => ({
@@ -141,6 +141,10 @@ export async function listTasksWithSubtasks(
   sort: TaskSortMode = "priority",
   tz?: string,
 ) {
+  if (status === "today") {
+    return listDueTodayTasksWithSubtasks(tz, sort);
+  }
+
   await ensureDbReady();
   const db = getDb();
   const taskList = await listTasks(status, sort, tz);

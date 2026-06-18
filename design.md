@@ -345,11 +345,11 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 
 | 页面 | 数据源 | 客户端过滤 |
 |------|--------|------------|
-| **Today** | `GET /api/tasks/today?tz=` + `GET /api/completions?since=today&until=today` | pillar filter → Top 5 `rankAndLimit(5)`；底部折叠「今日已完成」 |
+| **Today** | `GET /api/tasks?status=today&tz=` + `GET /api/completions?since=today&until=today` | pillar filter → Top 5 `rankAndLimit(5)`；底部折叠「今日已完成」 |
 | **Tasks** | `GET /api/tasks?sort=manual&tz=` | **状态分段**（进行中 / 已完成 / 全部）+ pillar filter；已完成 tab 禁拖拽 |
 | **Alignment** | `GET /api/alignment?period=&tz=` + `GET /api/completions?since=&until=` + `GET /api/reviews?period=`（week/month 快照区） | 统一 period 选择器；`#completions` 逐条列表 + pillar 筛选；`#snapshots` 历史与保存（week/month） |
 
-Today API 返回 **priority 预排序**的 due-today 全量 + subtasks；客户端不再用 `takeTopTasks`（后者会额外排除 done，Today 路径不需要）。
+`/api/tasks?status=today` 返回 **priority 预排序**的 due-today 全量 + subtasks；客户端不再用 `takeTopTasks`（后者会额外排除 done，Today 路径不需要）。
 
 Tasks 板**不做日历过滤**；**进行中** tab 排除 `done`；**已完成** tab 仅当前仍为 done 的行（recurring reset 后不在此 tab，但 **completion event 保留**）。
 
@@ -449,8 +449,7 @@ Classify 对 Work pillar 额外推断 `focusTrack`（`suggestFocusTrack` 规则 
 
 | 方法 | 路径 | 读 `tz` | 说明 |
 |------|------|---------|------|
-| GET | `/api/tasks?sort=&status=&tz=` | ✓ | 全量任务 + subtasks |
-| GET | `/api/tasks/today?tz=` | ✓ | due-today + subtasks |
+| GET | `/api/tasks?sort=&status=&tz=` | ✓ | 全量任务 + subtasks；`status=today` 返回 due-today + subtasks |
 | POST | `/api/tasks` | — | 创建 |
 | PATCH | `/api/tasks/[id]` | ✓ body `tz` | 更新；done 时写 completion event |
 | POST | `/api/tasks/recalculate-priorities?tz=` | ✓ | 重算优先级 |
@@ -678,7 +677,7 @@ src/components/
 
 1. 打开 `/today` → 无策略 → redirect `/onboarding`
 2. 完成 5 步 → 写入 life balance 模板 + 4 条 seed 任务
-3. `/today` 加载 `GET /api/tasks/today?tz=Asia/Shanghai` → openOcc → pillar filter → Top 5
+3. `/today` 加载 `GET /api/tasks?status=today&tz=Asia/Shanghai` → openOcc → pillar filter → Top 5
 4. 完成「晨跑」→ PATCH done → reload → Today 移除（非 recurring one-off done）
 
 ### 18.2 Daily recurring

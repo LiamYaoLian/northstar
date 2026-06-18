@@ -63,7 +63,7 @@ describe("withAutoTimezone", () => {
   });
 
   it("does not override existing tz", () => {
-    const url = "/api/tasks/today?tz=Europe/London";
+    const url = "/api/tasks?status=today&tz=Europe/London";
     expect(withAutoTimezone(url)).toBe(url);
   });
 

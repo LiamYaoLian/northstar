@@ -39,7 +39,7 @@ export default function TodayPage() {
       const tz = clientTimezone();
       const todayQuery = completionQueryForToday(tz, new Date());
       const [tasksData, strategyData, completionsData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks/today"),
+        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?status=today"),
         apiFetch<{ hasStrategy: boolean; strategy: { pillars: { id: string; name: string; color: string; focusTracks: string | null }[] } | null }>(
           "/api/strategy",
         ),
