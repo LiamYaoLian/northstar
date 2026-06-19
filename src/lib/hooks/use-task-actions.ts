@@ -203,6 +203,13 @@ export function useTaskActions({
     [optimisticPatchTask],
   );
 
+  const updateTaskDates = useCallback(
+    (id: string, patch: { startAt?: string | null; dueAt?: string | null }) => {
+      optimisticPatchTask(id, patch, patch);
+    },
+    [optimisticPatchTask],
+  );
+
   const updateSubtaskTitle = useCallback(
     (subtaskId: string, title: string) => {
       void patchSubtask(subtaskId, { title });
@@ -332,6 +339,7 @@ export function useTaskActions({
     toggleSubtask,
     updateTaskTitle,
     updateEstimatedMin,
+    updateTaskDates,
     updateSubtaskTitle,
     updateSubtaskEstimatedMin,
     addSubtask,

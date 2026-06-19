@@ -46,6 +46,10 @@ export type TaskCardProps = {
     focusTrack?: string | null,
   ) => void;
   onUpdateEstimatedMin?: (taskId: string, minutes: number | null) => void;
+  onUpdateTaskDates?: (
+    taskId: string,
+    patch: { startAt?: string | null; dueAt?: string | null },
+  ) => void;
   onUpdateRecurrence?: (
     taskId: string,
     value: {

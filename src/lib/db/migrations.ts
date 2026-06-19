@@ -181,6 +181,10 @@ export async function addSubtaskEstimatedMinColumnIfMissing(
   await addColumnIfMissing(client, "subtasks", "estimated_min", "INTEGER");
 }
 
+export async function addTaskStartAtColumnIfMissing(client: Client): Promise<void> {
+  await addColumnIfMissing(client, "tasks", "start_at", "TEXT");
+}
+
 export async function addRecurrenceColumnsIfMissing(
   client: Client,
 ): Promise<void> {
@@ -357,6 +361,7 @@ export async function applyMigrations(client: Client, db: Db) {
   await backfillLegacyUserIds(client, db);
   await addRecurrenceColumnsIfMissing(client);
   await addSubtaskEstimatedMinColumnIfMissing(client);
+  await addTaskStartAtColumnIfMissing(client);
   await addCompletionEventsTableIfMissing(client);
   await addActiveTimeSessionsTableIfMissing(client);
   await dedupeCompletionEvents(client);

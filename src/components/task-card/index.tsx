@@ -48,6 +48,7 @@ export function TaskCard({
   onToggleIntimidating,
   onChangePillar,
   onUpdateEstimatedMin,
+  onUpdateTaskDates,
   onUpdateRecurrence,
 }: TaskCardProps) {
   const { t } = useLocale();
@@ -73,6 +74,7 @@ export function TaskCard({
   const displayEstimatedMin = resolveTaskEstimatedMin(task.estimatedMin, subtaskList);
   const canEditCategory = Boolean(pillars && onChangePillar);
   const canEditEstimatedMin = Boolean(onUpdateEstimatedMin) && subtaskList.length === 0;
+  const canEditDueDate = task.recurrenceType === "none";
 
   const forms = useTaskCardForms({
     taskId: task.id,
@@ -110,13 +112,20 @@ export function TaskCard({
         )}
         <TaskMetadataBadges
           estimatedMin={displayEstimatedMin}
+          startAt={task.startAt}
           dueAt={task.dueAt}
+          canEditDue={canEditDueDate}
           intimidationScore={task.intimidationScore}
           subtasks={subtaskList}
           derivedFromSubtasks={subtaskList.length > 0}
           onUpdateEstimatedMin={
             canEditEstimatedMin && onUpdateEstimatedMin
               ? (minutes) => onUpdateEstimatedMin(task.id, minutes)
+              : undefined
+          }
+          onUpdateTaskDates={
+            onUpdateTaskDates
+              ? (patch) => onUpdateTaskDates(task.id, patch)
               : undefined
           }
         />

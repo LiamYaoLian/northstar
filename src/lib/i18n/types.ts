@@ -28,6 +28,7 @@ export type Messages = {
     addTaskFailed: string;
     breakdownFailed: string;
     updateSubtaskFailed: string;
+    invalidTaskDateRange: string;
     addSubtaskFailed: string;
     deleteSubtaskFailed: string;
     deleteTaskFailed: string;
@@ -133,6 +134,12 @@ export type Messages = {
     estMin: string;
     subtasks: string;
     due: string;
+    start: string;
+    addStartDate: string;
+    addDueDate: string;
+    editStartDate: string;
+    editDueDate: string;
+    dueDisabledForRecurrence: string;
     intimidating: string;
     priority: string;
     subtaskPlaceholder: string;

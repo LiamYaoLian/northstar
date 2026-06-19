@@ -130,6 +130,7 @@ export const tasks = sqliteTable(
     priorityFactors: text("priority_factors"), // JSON
     priorityComputedAt: text("priority_computed_at"),
     estimatedMin: integer("estimated_min"),
+    startAt: text("start_at"),
     dueAt: text("due_at"),
     manualSortOrder: integer("manual_sort_order").notNull().default(0),
     createdAt: text("created_at").notNull(),

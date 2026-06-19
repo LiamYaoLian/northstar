@@ -25,6 +25,10 @@ import {
 import { analyzeTaskTitle } from "@/lib/tasks/analyze";
 import { estimateTaskMinutes } from "@/lib/tasks/estimate-time";
 import { sumSubtaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
+import {
+  isValidTaskDateRange,
+  normalizeTaskDate,
+} from "@/lib/tasks/task-dates";
 import type { RecurrenceInference } from "@/lib/tasks/infer-recurrence";
 import type { ClassifyResult } from "@/lib/tasks/classify";
 import {
@@ -209,7 +213,8 @@ export async function createTask(input: {
   pillarId?: string;
   focusTrack?: string;
   estimatedMin?: number;
-  dueAt?: string;
+  startAt?: string | null;
+  dueAt?: string | null;
   intimidationScore?: number;
   autoBreakdown?: boolean;
   recurrenceType?: RecurrenceType;
@@ -252,6 +257,13 @@ export async function createTask(input: {
       ? Boolean(resolvedRecurrence.recurrenceCarryOver)
       : false;
 
+  const normalizedStart = normalizeTaskDate(input.startAt);
+  const normalizedDue =
+    recurrenceType !== "none" ? null : normalizeTaskDate(input.dueAt);
+  if (!isValidTaskDateRange(normalizedStart, normalizedDue)) {
+    throw new Error("Start date must be on or before due date");
+  }
+
   await db.insert(tasks).values({
     id: taskId,
     userId: userId ?? null,
@@ -263,7 +275,8 @@ export async function createTask(input: {
     intimidationScore: input.intimidationScore ?? 2,
     priorityScore: 0,
     estimatedMin: input.estimatedMin ?? estimate.estimatedMin ?? null,
-    dueAt: recurrenceType !== "none" ? null : (input.dueAt ?? null),
+    startAt: normalizedStart,
+    dueAt: normalizedDue,
     recurrenceType,
     recurrenceDays,
     recurrenceCarryOver,
@@ -592,6 +605,8 @@ export async function updateTask(
     focusTrack: string | null;
     intimidationScore: number;
     estimatedMin: number | null;
+    startAt: string | null;
+    dueAt: string | null;
     recurrenceType: RecurrenceType;
     recurrenceDays: number[] | null;
     recurrenceCarryOver: boolean;
@@ -677,6 +692,8 @@ async function buildTaskPatch(
   const {
     intimidationScore,
     estimatedMin,
+    startAt,
+    dueAt,
     pillarId,
     focusTrack,
     recurrenceType,
@@ -700,8 +717,28 @@ async function buildTaskPatch(
     }
   }
 
+  if (startAt !== undefined) {
+    safePatch.startAt = normalizeTaskDate(startAt);
+  }
+
   const nextRecurrenceType =
     recurrenceType ?? existing.recurrenceType ?? "none";
+
+  if (dueAt !== undefined) {
+    safePatch.dueAt =
+      nextRecurrenceType !== "none" ? null : normalizeTaskDate(dueAt);
+  }
+
+  const effectiveStart = normalizeTaskDate(
+    (safePatch.startAt as string | null | undefined) ?? existing.startAt,
+  );
+  const effectiveDue = normalizeTaskDate(
+    (safePatch.dueAt as string | null | undefined) ?? existing.dueAt,
+  );
+  if (!isValidTaskDateRange(effectiveStart, effectiveDue)) {
+    return null;
+  }
+
   if (recurrenceType !== undefined) {
     safePatch.recurrenceType = recurrenceType;
   }

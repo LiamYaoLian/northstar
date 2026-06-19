@@ -1,6 +1,8 @@
 "use client";
 
+import { Timer } from "lucide-react";
 import { useState } from "react";
+import { TomatoIcon } from "@/components/icons/tomato-icon";
 import { useTimer } from "@/components/timer-provider";
 import { useLocale } from "@/lib/i18n/context";
 import { POMODORO_PRESETS } from "@/lib/timer/elapsed";
@@ -149,15 +151,16 @@ export function TaskActionBar({
             <button
               type="button"
               disabled={timerDisabled}
+              aria-label={t.timer.start}
               title={
                 runningElsewhere && otherRunningTaskTitle
                   ? t.timer.runningOnOtherTask.replace("{title}", otherRunningTaskTitle)
-                  : undefined
+                  : t.timer.start
               }
               onClick={() => void runTimerAction(() => startStopwatch(task.id))}
-              className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-border p-1 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {t.timer.start}
+              <Timer className="h-4 w-4" aria-hidden />
             </button>
             <div className="flex items-center gap-1">
               <select
@@ -176,17 +179,18 @@ export function TaskActionBar({
               <button
                 type="button"
                 disabled={timerDisabled}
+                aria-label={t.timer.pomodoro}
                 title={
                   runningElsewhere && otherRunningTaskTitle
                     ? t.timer.runningOnOtherTask.replace("{title}", otherRunningTaskTitle)
-                    : undefined
+                    : t.timer.pomodoro
                 }
                 onClick={() =>
                   void runTimerAction(() => startPomodoro(task.id, pomodoroMin))
                 }
-                className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md border border-border p-1 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {t.timer.pomodoro}
+                <TomatoIcon className="h-4 w-4" />
               </button>
             </div>
           </>

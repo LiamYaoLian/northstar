@@ -30,6 +30,7 @@ import {
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
 import { recurrenceTypeUsesDays } from "@/lib/tasks/recurrence-types";
+import { isValidTaskDateRange, normalizeTaskDate } from "@/lib/tasks/task-dates";
 
 type ClassifyPreview = {
   pillarName: string | null;
@@ -61,6 +62,8 @@ export default function TasksPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [todayOnly, setTodayOnly] = useState(false);
+  const [newTaskStartAt, setNewTaskStartAt] = useState("");
+  const [newTaskDueAt, setNewTaskDueAt] = useState("");
   const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
   const [recurrenceTouched, setRecurrenceTouched] = useState(false);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
@@ -287,6 +290,7 @@ export default function TasksPage() {
     toggleSubtask,
     updateTaskTitle,
     updateEstimatedMin,
+    updateTaskDates,
     updateSubtaskTitle,
     updateSubtaskEstimatedMin,
     addSubtask,
@@ -307,6 +311,15 @@ export default function TasksPage() {
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    const startAt = normalizeTaskDate(newTaskStartAt || null);
+    const dueAt =
+      recurrence.recurrenceType === "none"
+        ? normalizeTaskDate(newTaskDueAt || null)
+        : null;
+    if (!isValidTaskDateRange(startAt, dueAt)) {
+      setError(t.errors.invalidTaskDateRange);
+      return;
+    }
     try {
       setError(null);
       await apiFetch("/api/tasks", {
@@ -315,6 +328,8 @@ export default function TasksPage() {
         body: JSON.stringify({
           title: title.trim(),
           autoBreakdown: true,
+          ...(startAt ? { startAt } : {}),
+          ...(dueAt ? { dueAt } : {}),
           ...(newTaskPillarId ? { pillarId: newTaskPillarId } : {}),
           ...(recurrenceTouched
             ? recurrence.recurrenceType !== "none"
@@ -331,6 +346,8 @@ export default function TasksPage() {
       });
       setTitle("");
       setNewTaskPillarId("");
+      setNewTaskStartAt("");
+      setNewTaskDueAt("");
       setRecurrence(defaultRecurrenceFormValue);
       setRecurrenceTouched(false);
       setAutoRecurrence(null);
@@ -396,6 +413,7 @@ export default function TasksPage() {
       onUpdateSubtaskTitle={updateSubtaskTitle}
       onUpdateSubtaskEstimatedMin={updateSubtaskEstimatedMin}
       onUpdateEstimatedMin={updateEstimatedMin}
+      onUpdateTaskDates={updateTaskDates}
       onToggleIntimidating={(id, intimidating) =>
         void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
       }
@@ -508,11 +526,42 @@ export default function TasksPage() {
             {t.common.add}
           </button>
         </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+          <label className="inline-flex items-center gap-1.5">
+            <span>{t.taskCard.start}</span>
+            <input
+              type="date"
+              value={newTaskStartAt}
+              max={newTaskDueAt || undefined}
+              onChange={(e) => setNewTaskStartAt(e.target.value)}
+              className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
+            />
+          </label>
+          {recurrence.recurrenceType === "none" ? (
+            <label className="inline-flex items-center gap-1.5">
+              <span>{t.taskCard.due}</span>
+              <input
+                type="date"
+                value={newTaskDueAt}
+                min={newTaskStartAt || undefined}
+                onChange={(e) => setNewTaskDueAt(e.target.value)}
+                className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
+              />
+            </label>
+          ) : (
+            <span title={t.taskCard.dueDisabledForRecurrence}>
+              {t.taskCard.dueDisabledForRecurrence}
+            </span>
+          )}
+        </div>
         <TaskRecurrenceForm
           value={recurrence}
           onChange={(value) => {
             setRecurrenceTouched(true);
             setRecurrence(value);
+            if (value.recurrenceType !== "none") {
+              setNewTaskDueAt("");
+            }
           }}
           leadingButton={
             <button
