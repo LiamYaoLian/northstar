@@ -30,7 +30,13 @@ import {
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
 import { recurrenceTypeUsesDays } from "@/lib/tasks/recurrence-types";
-import { isValidTaskDateRange, normalizeTaskDate } from "@/lib/tasks/task-dates";
+import {
+  isValidTaskDateRange,
+  normalizeTaskDate,
+  resolveTaskStartAt,
+  todayTaskDate,
+} from "@/lib/tasks/task-dates";
+import { clientTimezone } from "@/lib/tasks/timezone";
 
 type ClassifyPreview = {
   pillarName: string | null;
@@ -62,7 +68,9 @@ export default function TasksPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [todayOnly, setTodayOnly] = useState(false);
-  const [newTaskStartAt, setNewTaskStartAt] = useState("");
+  const [newTaskStartAt, setNewTaskStartAt] = useState(() =>
+    todayTaskDate(clientTimezone()),
+  );
   const [newTaskDueAt, setNewTaskDueAt] = useState("");
   const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
   const [recurrenceTouched, setRecurrenceTouched] = useState(false);
@@ -311,7 +319,7 @@ export default function TasksPage() {
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    const startAt = normalizeTaskDate(newTaskStartAt || null);
+    const startAt = resolveTaskStartAt(newTaskStartAt, clientTimezone());
     const dueAt =
       recurrence.recurrenceType === "none"
         ? normalizeTaskDate(newTaskDueAt || null)
@@ -328,7 +336,7 @@ export default function TasksPage() {
         body: JSON.stringify({
           title: title.trim(),
           autoBreakdown: true,
-          ...(startAt ? { startAt } : {}),
+          startAt,
           ...(dueAt ? { dueAt } : {}),
           ...(newTaskPillarId ? { pillarId: newTaskPillarId } : {}),
           ...(recurrenceTouched
@@ -346,7 +354,7 @@ export default function TasksPage() {
       });
       setTitle("");
       setNewTaskPillarId("");
-      setNewTaskStartAt("");
+      setNewTaskStartAt(todayTaskDate(clientTimezone()));
       setNewTaskDueAt("");
       setRecurrence(defaultRecurrenceFormValue);
       setRecurrenceTouched(false);

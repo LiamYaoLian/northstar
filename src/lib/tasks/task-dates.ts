@@ -1,3 +1,5 @@
+import { localDateString, resolveTimezone } from "./timezone";
+
 /** Normalize API / date-input values to YYYY-MM-DD or null. */
 export function normalizeTaskDate(value: string | null | undefined): string | null {
   if (value == null) return null;
@@ -7,6 +9,19 @@ export function normalizeTaskDate(value: string | null | undefined): string | nu
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
+}
+
+/** Calendar today in the given timezone as YYYY-MM-DD. */
+export function todayTaskDate(tz?: string): string {
+  return localDateString(new Date(), resolveTimezone(tz));
+}
+
+/** Default missing start dates to today; preserve explicit values. */
+export function resolveTaskStartAt(
+  inputStartAt: string | null | undefined,
+  tz?: string,
+): string {
+  return normalizeTaskDate(inputStartAt) ?? todayTaskDate(tz);
 }
 
 export function taskDateToInputValue(value: string | null | undefined): string {

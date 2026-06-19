@@ -3,6 +3,7 @@ import {
   formatTaskDate,
   isValidTaskDateRange,
   normalizeTaskDate,
+  resolveTaskStartAt,
   taskDateToInputValue,
 } from "./task-dates";
 
@@ -22,5 +23,10 @@ describe("task-dates", () => {
   it("validates start is on or before due", () => {
     expect(isValidTaskDateRange("2026-06-01", "2026-06-15")).toBe(true);
     expect(isValidTaskDateRange("2026-06-20", "2026-06-15")).toBe(false);
+  });
+
+  it("defaults missing start to today in timezone", () => {
+    expect(resolveTaskStartAt(null, "America/New_York")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(resolveTaskStartAt("2026-06-01", "America/New_York")).toBe("2026-06-01");
   });
 });

@@ -185,6 +185,16 @@ export async function addTaskStartAtColumnIfMissing(client: Client): Promise<voi
   await addColumnIfMissing(client, "tasks", "start_at", "TEXT");
 }
 
+/** Set start_at from created_at for tasks missing a start date. */
+export async function backfillTaskStartAt(client: Client): Promise<number> {
+  const result = await client.execute(`
+    UPDATE tasks
+    SET start_at = substr(created_at, 1, 10)
+    WHERE start_at IS NULL OR trim(start_at) = ''
+  `);
+  return Number(result.rowsAffected ?? 0);
+}
+
 export async function addRecurrenceColumnsIfMissing(
   client: Client,
 ): Promise<void> {
@@ -362,6 +372,7 @@ export async function applyMigrations(client: Client, db: Db) {
   await addRecurrenceColumnsIfMissing(client);
   await addSubtaskEstimatedMinColumnIfMissing(client);
   await addTaskStartAtColumnIfMissing(client);
+  await backfillTaskStartAt(client);
   await addCompletionEventsTableIfMissing(client);
   await addActiveTimeSessionsTableIfMissing(client);
   await dedupeCompletionEvents(client);

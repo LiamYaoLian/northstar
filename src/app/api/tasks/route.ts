@@ -32,10 +32,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const user = await requireUser();
+    const tz = parseTzFromSearchParams(new URL(request.url).searchParams);
     const recurrence = parseCreateTaskRecurrenceFromBody(body);
     const task = await createTask(
       recurrence ? { ...body, ...recurrence } : body,
       user.id,
+      { tz },
     );
     const subtasks = task ? await listSubtasks(task.id, user.id) : [];
     return NextResponse.json({ task, subtasks });

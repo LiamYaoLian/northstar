@@ -28,6 +28,7 @@ import { sumSubtaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
 import {
   isValidTaskDateRange,
   normalizeTaskDate,
+  resolveTaskStartAt,
 } from "@/lib/tasks/task-dates";
 import type { RecurrenceInference } from "@/lib/tasks/infer-recurrence";
 import type { ClassifyResult } from "@/lib/tasks/classify";
@@ -220,10 +221,11 @@ export async function createTask(input: {
   recurrenceType?: RecurrenceType;
   recurrenceDays?: number[] | null;
   recurrenceCarryOver?: boolean;
-}, userId?: string) {
+}, userId?: string, options?: { tz?: string }) {
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
+  const resolvedTz = resolveTimezone(options?.tz);
   const pillarRows = db.select().from(strategicPillars);
   const pillars = userId
     ? await pillarRows.where(eq(strategicPillars.userId, userId))
@@ -257,7 +259,7 @@ export async function createTask(input: {
       ? Boolean(resolvedRecurrence.recurrenceCarryOver)
       : false;
 
-  const normalizedStart = normalizeTaskDate(input.startAt);
+  const normalizedStart = resolveTaskStartAt(input.startAt, resolvedTz);
   const normalizedDue =
     recurrenceType !== "none" ? null : normalizeTaskDate(input.dueAt);
   if (!isValidTaskDateRange(normalizedStart, normalizedDue)) {
