@@ -8,7 +8,7 @@ import {
   shouldRecordCompletionTransition,
   summarizeCompletionEventsByPillar,
 } from "./completion-events";
-import { filterTasksByStatus } from "@/lib/services/task-sorting";
+import { filterTasksByStatus } from "@/lib/tasks/task-sorting";
 import { testPillars } from "@/lib/test-fixtures";
 import {
   TEST_TZ,

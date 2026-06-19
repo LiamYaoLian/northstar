@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CategoryFilter } from "@/components/category-filter";
 import { ProjectFilter } from "@/components/project-filter";
@@ -10,6 +9,8 @@ import { TaskCard } from "@/components/task-card";
 import { TaskStatusFilterBar } from "@/components/task-status-filter";
 import { apiFetch } from "@/lib/api-client";
 import { useTimer } from "@/components/timer-provider";
+import { useOptimisticTaskPatches } from "@/lib/hooks/use-optimistic-task-patches";
+import { useTaskBoardData } from "@/lib/hooks/use-task-board-data";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
@@ -18,20 +19,15 @@ import {
   sortDoneTasksByCompletedAt,
   sortTasksByTime,
   type TaskStatusFilter,
-} from "@/lib/services/task-sorting";
+} from "@/lib/tasks/task-sorting";
 import {
   TaskRecurrenceForm,
   defaultRecurrenceFormValue,
 } from "@/components/task-recurrence-form";
 import { findWorkPillar, WORK_PILLAR_NAME } from "@/lib/pillars";
 import {
-  enrichTasksWithPillars,
-  enrichTasksWithProjects,
   filterTasksByPillar,
   filterTasksByProject,
-  parseStrategyPillars,
-  toProjectOptions,
-  type PillarOption,
   type ProjectOption,
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
@@ -63,19 +59,26 @@ type RecurrencePreview = {
 };
 
 export default function TasksPage() {
-  const router = useRouter();
   const { status: sessionStatus } = useSession();
   const { locale, t } = useLocale();
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
-  const [todayTasks, setTodayTasks] = useState<TaskRow[]>([]);
+  const {
+    tasks,
+    setTasks,
+    todayTasks,
+    setTodayTasks,
+    pillars,
+    setPillars,
+    projects,
+    setProjects,
+    error,
+    setError,
+    reload: load,
+  } = useTaskBoardData({ includeTodayTasks: true, requireAuth: true });
   const [title, setTitle] = useState("");
   const [newTaskPillarId, setNewTaskPillarId] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pillars, setPillars] = useState<PillarOption[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
-  const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [todayOnly, setTodayOnly] = useState(false);
   const [newTaskStartAt, setNewTaskStartAt] = useState(() =>
@@ -92,66 +95,15 @@ export default function TasksPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const { registerOnStop } = useTimer();
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const [todayData, tasksData, strategyData, projectsData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?status=today"),
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
-        apiFetch<{
-          hasStrategy: boolean;
-          strategy: {
-            pillars: {
-              id: string;
-              name: string;
-              color: string;
-              focusTracks: string | null;
-            }[];
-          } | null;
-        }>("/api/strategy"),
-        apiFetch<{
-          projects: Array<{
-            id: string;
-            name: string;
-            pillarId: string;
-            focusTrack: string | null;
-          }>;
-        }>("/api/projects"),
-      ]);
-      if (!strategyData.hasStrategy) {
-        router.replace("/onboarding");
-        return;
-      }
-
-      const strategyPillars = parseStrategyPillars(
-        strategyData.strategy?.pillars ?? [],
-      );
-      const projectOptions = toProjectOptions(projectsData.projects);
-      setPillars(strategyPillars);
-      setProjects(projectOptions);
-      const enrich = (list: TaskRow[]) =>
-        enrichTasksWithProjects(
-          enrichTasksWithPillars(list, strategyPillars),
-          projectOptions,
-        );
-      setTodayTasks(enrich(todayData.tasks));
-      setTasks(enrich(tasksData.tasks));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.errors.loadFailed);
-    }
-  }, [router, t.errors.loadFailed]);
-
-  useEffect(() => {
-    if (sessionStatus !== "authenticated") return;
-    void load();
-  }, [load, sessionStatus]);
-
   useEffect(() => {
     if (sessionStatus !== "authenticated") return;
     return registerOnStop(() => {
       void load();
     });
   }, [load, registerOnStop, sessionStatus]);
+
+  const { applyOptimisticTaskPatch, applyOptimisticSubtaskPatch } =
+    useOptimisticTaskPatches(setTasks, setTodayTasks);
 
   useEffect(() => {
     if (newTaskPillarId) setAutoClassify(null);
@@ -262,65 +214,6 @@ export default function TasksPage() {
     t.tasks.classifySourceRules,
   ]);
 
-  const applyOptimisticTaskPatch = useCallback(
-    (id: string, patch: Record<string, unknown>) => {
-      let snapshotTasks: TaskRow[] | null = null;
-      let snapshotToday: TaskRow[] | null = null;
-
-      setTasks((current) => {
-        snapshotTasks = current;
-        return current.map((task) =>
-          task.id === id ? { ...task, ...patch } : task,
-        );
-      });
-      setTodayTasks((current) => {
-        snapshotToday = current;
-        return current.map((task) =>
-          task.id === id ? { ...task, ...patch } : task,
-        );
-      });
-
-      return () => {
-        if (snapshotTasks) setTasks(snapshotTasks);
-        if (snapshotToday) setTodayTasks(snapshotToday);
-      };
-    },
-    [],
-  );
-
-  const applyOptimisticSubtaskPatch = useCallback(
-    (subtaskId: string, patch: Record<string, unknown>) => {
-      let snapshotTasks: TaskRow[] | null = null;
-      let snapshotToday: TaskRow[] | null = null;
-
-      const updateTaskSubtask = (task: TaskRow): TaskRow => {
-        const subtasks = task.subtasks;
-        if (!subtasks?.some((subtask) => subtask.id === subtaskId)) return task;
-        return {
-          ...task,
-          subtasks: subtasks.map((subtask) =>
-            subtask.id === subtaskId ? { ...subtask, ...patch } : subtask,
-          ),
-        };
-      };
-
-      setTasks((current) => {
-        snapshotTasks = current;
-        return current.map(updateTaskSubtask);
-      });
-      setTodayTasks((current) => {
-        snapshotToday = current;
-        return current.map(updateTaskSubtask);
-      });
-
-      return () => {
-        if (snapshotTasks) setTasks(snapshotTasks);
-        if (snapshotToday) setTodayTasks(snapshotToday);
-      };
-    },
-    [],
-  );
-
   const workPillar = useMemo(() => findWorkPillar(pillars), [pillars]);
   const showProjectFilters =
     Boolean(workPillar) && categoryFilter === workPillar?.id;
@@ -335,7 +228,7 @@ export default function TasksPage() {
 
   const handleProjectCreated = useCallback((project: ProjectOption) => {
     setProjects((current) => [...current, project]);
-  }, []);
+  }, [setProjects]);
 
   const handleCategoryFilterChange = useCallback(
     (pillarId: string | null) => {

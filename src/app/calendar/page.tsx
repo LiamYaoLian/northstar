@@ -1,21 +1,18 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarBoard } from "@/components/calendar/calendar-board";
 import { CalendarTaskEditModal } from "@/components/calendar/calendar-task-edit-modal";
 import { TaskCard } from "@/components/task-card";
 import { apiFetch } from "@/lib/api-client";
+import { useOptimisticTaskPatches } from "@/lib/hooks/use-optimistic-task-patches";
+import { useTaskBoardData } from "@/lib/hooks/use-task-board-data";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { findWorkPillar } from "@/lib/pillars";
 import {
-  enrichTasksWithPillars,
-  enrichTasksWithProjects,
   filterTasksByPillar,
-  parseStrategyPillars,
-  toProjectOptions,
-  type PillarOption,
   type ProjectOption,
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
@@ -33,109 +30,23 @@ function CalendarPageContent() {
   const tz = clientTimezone();
 
   const urlState = parseCalendarUrlState(searchParams, tz);
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
-  const [pillars, setPillars] = useState<PillarOption[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const {
+    tasks,
+    setTasks,
+    pillars,
+    setProjects,
+    projects,
+    loading,
+    error,
+    setError,
+    reload: load,
+  } = useTaskBoardData({ trackLoading: true });
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [addingTask, setAddingTask] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const [tasksData, strategyData, projectsData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
-        apiFetch<{
-          hasStrategy: boolean;
-          strategy: {
-            pillars: {
-              id: string;
-              name: string;
-              color: string;
-              focusTracks: string | null;
-            }[];
-          } | null;
-        }>("/api/strategy"),
-        apiFetch<{
-          projects: Array<{
-            id: string;
-            name: string;
-            pillarId: string;
-            focusTrack: string | null;
-          }>;
-        }>("/api/projects"),
-      ]);
-
-      if (!strategyData.hasStrategy) {
-        router.replace("/onboarding");
-        return;
-      }
-
-      const strategyPillars = parseStrategyPillars(
-        strategyData.strategy?.pillars ?? [],
-      );
-      const projectOptions = toProjectOptions(projectsData.projects);
-      setPillars(strategyPillars);
-      setProjects(projectOptions);
-      setTasks(
-        enrichTasksWithProjects(
-          enrichTasksWithPillars(tasksData.tasks, strategyPillars),
-          projectOptions,
-        ),
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.errors.loadFailed);
-    } finally {
-      setLoading(false);
-    }
-  }, [router, t.errors.loadFailed]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const applyOptimisticTaskPatch = useCallback(
-    (id: string, patch: Record<string, unknown>) => {
-      let snapshot: TaskRow[] | null = null;
-      setTasks((current) => {
-        snapshot = current;
-        return current.map((task) =>
-          task.id === id ? { ...task, ...patch } : task,
-        );
-      });
-      return () => {
-        if (snapshot) setTasks(snapshot);
-      };
-    },
-    [],
-  );
-
-  const applyOptimisticSubtaskPatch = useCallback(
-    (subtaskId: string, patch: Record<string, unknown>) => {
-      let snapshot: TaskRow[] | null = null;
-
-      setTasks((current) => {
-        snapshot = current;
-        return current.map((task) => {
-          const subtasks = task.subtasks;
-          if (!subtasks?.some((subtask) => subtask.id === subtaskId)) return task;
-          return {
-            ...task,
-            subtasks: subtasks.map((subtask) =>
-              subtask.id === subtaskId ? { ...subtask, ...patch } : subtask,
-            ),
-          };
-        });
-      });
-
-      return () => {
-        if (snapshot) setTasks(snapshot);
-      };
-    },
-    [],
-  );
+  const { applyOptimisticTaskPatch, applyOptimisticSubtaskPatch } =
+    useOptimisticTaskPatches(setTasks);
 
   const {
     patchTask,
@@ -168,7 +79,7 @@ function CalendarPageContent() {
 
   const handleProjectCreated = useCallback((project: ProjectOption) => {
     setProjects((current) => [...current, project]);
-  }, []);
+  }, [setProjects]);
 
   const visibleTasks = useMemo(() => {
     const active = tasks.filter((task) => task.status !== "done");

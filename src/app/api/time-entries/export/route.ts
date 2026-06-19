@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { parseCompletionsSummaryQuery, InvalidCompletionQueryError } from "@/lib/api/completions/parse-completions-query";
+import { parseCompletionsSummaryQuery } from "@/lib/api/completions/parse-completions-query";
+import { handleCompletionsApiError } from "@/lib/api/completions/handle-completions-error";
 import { listTimeEntriesForExport } from "@/lib/services/time-entries-export";
 import { timeEntriesToCsv } from "@/lib/export/time-entries-csv";
-import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
-import { InvalidTimezoneError } from "@/lib/tasks/timezone";
 import { requireUser } from "@/lib/auth/require-user";
-import { toApiError } from "@/lib/auth/errors";
 
 export async function GET(request: Request) {
   try {
@@ -26,15 +24,10 @@ export async function GET(request: Request) {
       },
     });
   } catch (err) {
-    const tzErr = tzErrorResponse(err);
-    if (tzErr) return tzErr;
-    if (err instanceof InvalidCompletionQueryError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    if (err instanceof InvalidTimezoneError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    console.error("GET /api/time-entries/export", err);
-    return toApiError(err, "Failed to export time entries");
+    return handleCompletionsApiError(
+      err,
+      "GET /api/time-entries/export",
+      "Failed to export time entries",
+    );
   }
 }

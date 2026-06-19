@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale } from "@/lib/i18n/context";
-import type { TaskStatusFilter } from "@/lib/services/task-sorting";
+import type { TaskStatusFilter } from "@/lib/tasks/task-sorting";
 import { cn } from "@/lib/utils";
 
 type TaskStatusFilterProps = {

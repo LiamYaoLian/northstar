@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateTask } from "@/lib/services/tasks";
+import { deleteTask, updateTask } from "@/lib/services/tasks";
 import { ProjectValidationError } from "@/lib/services/projects";
 import { patchTaskRecurrenceSchema } from "@/lib/api/tasks/schemas";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
