@@ -175,6 +175,14 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 
 时间记录**不删除**；recurring 任务 lazy reset 只清 `status` / `completedAt` / 子任务勾选。
 
+**`active_time_sessions`** — 运行中计时器（单用户单 session；stop 写入 `time_entries` 后删除）
+
+| 字段 | 说明 |
+|------|------|
+| `mode` | `stopwatch` \| `pomodoro` |
+| `targetDurationMin` | 番茄目标分钟；正向计时为 null |
+| `startedAt` | session 开始时刻 |
+
 **`task_completion_events`** — 完成快照（recurring reset **不删**；用户 reopen 当前 done 任务会撤销本次 event）
 
 | 字段 | 说明 |
@@ -339,7 +347,8 @@ Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce
 
 ### 7.4 时间记录
 
-`POST /api/time-entries` — `{ taskId, durationMin, ... }`，供 TaskCard「记录时间」使用。记录影响 alignment 与 intimidation 因子。
+- `POST /api/time-entries` — `{ taskId, durationMin, ... }`，供 TaskCard「记录时间」使用。记录影响 alignment 与 intimidation 因子。
+- **计时器** — `GET/POST /api/timer*`：正向计时（`stopwatch`）与番茄倒计时（`pomodoro`）。运行中状态存 `active_time_sessions`；`POST /api/timer/stop` 写入 `time_entries`（`source=timer`）。UI：`TimerProvider` + Header `ActiveTimerBar` + TaskCard 计时按钮。
 
 ### 7.5 Today vs Tasks
 
@@ -466,6 +475,10 @@ Classify 对 Work pillar 额外推断 `focusTrack`（`suggestFocusTrack` 规则 
 | GET | `/api/completions/summary?since=&until=&tz=` | ✓ | Alignment 本周完成摘要 |
 | GET/POST | `/api/time-entries` | — | 时间记录 |
 | GET | `/api/time-entries/export?since=&until=&tz=` | ✓ | 周期内 time log CSV |
+| GET | `/api/timer` | — | 当前运行中计时器 |
+| POST | `/api/timer/start` | — | 启动 stopwatch / pomodoro |
+| POST | `/api/timer/stop` | — | 停止并写入 time entry |
+| POST | `/api/timer/cancel` | — | 取消运行中 session |
 | GET/POST | `/api/strategy` | — | 策略读 / 全量写（onboarding） |
 | GET | `/api/reviews?period=&tz=` | ✓ | 周期回顾 live 数据 + saved/history |
 | POST | `/api/reviews` | ✓ body `tz` | 保存 week/month 快照（body.period） |
@@ -494,6 +507,8 @@ Zod schemas：`src/lib/api/tasks/schemas.ts`；tz 解析：`parse-tz-query.ts` +
 - `logTime`、`reorderTasks`
 
 每次 mutation 后 `reload()`（full reload，无 optimistic）。
+
+`TimerProvider`（layout 级）— mount 时 `GET /api/timer`；暴露 start/stop/cancel；stop 后通过 `registerOnStop` 触发页面 `reload()`。
 
 ### 11.3 核心组件
 
