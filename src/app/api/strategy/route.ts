@@ -7,41 +7,57 @@ import {
   updateNorthStar,
 } from "@/lib/services/strategy";
 import { updateNorthStarSchema } from "@/lib/api/strategy/schemas";
+import { requireUser } from "@/lib/auth/require-user";
+import { toApiError } from "@/lib/auth/errors";
 
 export async function GET() {
-  const strategy = await getStrategy();
-  return NextResponse.json({
-    hasStrategy: await hasStrategy(),
-    strategy,
-  });
+  try {
+    const user = await requireUser();
+    const strategy = await getStrategy(user.id);
+    return NextResponse.json({
+      hasStrategy: await hasStrategy(user.id),
+      strategy,
+    });
+  } catch (err) {
+    return toApiError(err, "Failed to load strategy");
+  }
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  try {
+    const user = await requireUser();
+    const body = await request.json();
 
-  if (body.action === "template") {
-    const strategy = await applyLifeBalanceTemplate(body.workTrack ?? "big_tech", {
-      statement: body.statement,
-      horizon: body.horizon,
-      hoursPerWeek: body.hoursPerWeek,
-    });
+    if (body.action === "template") {
+      const strategy = await applyLifeBalanceTemplate(
+        user.id,
+        body.workTrack ?? "big_tech",
+        {
+          statement: body.statement,
+          horizon: body.horizon,
+          hoursPerWeek: body.hoursPerWeek,
+        },
+      );
+      return NextResponse.json({ strategy });
+    }
+
+    const strategy = await saveStrategy(user.id, body);
     return NextResponse.json({ strategy });
+  } catch (err) {
+    return toApiError(err, "Failed to save strategy");
   }
-
-  const strategy = await saveStrategy(body);
-  return NextResponse.json({ strategy });
 }
 
 export async function PATCH(request: Request) {
   try {
+    const user = await requireUser();
     const body = updateNorthStarSchema.parse(await request.json());
-    const strategy = await updateNorthStar(body);
+    const strategy = await updateNorthStar(body, user.id);
     if (!strategy) {
       return NextResponse.json({ error: "Strategy not found" }, { status: 404 });
     }
     return NextResponse.json({ strategy });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Invalid request";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return toApiError(err, "Invalid request");
   }
 }

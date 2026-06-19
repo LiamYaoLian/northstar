@@ -11,6 +11,7 @@ import type { Subtask } from "@/lib/db/schema";
 
 const subtask: Subtask = {
   id: "s1",
+  userId: null,
   parentTaskId: "t1",
   title: "Draft outline",
   sortOrder: 0,

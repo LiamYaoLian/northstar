@@ -3,6 +3,7 @@ import type { StrategicPillar, Task, TimeEntry } from "@/lib/db/schema";
 export const testPillars: StrategicPillar[] = [
   {
     id: "p-work",
+    userId: null,
     name: "工作",
     description: null,
     targetPct: 40,
@@ -21,6 +22,7 @@ export const testPillars: StrategicPillar[] = [
   },
   {
     id: "p-health",
+    userId: null,
     name: "健康",
     description: null,
     targetPct: 20,
@@ -38,6 +40,7 @@ export const testPillars: StrategicPillar[] = [
 export function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: "t1",
+    userId: null,
     title: "LC",
     description: null,
     pillarId: "p-work",
@@ -63,6 +66,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
 export const testEntries: TimeEntry[] = [
   {
     id: "e1",
+    userId: null,
     taskId: "t1",
     startedAt: "2026-01-02T00:00:00.000Z",
     durationMin: 120,
@@ -72,6 +76,7 @@ export const testEntries: TimeEntry[] = [
   },
   {
     id: "e2",
+    userId: null,
     taskId: "t2",
     startedAt: "2026-01-02T00:00:00.000Z",
     durationMin: 30,

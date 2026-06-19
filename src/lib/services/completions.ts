@@ -20,6 +20,7 @@ export type ListCompletionEventsQuery = {
   pillarId?: string | null;
   tz: string;
   limit?: number;
+  userId?: string;
 };
 
 export type CompletionSummary = {
@@ -49,6 +50,7 @@ type DbCompletionDeleter = Pick<Db, "delete">;
 
 export async function recordCompletionEvent(
   tx: DbWriter,
+  userId: string | undefined,
   task: Task,
   tz: string,
   now = new Date(),
@@ -62,13 +64,19 @@ export async function recordCompletionEvent(
       and(
         eq(taskCompletionEvents.taskId, task.id),
         eq(taskCompletionEvents.completedAt, completedAtIso),
+        userId
+          ? eq(taskCompletionEvents.userId, userId)
+          : isNull(taskCompletionEvents.userId),
       ),
     );
   if (existing[0]) {
     return rowToEvent(existing[0]);
   }
 
-  const pillars = await tx.select().from(strategicPillars);
+  const pillarRows = tx.select().from(strategicPillars);
+  const pillars = userId
+    ? await pillarRows.where(eq(strategicPillars.userId, userId))
+    : await pillarRows;
   const snapshot = resolvePillarSnapshotForCompletion(task, pillars);
   const ts = nowIso();
   const completedAt = new Date(completedAtIso);
@@ -83,6 +91,7 @@ export async function recordCompletionEvent(
 
   await tx.insert(taskCompletionEvents).values({
     id: payload.id,
+    userId: userId ?? task.userId ?? null,
     taskId: payload.taskId,
     completedAt: payload.completedAt,
     occurrenceDate: payload.occurrenceDate,
@@ -100,6 +109,7 @@ export async function recordCompletionEvent(
 
 export async function deleteCompletionEventForTaskCompletion(
   tx: DbCompletionDeleter,
+  userId: string | undefined,
   taskId: string,
   completedAt: string | null,
 ): Promise<void> {
@@ -110,6 +120,9 @@ export async function deleteCompletionEventForTaskCompletion(
       and(
         eq(taskCompletionEvents.taskId, taskId),
         eq(taskCompletionEvents.completedAt, completedAt),
+        userId
+          ? eq(taskCompletionEvents.userId, userId)
+          : isNull(taskCompletionEvents.userId),
       ),
     );
 }
@@ -123,6 +136,9 @@ export async function listCompletionEvents(
     gte(taskCompletionEvents.occurrenceDate, query.since),
     lte(taskCompletionEvents.occurrenceDate, query.until),
   ];
+  if (query.userId) {
+    conditions.push(eq(taskCompletionEvents.userId, query.userId));
+  }
   if (query.pillarId !== undefined) {
     conditions.push(
       query.pillarId === null

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { previewBreakdownTask } from "@/lib/services/tasks";
 import { BreakdownError } from "@/lib/ai/breakdown";
+import { requireUser } from "@/lib/auth/require-user";
+import { toApiError } from "@/lib/auth/errors";
 
 export async function POST(
   request: Request,
@@ -8,6 +10,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const user = await requireUser();
     let userPrompt: string | undefined;
     try {
       const body = await request.json();
@@ -18,7 +21,7 @@ export async function POST(
       // empty body is fine
     }
 
-    const result = await previewBreakdownTask(id, { userPrompt });
+    const result = await previewBreakdownTask(id, { userPrompt, userId: user.id });
     if (!result.preview && !result.task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
@@ -31,6 +34,9 @@ export async function POST(
         : err instanceof Error
           ? err.message
           : "Breakdown failed";
+    if (!(err instanceof BreakdownError)) {
+      return toApiError(err, "Breakdown failed");
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

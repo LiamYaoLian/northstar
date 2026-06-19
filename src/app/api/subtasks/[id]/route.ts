@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { updateSubtask, deleteSubtask } from "@/lib/services/tasks";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
+import { requireUser } from "@/lib/auth/require-user";
+import { toApiError } from "@/lib/auth/errors";
 
 export async function PATCH(
   request: Request,
@@ -9,6 +11,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
+    const user = await requireUser();
     const url = new URL(request.url);
     const tz = parseTzFromSearchParams(url.searchParams);
     const body = await request.json();
@@ -24,7 +27,7 @@ export async function PATCH(
         ...(isDone !== undefined ? { isDone: Boolean(isDone) } : {}),
         ...(title !== undefined ? { title: String(title) } : {}),
       },
-      { tz },
+      { tz, userId: user.id },
     );
     if (!subtask) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -34,10 +37,7 @@ export async function PATCH(
     const tzErr = tzErrorResponse(err);
     if (tzErr) return tzErr;
     console.error("PATCH /api/subtasks/[id]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to update subtask" },
-      { status: 500 },
-    );
+    return toApiError(err, "Failed to update subtask");
   }
 }
 
@@ -47,16 +47,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const ok = await deleteSubtask(id);
+    const user = await requireUser();
+    const ok = await deleteSubtask(id, user.id);
     if (!ok) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/subtasks/[id]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to delete subtask" },
-      { status: 500 },
-    );
+    return toApiError(err, "Failed to delete subtask");
   }
 }

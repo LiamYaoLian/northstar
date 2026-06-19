@@ -75,6 +75,7 @@ describe("filterTimeEntriesInDateRange", () => {
   const entries: TimeEntry[] = [
     {
       id: "e1",
+      userId: null,
       taskId: "t1",
       startedAt: "2026-06-16T12:00:00.000Z",
       durationMin: 30,
@@ -84,6 +85,7 @@ describe("filterTimeEntriesInDateRange", () => {
     },
     {
       id: "e2",
+      userId: null,
       taskId: "t1",
       startedAt: "2026-06-10T12:00:00.000Z",
       durationMin: 60,

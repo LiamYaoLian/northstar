@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppHeader } from "@/components/app-header";
+import { AuthSessionProvider } from "@/components/auth-session-provider";
 import { LocaleProvider } from "@/lib/i18n/context";
 
 export const metadata: Metadata = {
@@ -16,12 +17,14 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <LocaleProvider>
-          <div className="mx-auto max-w-3xl px-4 py-6">
-            <AppHeader />
-            {children}
-          </div>
-        </LocaleProvider>
+        <AuthSessionProvider>
+          <LocaleProvider>
+            <div className="mx-auto max-w-3xl px-4 py-6">
+              <AppHeader />
+              {children}
+            </div>
+          </LocaleProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

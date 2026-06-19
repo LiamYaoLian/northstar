@@ -37,6 +37,11 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      const loginUrl = new URL("/login", window.location.origin);
+      loginUrl.searchParams.set("callbackUrl", window.location.pathname);
+      window.location.assign(loginUrl.toString());
+    }
     const base =
       data &&
       typeof data === "object" &&

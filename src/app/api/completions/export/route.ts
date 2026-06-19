@@ -7,12 +7,15 @@ import { listCompletionEvents } from "@/lib/services/completions";
 import { completionsToCsv } from "@/lib/export/completions-csv";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
 import { InvalidTimezoneError } from "@/lib/tasks/timezone";
+import { requireUser } from "@/lib/auth/require-user";
+import { toApiError } from "@/lib/auth/errors";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    const user = await requireUser();
     const query = parseCompletionsQuery(url.searchParams);
-    const events = await listCompletionEvents(query);
+    const events = await listCompletionEvents({ ...query, userId: user.id });
     const csv = completionsToCsv(events);
     return new NextResponse(csv, {
       headers: {
@@ -30,6 +33,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     console.error("GET /api/completions/export", err);
-    return NextResponse.json({ error: "Failed to export completions" }, { status: 500 });
+    return toApiError(err, "Failed to export completions");
   }
 }

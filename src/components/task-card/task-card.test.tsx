@@ -15,8 +15,6 @@ function renderTaskCard(
   const task = makeTask({
     title: "Prepare deck",
     priorityScore: 0.82,
-    pillarName: "工作",
-    pillarColor: "#3b82f6",
     priorityFactors: JSON.stringify({
       strategicUrgency: 0.5,
       deadlinePressure: 0.2,
@@ -25,7 +23,9 @@ function renderTaskCard(
       staleness: 0.1,
       recentlyDonePenalty: 0,
     }),
-  });
+  }) as React.ComponentProps<typeof TaskCard>["task"];
+  task.pillarName = "工作";
+  task.pillarColor = "#3b82f6";
 
   return render(
     <LocaleProvider>

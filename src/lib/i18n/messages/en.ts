@@ -43,13 +43,13 @@ export const en: Messages = {
   today: {
     title: "Today",
     subtitle: "Auto-ranked · Last updated",
-    empty: "Nothing on your plate. Go to",
-    viewAll: "View all tasks →",
+    empty: "Nothing due today.",
+    viewAll: "View completion log →",
     recalculatePriority: "Recalculate priority",
     recalculating: "Recalculating...",
     completedToday: "Completed today",
     completedCount: "{count} completed",
-    filteredEmpty: "Nothing due in this category today. Clear the filter or check Tasks.",
+    filteredEmpty: "Nothing due in this category today. Clear the filter or use the task board below.",
   },
   tasks: {
     title: "Tasks",

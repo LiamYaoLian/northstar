@@ -10,7 +10,6 @@ export function AppNav() {
   const { t } = useLocale();
 
   const links = [
-    { href: "/today", label: t.nav.today },
     { href: "/alignment", label: t.nav.alignment },
     { href: "/tasks", label: t.nav.tasks },
     { href: "/strategy", label: t.nav.strategy },

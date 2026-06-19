@@ -50,18 +50,34 @@ function rowToView(row: typeof reviewSnapshots.$inferSelect): ReviewSnapshotView
   };
 }
 
-async function buildLiveReview(period: ReviewPeriod, tz: string, now = new Date()) {
+async function buildLiveReview(
+  period: ReviewPeriod,
+  tz: string,
+  now = new Date(),
+  userId?: string,
+) {
   const { periodStart, periodEnd } = resolveReviewPeriod(period, tz, now);
   const db = getDb();
-  const pillars = (await db.select().from(strategicPillars)).sort(
+  const pillarRows = db.select().from(strategicPillars);
+  const pillars = (userId
+    ? await pillarRows.where(eq(strategicPillars.userId, userId))
+    : await pillarRows
+  ).sort(
     (a, b) => a.sortOrder - b.sortOrder,
   );
-  const taskList = await db.select().from(tasks);
-  const entries = await db.select().from(timeEntries);
+  const taskRows = db.select().from(tasks);
+  const taskList = userId
+    ? await taskRows.where(eq(tasks.userId, userId))
+    : await taskRows;
+  const entryRows = db.select().from(timeEntries);
+  const entries = userId
+    ? await entryRows.where(eq(timeEntries.userId, userId))
+    : await entryRows;
   const completions = await summarizeCompletionsByPillar({
     since: periodStart,
     until: periodEnd,
     tz,
+    userId,
   });
 
   const payload = buildReviewSnapshotPayload({
@@ -91,31 +107,34 @@ export async function getReviewDashboard(
   period: ReviewPeriod,
   tzInput?: string,
   now = new Date(),
+  userId?: string,
 ): Promise<ReviewDashboard | null> {
-  if (!(await hasStrategy())) return null;
+  if (!(await hasStrategy(userId))) return null;
   await ensureDbReady();
   const tz = resolveTimezone(tzInput);
   const { periodStart, periodEnd } = resolveReviewPeriod(period, tz, now);
   const db = getDb();
 
-  const live = await buildLiveReview(period, tz, now);
+  const live = await buildLiveReview(period, tz, now, userId);
 
+  const savedConditions = [
+    eq(reviewSnapshots.periodStart, periodStart),
+    eq(reviewSnapshots.periodEnd, periodEnd),
+    ...(userId ? [eq(reviewSnapshots.userId, userId)] : []),
+  ];
   const savedRows = await db
     .select()
     .from(reviewSnapshots)
-    .where(
-      and(
-        eq(reviewSnapshots.periodStart, periodStart),
-        eq(reviewSnapshots.periodEnd, periodEnd),
-      ),
-    )
+    .where(and(...savedConditions))
     .orderBy(desc(reviewSnapshots.createdAt))
     .limit(1);
   const saved = savedRows[0] ? rowToView(savedRows[0]) : null;
 
-  const historyRows = await db
-    .select()
-    .from(reviewSnapshots)
+  const historyQuery = db.select().from(reviewSnapshots);
+  const historyRows = await (userId
+    ? historyQuery.where(eq(reviewSnapshots.userId, userId))
+    : historyQuery
+  )
     .orderBy(desc(reviewSnapshots.createdAt))
     .limit(12);
   const history = historyRows.map(rowToView);
@@ -134,8 +153,9 @@ export async function saveReviewSnapshot(
   period: ReviewPeriod,
   tzInput?: string,
   now = new Date(),
+  userId?: string,
 ): Promise<ReviewSnapshotView | null> {
-  const dashboard = await getReviewDashboard(period, tzInput, now);
+  const dashboard = await getReviewDashboard(period, tzInput, now, userId);
   if (!dashboard) return null;
 
   await ensureDbReady();
@@ -148,15 +168,15 @@ export async function saveReviewSnapshot(
     totalCompletions: 0,
   };
 
+  const existingConditions = [
+    eq(reviewSnapshots.periodStart, live.periodStart),
+    eq(reviewSnapshots.periodEnd, live.periodEnd),
+    ...(userId ? [eq(reviewSnapshots.userId, userId)] : []),
+  ];
   const existing = await db
     .select()
     .from(reviewSnapshots)
-    .where(
-      and(
-        eq(reviewSnapshots.periodStart, live.periodStart),
-        eq(reviewSnapshots.periodEnd, live.periodEnd),
-      ),
-    )
+    .where(and(...existingConditions))
     .limit(1);
 
   if (existing[0]) {
@@ -170,17 +190,18 @@ export async function saveReviewSnapshot(
         aiSummary: serializeReviewHighlights(highlights),
         createdAt: ts,
       })
-      .where(eq(reviewSnapshots.id, existing[0].id));
+      .where(scopedSnapshotId(existing[0].id, userId));
     const updated = await db
       .select()
       .from(reviewSnapshots)
-      .where(eq(reviewSnapshots.id, existing[0].id));
+      .where(scopedSnapshotId(existing[0].id, userId));
     return updated[0] ? rowToView(updated[0]) : null;
   }
 
   const snapshotId = id();
   await db.insert(reviewSnapshots).values({
     id: snapshotId,
+    userId: userId ?? null,
     periodStart: live.periodStart,
     periodEnd: live.periodEnd,
     plannedPct: JSON.stringify(live.plannedPct),
@@ -194,6 +215,12 @@ export async function saveReviewSnapshot(
   const row = await db
     .select()
     .from(reviewSnapshots)
-    .where(eq(reviewSnapshots.id, snapshotId));
+    .where(scopedSnapshotId(snapshotId, userId));
   return row[0] ? rowToView(row[0]) : null;
+}
+
+function scopedSnapshotId(snapshotId: string, userId?: string) {
+  return userId
+    ? and(eq(reviewSnapshots.id, snapshotId), eq(reviewSnapshots.userId, userId))
+    : eq(reviewSnapshots.id, snapshotId);
 }

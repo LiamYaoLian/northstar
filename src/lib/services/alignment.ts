@@ -15,22 +15,34 @@ import {
   type AlignmentPeriod,
 } from "@/lib/review/period";
 import { resolveTimezone } from "@/lib/tasks/timezone";
+import { eq } from "drizzle-orm";
 
 export async function getAlignmentDashboard(
   tzInput?: string,
   periodInput: AlignmentPeriod = "week",
   now = new Date(),
+  userId?: string,
 ) {
   await ensureDbReady();
   const tz = resolveTimezone(tzInput);
   const period = periodInput;
   const { periodStart, periodEnd } = resolveAlignmentPeriod(period, tz, now);
   const db = getDb();
-  const pillars = (await db.select().from(strategicPillars)).sort(
+  const pillarRows = db.select().from(strategicPillars);
+  const pillars = (userId
+    ? await pillarRows.where(eq(strategicPillars.userId, userId))
+    : await pillarRows
+  ).sort(
     (a, b) => a.sortOrder - b.sortOrder,
   );
-  const taskList = await db.select().from(tasks);
-  const allEntries = await db.select().from(timeEntries);
+  const taskRows = db.select().from(tasks);
+  const taskList = userId
+    ? await taskRows.where(eq(tasks.userId, userId))
+    : await taskRows;
+  const entryRows = db.select().from(timeEntries);
+  const allEntries = userId
+    ? await entryRows.where(eq(timeEntries.userId, userId))
+    : await entryRows;
   const entries =
     period === "all"
       ? allEntries

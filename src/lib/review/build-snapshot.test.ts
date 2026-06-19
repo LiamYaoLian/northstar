@@ -7,6 +7,7 @@ describe("buildReviewSnapshotPayload", () => {
     const entries = [
       {
         id: "e1",
+        userId: null,
         taskId: "t1",
         startedAt: "2026-06-17T16:00:00.000Z",
         durationMin: 120,
@@ -16,6 +17,7 @@ describe("buildReviewSnapshotPayload", () => {
       },
       {
         id: "e2",
+        userId: null,
         taskId: "t2",
         startedAt: "2026-06-17T18:00:00.000Z",
         durationMin: 30,
@@ -25,6 +27,7 @@ describe("buildReviewSnapshotPayload", () => {
       },
       {
         id: "e-old",
+        userId: null,
         taskId: "t1",
         startedAt: "2026-01-01T12:00:00.000Z",
         durationMin: 500,

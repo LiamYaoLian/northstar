@@ -43,13 +43,13 @@ export const zh: Messages = {
   today: {
     title: "今日",
     subtitle: "自动排序 · 上次更新",
-    empty: "暂无待办。去",
-    viewAll: "查看全部待办 →",
+    empty: "今日暂无待办。",
+    viewAll: "查看完成记录 →",
     recalculatePriority: "重算优先级",
     recalculating: "重算中...",
     completedToday: "今日已完成",
     completedCount: "已完成 {count} 项",
-    filteredEmpty: "该分类下今日无待办。可清除筛选或前往任务板。",
+    filteredEmpty: "该分类下今日无待办。可清除筛选，或查看下方任务板。",
   },
   tasks: {
     title: "任务",

@@ -5,19 +5,30 @@ import { strategicPillars, tasks, timeEntries } from "@/lib/db/schema";
 import { filterTimeEntriesInDateRange } from "@/lib/review/period";
 import type { TimeEntryExportRow } from "@/lib/export/time-entries-csv";
 import { resolveTimezone } from "@/lib/tasks/timezone";
+import { eq } from "drizzle-orm";
 
 export async function listTimeEntriesForExport(
   since: string,
   until: string,
   tzInput?: string,
+  userId?: string,
 ): Promise<TimeEntryExportRow[]> {
   await ensureDbReady();
   const tz = resolveTimezone(tzInput);
   const db = getDb();
-  const allEntries = await db.select().from(timeEntries);
+  const entryRows = db.select().from(timeEntries);
+  const allEntries = userId
+    ? await entryRows.where(eq(timeEntries.userId, userId))
+    : await entryRows;
   const filtered = filterTimeEntriesInDateRange(allEntries, since, until, tz);
-  const taskList = await db.select().from(tasks);
-  const pillars = await db.select().from(strategicPillars);
+  const taskRows = db.select().from(tasks);
+  const taskList = userId
+    ? await taskRows.where(eq(tasks.userId, userId))
+    : await taskRows;
+  const pillarRows = db.select().from(strategicPillars);
+  const pillars = userId
+    ? await pillarRows.where(eq(strategicPillars.userId, userId))
+    : await pillarRows;
   const taskMap = new Map(taskList.map((task) => [task.id, task]));
   const pillarMap = new Map(pillars.map((pillar) => [pillar.id, pillar.name]));
 

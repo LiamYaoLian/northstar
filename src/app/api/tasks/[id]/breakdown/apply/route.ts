@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { applyBreakdownPreview } from "@/lib/services/tasks";
 import type { ProposedSubtask } from "@/lib/tasks/subtask-diff";
+import { requireUser } from "@/lib/auth/require-user";
+import { toApiError } from "@/lib/auth/errors";
 
 export async function POST(
   request: Request,
@@ -8,6 +10,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const user = await requireUser();
     const body = await request.json();
     const proposed = body?.proposed;
 
@@ -33,16 +36,13 @@ export async function POST(
       return NextResponse.json({ error: "Invalid proposed subtasks" }, { status: 400 });
     }
 
-    const result = await applyBreakdownPreview(id, safeProposed);
+    const result = await applyBreakdownPreview(id, safeProposed, undefined, user.id);
     if (!result.task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     return NextResponse.json(result);
   } catch (err) {
     console.error("POST /api/tasks/[id]/breakdown/apply", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to apply breakdown" },
-      { status: 500 },
-    );
+    return toApiError(err, "Failed to apply breakdown");
   }
 }

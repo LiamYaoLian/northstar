@@ -86,7 +86,7 @@ export default function OnboardingPage() {
     }
 
     setLoading(false);
-    router.push("/today");
+    router.push("/tasks");
   }
 
   const budgetRows = budgetTable(locale);

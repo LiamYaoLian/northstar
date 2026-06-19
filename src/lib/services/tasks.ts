@@ -45,17 +45,17 @@ import {
   recordCompletionEvent,
 } from "@/lib/services/completions";
 import { id, nowIso } from "@/lib/utils";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
 
 export type { TaskSortMode };
 
-export async function recalculatePriorities(tz?: string) {
+export async function recalculatePriorities(tz?: string, userId?: string) {
   await ensureDbReady();
   const db = getDb();
   const resolvedTz = resolveTimezone(tz);
-  await openRecurringOccurrences(db, resolvedTz);
-  const computedAt = await persistPriorities(resolvedTz);
+  await openRecurringOccurrences(db, resolvedTz, new Date(), userId);
+  const computedAt = await persistPriorities(resolvedTz, userId);
   return { computedAt };
 }
 
@@ -63,8 +63,12 @@ export async function openRecurringOccurrences(
   db: ReturnType<typeof getDb>,
   tz: string,
   now = new Date(),
+  userId?: string,
 ) {
-  const all = await db.select().from(tasks);
+  const allRows = db.select().from(tasks);
+  const all = userId
+    ? await allRows.where(eq(tasks.userId, userId))
+    : await allRows;
   const plan = all
     .filter(
       (task) =>
@@ -75,7 +79,10 @@ export async function openRecurringOccurrences(
 
   if (plan.length === 0) return;
 
-  const allSubtasks = await db.select().from(subtasks);
+  const subtaskRows = db.select().from(subtasks);
+  const allSubtasks = userId
+    ? await subtaskRows.where(eq(subtasks.userId, userId))
+    : await subtaskRows;
   const subtaskIds = subtaskIdsForResetPlan(plan, allSubtasks);
   const ts = nowIso();
 
@@ -88,13 +95,13 @@ export async function openRecurringOccurrences(
           completedAt: null,
           updatedAt: ts,
         })
-        .where(eq(tasks.id, taskId));
+        .where(scopedTaskId(taskId, userId));
     }
     for (const subtaskId of subtaskIds) {
       await tx
         .update(subtasks)
         .set({ isDone: false })
-        .where(eq(subtasks.id, subtaskId));
+        .where(scopedSubtaskId(subtaskId, userId));
     }
   });
 }
@@ -103,17 +110,24 @@ export async function listTasks(
   status?: string,
   sort: TaskSortMode = "priority",
   tz?: string,
+  userId?: string,
 ) {
   await ensureDbReady();
   const db = getDb();
   const resolvedTz = resolveTimezone(tz);
-  await openRecurringOccurrences(db, resolvedTz);
+  await openRecurringOccurrences(db, resolvedTz, new Date(), userId);
 
-  const all = await db.select().from(tasks);
+  const allRows = db.select().from(tasks);
+  const all = userId
+    ? await allRows.where(eq(tasks.userId, userId))
+    : await allRows;
   const filtered = status ? all.filter((t) => t.status === status) : all;
 
-  await syncActivePriorityFromManualOrder(db, filtered);
-  const synced = await db.select().from(tasks);
+  await syncActivePriorityFromManualOrder(db, filtered, userId);
+  const syncedRows = db.select().from(tasks);
+  const synced = userId
+    ? await syncedRows.where(eq(tasks.userId, userId))
+    : await syncedRows;
   const rows = status ? synced.filter((t) => t.status === status) : synced;
   return sortTasks(rows, sort);
 }
@@ -122,16 +136,23 @@ export async function listDueTodayTasksWithSubtasks(
   tz?: string,
   sort: TaskSortMode = "priority",
   now = new Date(),
+  userId?: string,
 ) {
   await ensureDbReady();
   const db = getDb();
   const resolvedTz = resolveTimezone(tz);
-  await openRecurringOccurrences(db, resolvedTz, now);
+  await openRecurringOccurrences(db, resolvedTz, now, userId);
 
-  const all = await db.select().from(tasks);
+  const allRows = db.select().from(tasks);
+  const all = userId
+    ? await allRows.where(eq(tasks.userId, userId))
+    : await allRows;
   const dueToday = filterTasksDueToday(all, resolvedTz, now);
   const sorted = sortTasks(dueToday, sort);
-  const allSubtasks = await db.select().from(subtasks);
+  const subtaskRows = db.select().from(subtasks);
+  const allSubtasks = userId
+    ? await subtaskRows.where(eq(subtasks.userId, userId))
+    : await subtaskRows;
   const byParent = groupSubtasksByParent(allSubtasks);
   return sorted.map((t) => ({
     ...t,
@@ -143,15 +164,19 @@ export async function listTasksWithSubtasks(
   status?: string,
   sort: TaskSortMode = "priority",
   tz?: string,
+  userId?: string,
 ) {
   if (status === "today") {
-    return listDueTodayTasksWithSubtasks(tz, sort);
+    return listDueTodayTasksWithSubtasks(tz, sort, new Date(), userId);
   }
 
   await ensureDbReady();
   const db = getDb();
-  const taskList = await listTasks(status, sort, tz);
-  const allSubtasks = await db.select().from(subtasks);
+  const taskList = await listTasks(status, sort, tz, userId);
+  const subtaskRows = db.select().from(subtasks);
+  const allSubtasks = userId
+    ? await subtaskRows.where(eq(subtasks.userId, userId))
+    : await subtaskRows;
   const byParent = groupSubtasksByParent(allSubtasks);
   return taskList.map((t) => ({
     ...t,
@@ -181,11 +206,14 @@ export async function createTask(input: {
   recurrenceType?: RecurrenceType;
   recurrenceDays?: number[] | null;
   recurrenceCarryOver?: boolean;
-}) {
+}, userId?: string) {
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
-  const pillars = await db.select().from(strategicPillars);
+  const pillarRows = db.select().from(strategicPillars);
+  const pillars = userId
+    ? await pillarRows.where(eq(strategicPillars.userId, userId))
+    : await pillarRows;
   const { classification: classified, estimate } = await analyzeTaskTitle(
     input.title,
     pillars,
@@ -197,7 +225,10 @@ export async function createTask(input: {
   );
 
   const taskId = id();
-  const allTasks = await db.select().from(tasks);
+  const taskRows = db.select().from(tasks);
+  const allTasks = userId
+    ? await taskRows.where(eq(tasks.userId, userId))
+    : await taskRows;
   const maxOrder = allTasks.reduce(
     (max, t) => Math.max(max, t.manualSortOrder ?? 0),
     0,
@@ -213,6 +244,7 @@ export async function createTask(input: {
 
   await db.insert(tasks).values({
     id: taskId,
+    userId: userId ?? null,
     title: input.title,
     description: input.description ?? null,
     pillarId,
@@ -234,10 +266,10 @@ export async function createTask(input: {
     input.autoBreakdown !== false &&
     shouldAutoBreakdown(input.title, input.intimidationScore)
   ) {
-    await breakdownTask(taskId);
+    await breakdownTask(taskId, { userId });
   }
 
-  return fetchTaskById(taskId);
+  return fetchTaskById(taskId, userId);
 }
 
 function resolveCreateClassification(
@@ -266,7 +298,7 @@ function resolveCreateClassification(
 
 export async function breakdownTask(
   taskId: string,
-  options?: { userPrompt?: string },
+  options?: { userPrompt?: string; userId?: string },
 ) {
   const preview = await previewBreakdownTask(taskId, options);
   if (preview.preview) {
@@ -286,20 +318,23 @@ export type BreakdownAppliedResponse = {
 
 export async function previewBreakdownTask(
   taskId: string,
-  options?: { userPrompt?: string },
+  options?: { userPrompt?: string; userId?: string },
 ): Promise<BreakdownPreviewResponse | BreakdownAppliedResponse> {
   await ensureDbReady();
   const db = getDb();
-  const task = await fetchTaskById(taskId);
+  const task = await fetchTaskById(taskId, options?.userId);
   if (!task) return { preview: false, task: null, subtasks: [], breakdown: null as never };
 
-  const existing = await listSubtasks(taskId);
-  const stars = await db.select().from(northStars);
+  const existing = await listSubtasks(taskId, options?.userId);
+  const starRows = db.select().from(northStars);
+  const stars = options?.userId
+    ? await starRows.where(eq(northStars.userId, options.userId))
+    : await starRows;
   const pillar = task.pillarId
     ? (await db
         .select()
         .from(strategicPillars)
-        .where(eq(strategicPillars.id, task.pillarId)))[0]
+        .where(scopedPillarId(task.pillarId, options?.userId)))[0]
     : null;
 
   const breakdown = await generateBreakdown(task.title, task.description, {
@@ -317,7 +352,7 @@ export async function previewBreakdownTask(
   const diff = computeSubtaskDiff(existing, proposed);
 
   if (existing.length === 0 || !hasSubtaskDiffChanges(diff)) {
-    return applyBreakdownPreview(taskId, proposed, breakdown);
+    return applyBreakdownPreview(taskId, proposed, breakdown, options?.userId);
   }
 
   return {
@@ -334,15 +369,16 @@ export async function applyBreakdownPreview(
   taskId: string,
   proposed: ProposedSubtask[],
   breakdown?: Awaited<ReturnType<typeof generateBreakdown>>,
+  userId?: string,
 ): Promise<BreakdownAppliedResponse> {
   await ensureDbReady();
   const db = getDb();
-  const task = await fetchTaskById(taskId);
+  const task = await fetchTaskById(taskId, userId);
   if (!task) {
     return { preview: false, task: null, subtasks: [], breakdown: breakdown as never };
   }
 
-  const existing = await listSubtasks(taskId);
+  const existing = await listSubtasks(taskId, userId);
   const existingById = new Map(existing.map((subtask) => [subtask.id, subtask]));
   const keepIds = new Set(
     proposed.map((item) => item.existingId).filter(Boolean) as string[],
@@ -376,6 +412,7 @@ export async function applyBreakdownPreview(
 
     inserts.push({
       id: id(),
+      userId: userId ?? task.userId ?? null,
       parentTaskId: taskId,
       title,
       sortOrder,
@@ -386,11 +423,11 @@ export async function applyBreakdownPreview(
 
   await db.transaction(async (tx) => {
     if (deleteIds.length > 0) {
-      await tx.delete(subtasks).where(inArray(subtasks.id, deleteIds));
+      await tx.delete(subtasks).where(scopedSubtaskIds(deleteIds, userId));
     }
 
     for (const { id: subtaskId, patch } of updates) {
-      await tx.update(subtasks).set(patch).where(eq(subtasks.id, subtaskId));
+      await tx.update(subtasks).set(patch).where(scopedSubtaskId(subtaskId, userId));
     }
 
     if (inserts.length > 0) {
@@ -405,16 +442,16 @@ export async function applyBreakdownPreview(
           estimatedMin: task.estimatedMin ?? breakdown.estimatedMinTotal ?? null,
           updatedAt: ts,
         })
-        .where(eq(tasks.id, taskId));
+        .where(scopedTaskId(taskId, userId));
     } else {
-      await tx.update(tasks).set({ updatedAt: ts }).where(eq(tasks.id, taskId));
+      await tx.update(tasks).set({ updatedAt: ts }).where(scopedTaskId(taskId, userId));
     }
   });
 
   return {
     preview: false,
-    task: await fetchTaskById(taskId),
-    subtasks: await listSubtasks(taskId),
+    task: await fetchTaskById(taskId, userId),
+    subtasks: await listSubtasks(taskId, userId),
     breakdown: breakdown ?? (null as never),
   };
 }
@@ -422,11 +459,11 @@ export async function applyBreakdownPreview(
 export async function updateSubtask(
   subtaskId: string,
   patch: { title?: string; isDone?: boolean },
-  options?: { tz?: string },
+  options?: { tz?: string; userId?: string },
 ) {
   await ensureDbReady();
   const db = getDb();
-  const existing = await fetchSubtaskById(subtaskId);
+  const existing = await fetchSubtaskById(subtaskId, options?.userId);
   if (!existing) return null;
 
   const updates: { title?: string; isDone?: boolean } = {};
@@ -440,10 +477,10 @@ export async function updateSubtask(
   }
   if (Object.keys(updates).length === 0) return existing;
 
-  await db.update(subtasks).set(updates).where(eq(subtasks.id, subtaskId));
+  await db.update(subtasks).set(updates).where(scopedSubtaskId(subtaskId, options?.userId));
 
   if (patch.isDone !== undefined) {
-    const siblings = await listSubtasks(existing.parentTaskId);
+    const siblings = await listSubtasks(existing.parentTaskId, options?.userId);
     if (siblings.length > 0 && siblings.every((s) => s.isDone)) {
       await updateTask(existing.parentTaskId, { status: "done" }, options);
     }
@@ -453,10 +490,10 @@ export async function updateSubtask(
     await db
       .update(tasks)
       .set({ updatedAt: nowIso() })
-      .where(eq(tasks.id, existing.parentTaskId));
+      .where(scopedTaskId(existing.parentTaskId, options?.userId));
   }
 
-  return fetchSubtaskById(subtaskId);
+  return fetchSubtaskById(subtaskId, options?.userId);
 }
 
 export async function toggleSubtask(subtaskId: string, isDone: boolean) {
@@ -476,17 +513,17 @@ export async function updateTask(
     recurrenceDays: number[] | null;
     recurrenceCarryOver: boolean;
   }>,
-  options?: { tz?: string },
+  options?: { tz?: string; userId?: string },
 ) {
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
   const resolvedTz = resolveTimezone(options?.tz);
   const now = new Date();
-  const existing = await fetchTaskById(taskId);
+  const existing = await fetchTaskById(taskId, options?.userId);
   if (!existing) return null;
 
-  const safePatch = await buildTaskPatch(db, existing, patch);
+  const safePatch = await buildTaskPatch(db, existing, patch, options?.userId);
   if (safePatch === null) return null;
 
   let completedAt = existing.completedAt;
@@ -501,7 +538,7 @@ export async function updateTask(
       const [current] = await tx
         .select()
         .from(tasks)
-        .where(eq(tasks.id, taskId));
+        .where(scopedTaskId(taskId, options?.userId));
       if (!current) return;
 
       await tx
@@ -511,7 +548,7 @@ export async function updateTask(
           completedAt,
           updatedAt: ts,
         })
-        .where(eq(tasks.id, taskId));
+        .where(scopedTaskId(taskId, options?.userId));
 
       const recordEvent =
         patch.status === "done" &&
@@ -529,11 +566,12 @@ export async function updateTask(
           completedAt,
           updatedAt: ts,
         } as Task;
-        await recordCompletionEvent(tx, updatedTask, resolvedTz, now);
+        await recordCompletionEvent(tx, options?.userId, updatedTask, resolvedTz, now);
       }
       if (undoCompletion) {
         await deleteCompletionEventForTaskCompletion(
           tx,
+          options?.userId,
           current.id,
           current.completedAt,
         );
@@ -544,13 +582,14 @@ export async function updateTask(
     throw err;
   }
 
-  return fetchTaskById(taskId);
+  return fetchTaskById(taskId, options?.userId);
 }
 
 async function buildTaskPatch(
   db: ReturnType<typeof getDb>,
   existing: Task,
   patch: Parameters<typeof updateTask>[1],
+  userId?: string,
 ) {
   const {
     intimidationScore,
@@ -614,11 +653,15 @@ async function buildTaskPatch(
         await db
           .select()
           .from(strategicPillars)
-          .where(eq(strategicPillars.id, pillarId))
+          .where(scopedPillarId(pillarId, userId))
       )[0];
       if (!pillar) return null;
       safePatch.pillarId = pillarId;
-      const workPillar = findWorkPillar(await db.select().from(strategicPillars));
+      const pillarRows = db.select().from(strategicPillars);
+      const pillars = userId
+        ? await pillarRows.where(eq(strategicPillars.userId, userId))
+        : await pillarRows;
+      const workPillar = findWorkPillar(pillars);
       if (!isWorkPillar(pillar, workPillar) && focusTrack === undefined) {
         safePatch.focusTrack = null;
       }
@@ -638,13 +681,16 @@ export async function addTimeEntry(input: {
   source?: string;
   note?: string;
   startedAt?: string;
-}) {
+}, userId?: string) {
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
+  const task = await fetchTaskById(input.taskId, userId);
+  if (!task) return null;
   const entryId = id();
   await db.insert(timeEntries).values({
     id: entryId,
+    userId: userId ?? task.userId ?? null,
     taskId: input.taskId,
     startedAt: input.startedAt ?? ts,
     durationMin: input.durationMin,
@@ -653,37 +699,45 @@ export async function addTimeEntry(input: {
     createdAt: ts,
   });
 
-  return fetchTimeEntryById(entryId);
+  return fetchTimeEntryById(entryId, userId);
 }
 
-export async function listTimeEntries() {
+export async function listTimeEntries(userId?: string) {
   await ensureDbReady();
-  return getDb().select().from(timeEntries);
+  const rows = getDb().select().from(timeEntries);
+  return userId ? rows.where(eq(timeEntries.userId, userId)) : rows;
 }
 
-export async function listSubtasks(taskId: string) {
+export async function listSubtasks(taskId: string, userId?: string) {
   await ensureDbReady();
   const rows = await getDb()
     .select()
     .from(subtasks)
-    .where(eq(subtasks.parentTaskId, taskId));
+    .where(
+      userId
+        ? and(eq(subtasks.parentTaskId, taskId), eq(subtasks.userId, userId))
+        : eq(subtasks.parentTaskId, taskId),
+    );
   return rows.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export async function createSubtask(
   taskId: string,
   input: { title: string },
+  userId?: string,
 ) {
   await ensureDbReady();
   const db = getDb();
-  if (!(await fetchTaskById(taskId))) return null;
+  const task = await fetchTaskById(taskId, userId);
+  if (!task) return null;
 
-  const existing = await listSubtasks(taskId);
+  const existing = await listSubtasks(taskId, userId);
   const ts = nowIso();
   const subtaskId = id();
 
   await db.insert(subtasks).values({
     id: subtaskId,
+    userId: userId ?? task.userId ?? null,
     parentTaskId: taskId,
     title: input.title.trim(),
     sortOrder: existing.length,
@@ -691,52 +745,59 @@ export async function createSubtask(
     createdAt: ts,
   });
 
-  await db.update(tasks).set({ updatedAt: ts }).where(eq(tasks.id, taskId));
-  return fetchSubtaskById(subtaskId);
+  await db.update(tasks).set({ updatedAt: ts }).where(scopedTaskId(taskId, userId));
+  return fetchSubtaskById(subtaskId, userId);
 }
 
-export async function deleteSubtask(subtaskId: string) {
+export async function deleteSubtask(subtaskId: string, userId?: string) {
   await ensureDbReady();
   const db = getDb();
-  const sub = await fetchSubtaskById(subtaskId);
+  const sub = await fetchSubtaskById(subtaskId, userId);
   if (!sub) return false;
 
-  await db.delete(subtasks).where(eq(subtasks.id, subtaskId));
-  await reindexSubtasks(sub.parentTaskId);
+  await db.delete(subtasks).where(scopedSubtaskId(subtaskId, userId));
+  await reindexSubtasks(sub.parentTaskId, userId);
   return true;
 }
 
-async function reindexSubtasks(parentTaskId: string) {
+async function reindexSubtasks(parentTaskId: string, userId?: string) {
   const db = getDb();
-  const remaining = await listSubtasks(parentTaskId);
+  const remaining = await listSubtasks(parentTaskId, userId);
   for (const [i, s] of remaining.entries()) {
     await db
       .update(subtasks)
       .set({ sortOrder: i })
-      .where(eq(subtasks.id, s.id));
+      .where(scopedSubtaskId(s.id, userId));
   }
 }
 
-export async function reorderTasks(orderedIds: string[]) {
+export async function reorderTasks(orderedIds: string[], userId?: string) {
   await ensureDbReady();
-  await applyManualReorderScores(getDb(), orderedIds);
-  return listTasks(undefined, "manual");
+  if (userId) {
+    const owned = await getDb()
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), inArray(tasks.id, orderedIds)));
+    if (owned.length !== orderedIds.length) return null;
+  }
+  await applyManualReorderScores(getDb(), orderedIds, userId);
+  return listTasks(undefined, "manual", undefined, userId);
 }
 
-export async function reorderSubtasks(taskId: string, orderedIds: string[]) {
+export async function reorderSubtasks(taskId: string, orderedIds: string[], userId?: string) {
   await ensureDbReady();
   const db = getDb();
-  const existing = await listSubtasks(taskId);
+  const existing = await listSubtasks(taskId, userId);
   if (!isValidReorder(orderedIds, existing.map((s) => s.id))) return null;
 
   for (const [index, subtaskId] of orderedIds.entries()) {
     await db
       .update(subtasks)
       .set({ sortOrder: index })
-      .where(eq(subtasks.id, subtaskId));
+      .where(scopedSubtaskId(subtaskId, userId));
   }
 
-  return listSubtasks(taskId);
+  return listSubtasks(taskId, userId);
 }
 
 function isValidReorder(orderedIds: string[], existingIds: string[]) {
@@ -747,26 +808,54 @@ function isValidReorder(orderedIds: string[], existingIds: string[]) {
   );
 }
 
-async function fetchTaskById(taskId: string) {
+async function fetchTaskById(taskId: string, userId?: string) {
   const rows = await getDb()
     .select()
     .from(tasks)
-    .where(eq(tasks.id, taskId));
+    .where(scopedTaskId(taskId, userId));
   return rows[0];
 }
 
-async function fetchSubtaskById(subtaskId: string) {
+async function fetchSubtaskById(subtaskId: string, userId?: string) {
   const rows = await getDb()
     .select()
     .from(subtasks)
-    .where(eq(subtasks.id, subtaskId));
+    .where(scopedSubtaskId(subtaskId, userId));
   return rows[0];
 }
 
-async function fetchTimeEntryById(entryId: string) {
+async function fetchTimeEntryById(entryId: string, userId?: string) {
   const rows = await getDb()
     .select()
     .from(timeEntries)
-    .where(eq(timeEntries.id, entryId));
+    .where(
+      userId
+        ? and(eq(timeEntries.id, entryId), eq(timeEntries.userId, userId))
+        : eq(timeEntries.id, entryId),
+    );
   return rows[0];
+}
+
+function scopedTaskId(taskId: string, userId?: string) {
+  return userId
+    ? and(eq(tasks.id, taskId), eq(tasks.userId, userId))
+    : eq(tasks.id, taskId);
+}
+
+function scopedSubtaskId(subtaskId: string, userId?: string) {
+  return userId
+    ? and(eq(subtasks.id, subtaskId), eq(subtasks.userId, userId))
+    : eq(subtasks.id, subtaskId);
+}
+
+function scopedSubtaskIds(subtaskIds: string[], userId?: string) {
+  return userId
+    ? and(inArray(subtasks.id, subtaskIds), eq(subtasks.userId, userId))
+    : inArray(subtasks.id, subtaskIds);
+}
+
+function scopedPillarId(pillarId: string, userId?: string) {
+  return userId
+    ? and(eq(strategicPillars.id, pillarId), eq(strategicPillars.userId, userId))
+    : eq(strategicPillars.id, pillarId);
 }

@@ -6,12 +6,15 @@ import {
 import { listCompletionEvents } from "@/lib/services/completions";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
 import { InvalidTimezoneError } from "@/lib/tasks/timezone";
+import { requireUser } from "@/lib/auth/require-user";
+import { toApiError } from "@/lib/auth/errors";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    const user = await requireUser();
     const query = parseCompletionsQuery(url.searchParams);
-    const events = await listCompletionEvents(query);
+    const events = await listCompletionEvents({ ...query, userId: user.id });
     return NextResponse.json({ events });
   } catch (err) {
     const tzErr = tzErrorResponse(err);
@@ -23,6 +26,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     console.error("GET /api/completions", err);
-    return NextResponse.json({ error: "Failed to list completions" }, { status: 500 });
+    return toApiError(err, "Failed to list completions");
   }
 }

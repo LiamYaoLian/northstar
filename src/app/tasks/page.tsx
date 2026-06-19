@@ -1,16 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CategoryFilter } from "@/components/category-filter";
+import { CompletionListItem } from "@/components/completion-list-item";
 import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
 import { TaskStatusFilterBar } from "@/components/task-status-filter";
 import { apiFetch } from "@/lib/api-client";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
-import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
+import {
+  localeTag,
+  translateFocusTrack,
+  translatePillar,
+} from "@/lib/i18n/entities";
 import {
   filterTasksByStatus,
+  rankAndLimit,
   sortDoneTasksByCompletedAt,
   type TaskStatusFilter,
 } from "@/lib/services/task-sorting";
@@ -26,6 +34,9 @@ import {
   type PillarOption,
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
+import { completionQueryForToday } from "@/lib/tasks/completion-ranges";
+import type { TaskCompletionEvent } from "@/lib/tasks/completion-events";
+import { clientTimezone } from "@/lib/tasks/timezone";
 
 type ClassifyPreview = {
   pillarName: string | null;
@@ -39,37 +50,83 @@ type EstimatePreview = {
 };
 
 export default function TasksPage() {
+  const router = useRouter();
   const { locale, t } = useLocale();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [todayTasks, setTodayTasks] = useState<TaskRow[]>([]);
   const [title, setTitle] = useState("");
   const [newTaskPillarId, setNewTaskPillarId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [todayCategoryFilter, setTodayCategoryFilter] = useState<string | null>(
+    null,
+  );
+  const [boardCategoryFilter, setBoardCategoryFilter] = useState<string | null>(
+    null,
+  );
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
   const [autoEstimate, setAutoEstimate] = useState<EstimatePreview | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState("");
+  const [completedEvents, setCompletedEvents] = useState<
+    TaskCompletionEvent[]
+  >([]);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [tasksData, strategyData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
-        apiFetch<{ strategy: { pillars: { id: string; name: string; color: string; focusTracks: string | null }[] } | null }>(
-          "/api/strategy",
-        ),
-      ]);
+      const tz = clientTimezone();
+      const todayQuery = completionQueryForToday(tz, new Date());
+      const [todayData, tasksData, strategyData, completionsData] =
+        await Promise.all([
+          apiFetch<{ tasks: TaskRow[] }>("/api/tasks?status=today"),
+          apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
+          apiFetch<{
+            hasStrategy: boolean;
+            strategy: {
+              pillars: {
+                id: string;
+                name: string;
+                color: string;
+                focusTracks: string | null;
+              }[];
+            } | null;
+          }>("/api/strategy"),
+          apiFetch<{ events: TaskCompletionEvent[] }>(
+            `/api/completions?since=${todayQuery.since}&until=${todayQuery.until}`,
+          ),
+        ]);
+      if (!strategyData.hasStrategy) {
+        router.replace("/onboarding");
+        return;
+      }
+
       const strategyPillars = parseStrategyPillars(
         strategyData.strategy?.pillars ?? [],
       );
+      const enrichedTodayTasks = enrichTasksWithPillars(
+        todayData.tasks,
+        strategyPillars,
+      );
       setPillars(strategyPillars);
+      setTodayTasks(enrichedTodayTasks);
       setTasks(enrichTasksWithPillars(tasksData.tasks, strategyPillars));
+      setCompletedEvents(completionsData.events);
+      setUpdatedAt(
+        enrichedTodayTasks[0]?.priorityComputedAt
+          ? new Date(enrichedTodayTasks[0].priorityComputedAt).toLocaleTimeString(
+              localeTag(locale),
+              { hour: "2-digit", minute: "2-digit" },
+            )
+          : "—",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : t.errors.loadFailed);
     }
-  }, [t.errors.loadFailed]);
+  }, [locale, router, t.errors.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -142,7 +199,12 @@ export default function TasksPage() {
     return source
       ? `${t.tasks.autoEstimated} ${autoEstimate.estimatedMin}min · ${source}`
       : `${t.tasks.autoEstimated} ${autoEstimate.estimatedMin}min`;
-  }, [autoEstimate, t.tasks.autoEstimated, t.tasks.classifySourceAi, t.tasks.classifySourceRules]);
+  }, [
+    autoEstimate,
+    t.tasks.autoEstimated,
+    t.tasks.classifySourceAi,
+    t.tasks.classifySourceRules,
+  ]);
 
   const {
     recalculating,
@@ -197,18 +259,23 @@ export default function TasksPage() {
     }
   }
 
+  const focusedTodayTasks = useMemo(() => {
+    const byPillar = filterTasksByPillar(todayTasks, todayCategoryFilter);
+    return rankAndLimit(byPillar, 5);
+  }, [todayTasks, todayCategoryFilter]);
+
   const filteredTasks = useMemo(() => {
     const byStatus = filterTasksByStatus(tasks, statusFilter);
-    const byPillar = filterTasksByPillar(byStatus, categoryFilter);
+    const byPillar = filterTasksByPillar(byStatus, boardCategoryFilter);
     if (statusFilter === "done") {
       return sortDoneTasksByCompletedAt(byPillar);
     }
     return byPillar;
-  }, [tasks, categoryFilter, statusFilter]);
+  }, [tasks, boardCategoryFilter, statusFilter]);
 
   const handleReorder = useCallback(
     async (orderedIds: string[]) => {
-      if (categoryFilter) {
+      if (boardCategoryFilter) {
         await reorderTasks(
           mergeFilteredTaskReorder(
             tasks.map((task) => task.id),
@@ -220,16 +287,154 @@ export default function TasksPage() {
       }
       await reorderTasks(orderedIds);
     },
-    [categoryFilter, filteredTasks, reorderTasks, tasks],
+    [boardCategoryFilter, filteredTasks, reorderTasks, tasks],
   );
 
   const taskMap = new Map(filteredTasks.map((task) => [task.id, task]));
 
+  const renderTaskCard = (
+    task: TaskRow,
+    action: "complete" | "reopen",
+    rank?: number,
+  ) => (
+    <TaskCard
+      key={task.id}
+      task={task}
+      rank={rank}
+      pillars={pillars}
+      onChangePillar={changePillar}
+      onBreakdown={breakdownTask}
+      onApplyBreakdown={applyBreakdown}
+      onAddSubtask={addSubtask}
+      onDeleteSubtask={(id) => void deleteSubtask(id)}
+      onReorderSubtasks={reorderSubtasks}
+      onToggleSubtask={toggleSubtask}
+      onUpdateSubtaskTitle={updateSubtaskTitle}
+      onUpdateEstimatedMin={(id, minutes) =>
+        void patchTask(id, { estimatedMin: minutes })
+      }
+      onToggleIntimidating={(id, intimidating) =>
+        void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
+      }
+      onComplete={
+        action === "complete"
+          ? (id) => void patchTask(id, { status: "done" })
+          : undefined
+      }
+      onReopen={
+        action === "reopen"
+          ? (id) => void patchTask(id, { status: "todo" })
+          : undefined
+      }
+      onLogTime={(id, minutes) => void logTime(id, minutes)}
+      onUpdateRecurrence={(id, value) =>
+        void patchTask(id, {
+          recurrenceType: value.recurrenceType,
+          recurrenceDays:
+            value.recurrenceType === "weekly" ? value.recurrenceDays : null,
+          recurrenceCarryOver: value.recurrenceCarryOver,
+        })
+      }
+    />
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">{t.tasks.title}</h2>
-        <div className="flex flex-col items-end gap-1">
+    <div className="space-y-6">
+      <section className="space-y-4" aria-labelledby="today-heading">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 id="today-heading" className="text-lg font-semibold">
+              {t.today.title}
+            </h2>
+            <p className="text-sm text-muted">
+              {t.today.subtitle} {updatedAt}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              disabled={recalculating}
+              onClick={() => void recalculatePriority()}
+              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+            >
+              {recalculating
+                ? t.today.recalculating
+                : t.today.recalculatePriority}
+            </button>
+            <p className="text-xs text-muted">{t.tasks.hint}</p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {error}
+            <button
+              type="button"
+              className="ml-2 underline"
+              onClick={() => void load()}
+            >
+              {t.common.retry}
+            </button>
+          </div>
+        )}
+
+        <CategoryFilter
+          pillars={pillars}
+          selectedPillarId={todayCategoryFilter}
+          onChange={setTodayCategoryFilter}
+        />
+
+        {focusedTodayTasks.length === 0 ? (
+          <p className="text-sm text-muted">
+            {todayTasks.length > 0 && todayCategoryFilter
+              ? t.today.filteredEmpty
+              : t.today.empty}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {focusedTodayTasks.map((task, i) =>
+              renderTaskCard(task, "complete", i + 1),
+            )}
+          </div>
+        )}
+
+        {completedEvents.length > 0 && (
+          <section className="space-y-2 border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={() => setShowCompleted((v) => !v)}
+              className="flex w-full items-center justify-between text-sm font-medium"
+            >
+              <span>
+                {t.today.completedToday} · {completedEvents.length}
+              </span>
+              <span className="text-muted">{showCompleted ? "−" : "+"}</span>
+            </button>
+            {showCompleted && (
+              <div className="space-y-2">
+                {completedEvents.map((event) => (
+                  <CompletionListItem key={event.id} event={event} />
+                ))}
+                <Link
+                  href="/alignment?period=today#completions"
+                  className="text-sm text-accent"
+                >
+                  {t.today.viewAll}
+                </Link>
+              </div>
+            )}
+          </section>
+        )}
+      </section>
+
+      <section
+        className="space-y-4 border-t border-border pt-6"
+        aria-labelledby="tasks-heading"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 id="tasks-heading" className="text-lg font-semibold">
+            {t.tasks.title}
+          </h2>
           <button
             type="button"
             disabled={recalculating}
@@ -238,184 +443,102 @@ export default function TasksPage() {
           >
             {recalculating ? t.tasks.recalculating : t.tasks.recalculatePriority}
           </button>
-          <p className="text-xs text-muted">{t.tasks.hint}</p>
         </div>
-      </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-          <button
-            type="button"
-            className="ml-2 underline"
-            onClick={() => void load()}
-          >
-            {t.common.retry}
-          </button>
-        </div>
-      )}
-
-      <form onSubmit={addTask} className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <input
-            className="min-w-[12rem] flex-1 rounded-md border border-border px-3 py-2 text-sm"
-            placeholder={t.tasks.placeholder}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          {pillars.length > 0 && (
-            <select
-              className="rounded-md border border-border px-3 py-2 text-sm"
-              value={newTaskPillarId}
-              onChange={(e) => setNewTaskPillarId(e.target.value)}
-              aria-label={t.tasks.categoryOnCreate}
-            >
-              <option value="">{t.tasks.autoCategory}</option>
-              {pillars.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {translatePillar(p.name, locale)}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="submit"
-            className="rounded-md bg-accent px-4 py-2 text-sm text-white"
-          >
-            {t.common.add}
-          </button>
-        </div>
-        <TaskRecurrenceForm value={recurrence} onChange={setRecurrence} />
-        {title.trim() && (
-          <p className="text-xs text-muted">
-            {analyzing ? (
-              t.tasks.analyzing
-            ) : (
-              <>
-                {newTaskPillarId ? (
-                  <>
-                    {t.tasks.manualOverride}：
-                    {translatePillar(
-                      pillars.find((p) => p.id === newTaskPillarId)?.name ?? "",
-                      locale,
-                    )}
-                  </>
-                ) : autoLabel ? (
-                  <>
-                    {t.tasks.autoDetected}：{autoLabel}
-                    {autoClassify?.source === "openai"
-                      ? ` · ${t.tasks.classifySourceAi}`
-                      : autoClassify?.source === "rules"
-                        ? ` · ${t.tasks.classifySourceRules}`
-                        : null}
-                  </>
-                ) : (
-                  t.taskCard.uncategorized
-                )}
-                {estimateLabel && <> · {estimateLabel}</>}
-              </>
+        <form onSubmit={addTask} className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="min-w-[12rem] flex-1 rounded-md border border-border px-3 py-2 text-sm"
+              placeholder={t.tasks.placeholder}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            {pillars.length > 0 && (
+              <select
+                className="rounded-md border border-border px-3 py-2 text-sm"
+                value={newTaskPillarId}
+                onChange={(e) => setNewTaskPillarId(e.target.value)}
+                aria-label={t.tasks.categoryOnCreate}
+              >
+                <option value="">{t.tasks.autoCategory}</option>
+                {pillars.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {translatePillar(p.name, locale)}
+                  </option>
+                ))}
+              </select>
             )}
-          </p>
-        )}
-      </form>
-
-      <CategoryFilter
-        pillars={pillars}
-        selectedPillarId={categoryFilter}
-        onChange={setCategoryFilter}
-      />
-
-      <TaskStatusFilterBar value={statusFilter} onChange={setStatusFilter} />
-
-      {statusFilter === "done" ? (
-        <div className="space-y-3">
-          {filteredTasks.length === 0 ? (
-            <p className="text-sm text-muted">
-              {statusFilter === "done"
-                ? t.completed.empty
-                : statusFilter === "active"
-                  ? t.tasks.activeEmpty
-                  : t.completed.empty}
+            <button
+              type="submit"
+              className="rounded-md bg-accent px-4 py-2 text-sm text-white"
+            >
+              {t.common.add}
+            </button>
+          </div>
+          <TaskRecurrenceForm value={recurrence} onChange={setRecurrence} />
+          {title.trim() && (
+            <p className="text-xs text-muted">
+              {analyzing ? (
+                t.tasks.analyzing
+              ) : (
+                <>
+                  {newTaskPillarId ? (
+                    <>
+                      {t.tasks.manualOverride}：
+                      {translatePillar(
+                        pillars.find((p) => p.id === newTaskPillarId)?.name ??
+                          "",
+                        locale,
+                      )}
+                    </>
+                  ) : autoLabel ? (
+                    <>
+                      {t.tasks.autoDetected}：{autoLabel}
+                      {autoClassify?.source === "openai"
+                        ? ` · ${t.tasks.classifySourceAi}`
+                        : autoClassify?.source === "rules"
+                          ? ` · ${t.tasks.classifySourceRules}`
+                          : null}
+                    </>
+                  ) : (
+                    t.taskCard.uncategorized
+                  )}
+                  {estimateLabel && <> · {estimateLabel}</>}
+                </>
+              )}
             </p>
-          ) : (
-            filteredTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                pillars={pillars}
-                onChangePillar={changePillar}
-                onBreakdown={breakdownTask}
-                onApplyBreakdown={applyBreakdown}
-                onAddSubtask={addSubtask}
-                onDeleteSubtask={(id) => void deleteSubtask(id)}
-                onReorderSubtasks={reorderSubtasks}
-                onToggleSubtask={toggleSubtask}
-                onUpdateSubtaskTitle={updateSubtaskTitle}
-                onUpdateEstimatedMin={(id, minutes) =>
-                  void patchTask(id, { estimatedMin: minutes })
-                }
-                onToggleIntimidating={(id, intimidating) =>
-                  void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
-                }
-                onReopen={(id) => void patchTask(id, { status: "todo" })}
-                onLogTime={(id, minutes) => void logTime(id, minutes)}
-                onUpdateRecurrence={(id, value) =>
-                  void patchTask(id, {
-                    recurrenceType: value.recurrenceType,
-                    recurrenceDays:
-                      value.recurrenceType === "weekly"
-                        ? value.recurrenceDays
-                        : null,
-                    recurrenceCarryOver: value.recurrenceCarryOver,
-                  })
-                }
-              />
-            ))
           )}
-        </div>
-      ) : (
-        <SortableTaskList
-          taskIds={filteredTasks.map((task) => task.id)}
-          onReorder={handleReorder}
-        >
-          {(taskId) => {
-            const task = taskMap.get(taskId);
-            if (!task) return null;
-            return (
-              <TaskCard
-                task={task}
-                pillars={pillars}
-                onChangePillar={changePillar}
-                onBreakdown={breakdownTask}
-                onApplyBreakdown={applyBreakdown}
-                onAddSubtask={addSubtask}
-                onDeleteSubtask={(id) => void deleteSubtask(id)}
-                onReorderSubtasks={reorderSubtasks}
-                onToggleSubtask={toggleSubtask}
-                onUpdateSubtaskTitle={updateSubtaskTitle}
-                onUpdateEstimatedMin={(id, minutes) =>
-                  void patchTask(id, { estimatedMin: minutes })
-                }
-                onToggleIntimidating={(id, intimidating) =>
-                  void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
-                }
-                onComplete={(id) => void patchTask(id, { status: "done" })}
-                onLogTime={(id, minutes) => void logTime(id, minutes)}
-                onUpdateRecurrence={(id, value) =>
-                  void patchTask(id, {
-                    recurrenceType: value.recurrenceType,
-                    recurrenceDays:
-                      value.recurrenceType === "weekly"
-                        ? value.recurrenceDays
-                        : null,
-                    recurrenceCarryOver: value.recurrenceCarryOver,
-                  })
-                }
-              />
-            );
-          }}
-        </SortableTaskList>
-      )}
+        </form>
+
+        <CategoryFilter
+          pillars={pillars}
+          selectedPillarId={boardCategoryFilter}
+          onChange={setBoardCategoryFilter}
+        />
+
+        <TaskStatusFilterBar value={statusFilter} onChange={setStatusFilter} />
+
+        {statusFilter === "done" ? (
+          <div className="space-y-3">
+            {filteredTasks.length === 0 ? (
+              <p className="text-sm text-muted">{t.completed.empty}</p>
+            ) : (
+              filteredTasks.map((task) => renderTaskCard(task, "reopen"))
+            )}
+          </div>
+        ) : (
+          <SortableTaskList
+            taskIds={filteredTasks.map((task) => task.id)}
+            onReorder={handleReorder}
+          >
+            {(taskId) => {
+              const task = taskMap.get(taskId);
+              if (!task) return null;
+              return renderTaskCard(task, "complete");
+            }}
+          </SortableTaskList>
+        )}
+      </section>
     </div>
   );
 }

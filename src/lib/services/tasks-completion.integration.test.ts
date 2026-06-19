@@ -40,8 +40,8 @@ describe("updateTask writes completion events", () => {
     ).length;
 
     await db.transaction(async (tx) => {
-      await recordCompletionEvent(tx, task, "America/Toronto");
-      await recordCompletionEvent(tx, task, "America/Toronto");
+      await recordCompletionEvent(tx, task.userId ?? undefined, task, "America/Toronto");
+      await recordCompletionEvent(tx, task.userId ?? undefined, task, "America/Toronto");
     });
 
     const events = await db
@@ -154,7 +154,13 @@ describe("updateTask undoes accidental completions", () => {
     });
     const task = (await getDb().select().from(tasks).where(eq(tasks.id, taskId)))[0]!;
     await getDb().transaction(async (tx) => {
-      await recordCompletionEvent(tx, task, "America/New_York", new Date(completedAt));
+      await recordCompletionEvent(
+        tx,
+        task.userId ?? undefined,
+        task,
+        "America/New_York",
+        new Date(completedAt),
+      );
     });
 
     await openRecurringOccurrences(
@@ -180,11 +186,18 @@ describe("updateTask undoes accidental completions", () => {
     await getDb().transaction(async (tx) => {
       await recordCompletionEvent(
         tx,
+        task.userId ?? undefined,
         { ...task, completedAt: previousCompletedAt },
         "America/New_York",
         new Date(previousCompletedAt),
       );
-      await recordCompletionEvent(tx, task, "America/New_York", new Date(currentCompletedAt));
+      await recordCompletionEvent(
+        tx,
+        task.userId ?? undefined,
+        task,
+        "America/New_York",
+        new Date(currentCompletedAt),
+      );
     });
     expect(await eventsForTask(taskId)).toHaveLength(2);
 

@@ -9,18 +9,26 @@ import type { Task } from "@/lib/db/schema";
 import { priorityScoreFromRank, rerankAll } from "@/lib/priority";
 import { resolveTimezone } from "@/lib/tasks/timezone";
 import { nowIso } from "@/lib/utils";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-export async function persistPriorities(tz?: string): Promise<string> {
+export async function persistPriorities(tz?: string, userId?: string): Promise<string> {
   await ensureDbReady();
   const db = getDb();
   const resolvedTz = resolveTimezone(tz);
   const now = new Date();
   const [allTasks, pillars, entries, stars] = await Promise.all([
-    db.select().from(tasks),
-    db.select().from(strategicPillars),
-    db.select().from(timeEntries),
-    db.select().from(northStars),
+    userId
+      ? db.select().from(tasks).where(eq(tasks.userId, userId))
+      : db.select().from(tasks),
+    userId
+      ? db.select().from(strategicPillars).where(eq(strategicPillars.userId, userId))
+      : db.select().from(strategicPillars),
+    userId
+      ? db.select().from(timeEntries).where(eq(timeEntries.userId, userId))
+      : db.select().from(timeEntries),
+    userId
+      ? db.select().from(northStars).where(eq(northStars.userId, userId))
+      : db.select().from(northStars),
   ]);
 
   const results = rerankAll(
@@ -33,7 +41,7 @@ export async function persistPriorities(tz?: string): Promise<string> {
   );
   const ts = nowIso();
 
-  await applyPriorityResults(db, allTasks, results, ts);
+  await applyPriorityResults(db, allTasks, results, ts, userId);
   return ts;
 }
 
@@ -42,6 +50,7 @@ async function applyPriorityResults(
   allTasks: Task[],
   results: ReturnType<typeof rerankAll>,
   ts: string,
+  userId?: string,
 ) {
   for (const [index, r] of results.entries()) {
     await db
@@ -53,7 +62,7 @@ async function applyPriorityResults(
         manualSortOrder: index,
         updatedAt: ts,
       })
-      .where(eq(tasks.id, r.taskId));
+      .where(scopedTaskId(r.taskId, userId));
   }
 
   const doneTasks = allTasks
@@ -64,13 +73,14 @@ async function applyPriorityResults(
     await db
       .update(tasks)
       .set({ manualSortOrder: results.length + i, updatedAt: ts })
-      .where(eq(tasks.id, task.id));
+      .where(scopedTaskId(task.id, userId));
   }
 }
 
 export async function syncActivePriorityFromManualOrder(
   db: Db,
   filtered: Task[],
+  userId?: string,
 ) {
   const active = filtered
     .filter((t) => t.status !== "done")
@@ -89,7 +99,7 @@ export async function syncActivePriorityFromManualOrder(
           priorityComputedAt: ts,
           updatedAt: ts,
         })
-        .where(eq(tasks.id, task.id));
+        .where(scopedTaskId(task.id, userId));
     }
   }
 }
@@ -97,6 +107,7 @@ export async function syncActivePriorityFromManualOrder(
 export async function applyManualReorderScores(
   db: Db,
   orderedIds: string[],
+  userId?: string,
 ) {
   const ts = nowIso();
   const total = orderedIds.length;
@@ -110,6 +121,12 @@ export async function applyManualReorderScores(
         priorityComputedAt: ts,
         updatedAt: ts,
       })
-      .where(eq(tasks.id, taskId));
+      .where(scopedTaskId(taskId, userId));
   }
+}
+
+function scopedTaskId(taskId: string, userId?: string) {
+  return userId
+    ? and(eq(tasks.id, taskId), eq(tasks.userId, userId))
+    : eq(tasks.id, taskId);
 }
