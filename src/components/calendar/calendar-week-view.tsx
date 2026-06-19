@@ -39,7 +39,7 @@ export function CalendarWeekView({
   return (
     <div className="overflow-auto rounded-lg border border-border bg-card">
       <div
-        className="grid min-w-[48rem]"
+        className="grid w-full min-w-[48rem]"
         style={{
           gridTemplateColumns: "4rem repeat(7, minmax(0, 1fr))",
           gridTemplateRows,

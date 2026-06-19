@@ -19,9 +19,7 @@ export default function RootLayout({
       <body className="min-h-screen antialiased">
         <AuthSessionProvider>
           <LocaleProvider>
-            <div className="mx-auto max-w-3xl px-4 py-6">
-              <AppShell>{children}</AppShell>
-            </div>
+            <AppShell>{children}</AppShell>
           </LocaleProvider>
         </AuthSessionProvider>
       </body>
