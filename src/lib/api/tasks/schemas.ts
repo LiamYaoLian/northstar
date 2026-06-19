@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-export const recurrenceTypeSchema = z.enum(["none", "daily", "weekly"]);
+export const recurrenceTypeSchema = z.enum(["none", "daily", "weekly", "monthly"]);
 
 const recurrenceBaseSchema = z.object({
   recurrenceType: recurrenceTypeSchema.optional().default("none"),
-  recurrenceDays: z.array(z.number().int().min(1).max(7)).nullable().optional(),
+  recurrenceDays: z.array(z.number().int()).nullable().optional(),
   recurrenceCarryOver: z.boolean().optional().default(false),
 });
 
@@ -14,7 +14,7 @@ function normalizeRecurrence(data: RecurrenceInput): RecurrenceInput {
   return {
     ...data,
     recurrenceCarryOver:
-      data.recurrenceType === "daily" ? false : data.recurrenceCarryOver,
+      data.recurrenceType === "weekly" ? data.recurrenceCarryOver : false,
   };
 }
 
@@ -24,6 +24,32 @@ function refineRecurrence(data: RecurrenceInput, ctx: z.RefinementCtx): void {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "weekly recurrence requires at least one weekday",
+        path: ["recurrenceDays"],
+      });
+      return;
+    }
+    if (!data.recurrenceDays.every((d) => d >= 1 && d <= 7)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "weekly recurrence days must be ISO weekdays 1-7",
+        path: ["recurrenceDays"],
+      });
+    }
+  }
+
+  if (data.recurrenceType === "monthly") {
+    if (!data.recurrenceDays || data.recurrenceDays.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "monthly recurrence requires at least one day of month",
+        path: ["recurrenceDays"],
+      });
+      return;
+    }
+    if (!data.recurrenceDays.every((d) => d >= 1 && d <= 31)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "monthly recurrence days must be 1-31",
         path: ["recurrenceDays"],
       });
     }
@@ -44,7 +70,7 @@ export const patchTaskRecurrenceSchema = recurrenceBaseSchema
     }),
   )
   .superRefine((data, ctx) => {
-    if (data.recurrenceType === "weekly") {
+    if (data.recurrenceType === "weekly" || data.recurrenceType === "monthly") {
       refineRecurrence(data, ctx);
     }
   });

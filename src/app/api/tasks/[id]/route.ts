@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateTask } from "@/lib/services/tasks";
+import { deleteTask, updateTask } from "@/lib/services/tasks";
 import { patchTaskRecurrenceSchema } from "@/lib/api/tasks/schemas";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
@@ -45,5 +45,23 @@ export async function PATCH(
     if (tzErr) return tzErr;
     console.error("PATCH /api/tasks/[id]", err);
     return toApiError(err, "Update failed");
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const user = await requireUser();
+    const ok = await deleteTask(id, user.id);
+    if (!ok) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/tasks/[id]", err);
+    return toApiError(err, "Failed to delete task");
   }
 }

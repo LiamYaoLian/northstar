@@ -71,4 +71,23 @@ describe("SortableSubtasks", () => {
     expect(onUpdateTitle).not.toHaveBeenCalled();
     expect((input as HTMLInputElement).value).toBe("Draft outline");
   });
+
+  it("renders subtask estimate as read-only text when onUpdateEstimatedMin is omitted", () => {
+    renderSubtasks();
+    expect(screen.getByText("15分钟")).toBeTruthy();
+  });
+
+  it("calls onUpdateEstimatedMin when estimate is edited and blurred", async () => {
+    const onUpdateEstimatedMin = vi.fn();
+    const user = userEvent.setup();
+    renderSubtasks({ onUpdateEstimatedMin });
+
+    await user.click(screen.getByRole("button", { name: /编辑估计用时/i }));
+    const input = screen.getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "30");
+    await user.tab();
+
+    expect(onUpdateEstimatedMin).toHaveBeenCalledWith("s1", 30);
+  });
 });

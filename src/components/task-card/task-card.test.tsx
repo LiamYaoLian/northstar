@@ -98,4 +98,34 @@ describe("TaskCard", () => {
 
     expect(onComplete).toHaveBeenCalledWith("t1");
   });
+
+  it("shows recurrence frequency in metadata without opening edit panel", () => {
+    const task = makeTask({
+      title: "Weekly sync",
+      recurrenceType: "weekly",
+      recurrenceDays: JSON.stringify([1, 3]),
+      recurrenceCarryOver: true,
+    }) as React.ComponentProps<typeof TaskCard>["task"];
+    task.pillarName = "工作";
+    task.pillarColor = "#3b82f6";
+
+    render(
+      <LocaleProvider>
+        <TimerProvider>
+          <TaskCard
+            task={task}
+            onUpdateRecurrence={vi.fn()}
+          />
+        </TimerProvider>
+      </LocaleProvider>,
+    );
+
+    expect(screen.getByText(/每周 一、三 · 补做/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "每天" })).toBeNull();
+  });
+
+  it("shows one-off recurrence summary without opening edit panel", () => {
+    renderTaskCard({ onUpdateRecurrence: vi.fn() });
+    expect(screen.getByText("不重复")).toBeTruthy();
+  });
 });

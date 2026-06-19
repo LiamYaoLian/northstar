@@ -158,3 +158,25 @@ export function startOfLocalMonth(instant: Date, tz: string): Date {
   const { year, month } = getLocalParts(instant, tz);
   return zonedTimeToUtc(year, month, 1, 0, 0, 0, tz);
 }
+
+/** Inclusive day count for the local calendar month containing `instant`. */
+export function daysInLocalMonth(instant: Date, tz: string): number {
+  const start = startOfLocalMonth(instant, tz);
+  const { year, month } = getLocalParts(instant, tz);
+  const nextMonthAnchor =
+    month === 12
+      ? zonedTimeToUtc(year + 1, 1, 15, 12, 0, 0, tz)
+      : zonedTimeToUtc(year, month + 1, 15, 12, 0, 0, tz);
+  const nextStart = startOfLocalMonth(nextMonthAnchor, tz);
+  let count = 0;
+  let cursor = start;
+  while (cursor.getTime() < nextStart.getTime()) {
+    count++;
+    cursor = addLocalDays(cursor, tz, 1);
+  }
+  return count;
+}
+
+export function dayOfMonthInTz(instant: Date, tz: string): number {
+  return getLocalParts(instant, tz).day;
+}

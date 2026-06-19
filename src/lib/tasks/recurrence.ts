@@ -2,17 +2,51 @@ import type { RecurrenceTaskFields } from "./recurrence-types";
 import { parseRecurrenceDays } from "./recurrence-types";
 import {
   addLocalDays,
+  dayOfMonthInTz,
+  daysInLocalMonth,
   endOfLocalDay,
   isoWeekdayInTz,
   startOfLocalDay,
 } from "./timezone";
 
-function weekdayMatches(task: RecurrenceTaskFields, instant: Date, tz: string): boolean {
-  if (task.recurrenceType === "daily") return true;
-  if (task.recurrenceType !== "weekly") return false;
+function weeklyDayMatches(
+  task: RecurrenceTaskFields,
+  instant: Date,
+  tz: string,
+): boolean {
   const days = parseRecurrenceDays(task.recurrenceDays);
   if (!days) return false;
   return days.includes(isoWeekdayInTz(instant, tz));
+}
+
+function monthlyDayMatches(
+  task: RecurrenceTaskFields,
+  instant: Date,
+  tz: string,
+): boolean {
+  const days = parseRecurrenceDays(task.recurrenceDays);
+  if (!days?.length) return false;
+  const day = dayOfMonthInTz(instant, tz);
+  const monthLength = daysInLocalMonth(instant, tz);
+  return days.some((scheduledDay) => {
+    const effectiveDay = Math.min(scheduledDay, monthLength);
+    return day === effectiveDay;
+  });
+}
+
+function scheduleMatches(
+  task: RecurrenceTaskFields,
+  instant: Date,
+  tz: string,
+): boolean {
+  if (task.recurrenceType === "daily") return true;
+  if (task.recurrenceType === "weekly") {
+    return weeklyDayMatches(task, instant, tz);
+  }
+  if (task.recurrenceType === "monthly") {
+    return monthlyDayMatches(task, instant, tz);
+  }
+  return false;
 }
 
 export function matchesRecurrenceDay(
@@ -21,7 +55,7 @@ export function matchesRecurrenceDay(
   tz: string,
 ): boolean {
   if (task.recurrenceType === "none") return false;
-  return weekdayMatches(task, instant, tz);
+  return scheduleMatches(task, instant, tz);
 }
 
 export function lastScheduledOnOrBefore(
@@ -33,7 +67,7 @@ export function lastScheduledOnOrBefore(
 
   let cursor = startOfLocalDay(instant, tz);
   for (let i = 0; i < 366; i++) {
-    if (weekdayMatches(task, cursor, tz)) {
+    if (scheduleMatches(task, cursor, tz)) {
       return startOfLocalDay(cursor, tz);
     }
     cursor = addLocalDays(cursor, tz, -1);

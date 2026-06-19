@@ -30,6 +30,7 @@ export type Messages = {
     updateSubtaskFailed: string;
     addSubtaskFailed: string;
     deleteSubtaskFailed: string;
+    deleteTaskFailed: string;
     reorderTasksFailed: string;
     reorderSubtasksFailed: string;
     logTimeFailed: string;
@@ -159,6 +160,7 @@ export type Messages = {
     factorIntimidation: string;
     factorStaleness: string;
     deleteSubtask: string;
+    deleteTask: string;
     editTask: string;
     editSubtask: string;
     estimatedMinSuffix: string;
@@ -204,12 +206,18 @@ export type Messages = {
     none: string;
     daily: string;
     weekly: string;
+    monthly: string;
+    monthDay: string;
+    monthDayShortMonthHint: string;
     carryOver: string;
     carryOverWeeklyOnly: string;
     subtaskResetHint: string;
     completedThisCycle: string;
     nextOccurrence: string;
     editRecurrence: string;
+    weeklyOn: (days: string) => string;
+    monthlyOn: (day: number) => string;
+    carryOverShort: string;
   };
   weekday: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
 };

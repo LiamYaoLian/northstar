@@ -16,8 +16,12 @@ import {
   MONDAY_8PM_NY,
   TUESDAY_10AM_NY,
   WEDNESDAY_10AM_NY,
+  FIFTEENTH_10AM_NY,
+  FEB_FIFTEENTH_10AM_NY,
+  FEB_LAST_10AM_NY,
   dailyTask,
   makeRecurrenceTask,
+  monthlyOnDay,
   weeklyMonOnly,
   weeklyMonWed,
 } from "./recurrence-test-helpers";
@@ -340,5 +344,48 @@ describe("lastScheduledOnOrBefore", () => {
     expect(last!.toISOString()).toBe(
       startOfLocalDay(MONDAY_10AM_NY, TEST_TZ).toISOString(),
     );
+  });
+});
+
+describe("monthly recurrence", () => {
+  it("matches only on the configured day of month", () => {
+    const task = monthlyOnDay(15);
+    expect(matchesRecurrenceDay(task, FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+    expect(matchesRecurrenceDay(task, TUESDAY_10AM_NY, TEST_TZ)).toBe(false);
+  });
+
+  it("shows on today when due and not completed this cycle", () => {
+    expect(
+      shouldShowOnToday(monthlyOnDay(15), FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(true);
+  });
+
+  it("hides on the same day after completion and between occurrences", () => {
+    const doneThisMonth = monthlyOnDay(15, {
+      status: "done",
+      completedAt: FIFTEENTH_10AM_NY.toISOString(),
+    });
+    expect(
+      shouldShowOnToday(doneThisMonth, FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(false);
+    expect(shouldShowOnToday(doneThisMonth, TUESDAY_10AM_NY, TEST_TZ)).toBe(false);
+  });
+
+  it("resets on the next month occurrence", () => {
+    const doneLastMonth = monthlyOnDay(15, {
+      status: "done",
+      completedAt: FIFTEENTH_10AM_NY.toISOString(),
+    });
+    expect(
+      needsOccurrenceReset(doneLastMonth, FEB_FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(true);
+  });
+
+  it("uses the last day of short months when scheduled on the 31st", () => {
+    const task = monthlyOnDay(31);
+    expect(matchesRecurrenceDay(task, FEB_LAST_10AM_NY, TEST_TZ)).toBe(true);
+    expect(
+      matchesRecurrenceDay(task, FEB_FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(false);
   });
 });

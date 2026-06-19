@@ -32,8 +32,10 @@ export type TaskCardProps = {
   onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
   onUpdateTitle?: (taskId: string, title: string) => void;
   onUpdateSubtaskTitle?: (subtaskId: string, title: string) => void;
+  onUpdateSubtaskEstimatedMin?: (subtaskId: string, minutes: number | null) => void;
   onAddSubtask?: (taskId: string, title: string) => Promise<void>;
   onDeleteSubtask?: (subtaskId: string) => void;
+  onDelete?: (taskId: string) => void;
   onReorderSubtasks?: (
     taskId: string,
     orderedIds: string[],
@@ -47,7 +49,7 @@ export type TaskCardProps = {
   onUpdateRecurrence?: (
     taskId: string,
     value: {
-      recurrenceType: "none" | "daily" | "weekly";
+      recurrenceType: "none" | "daily" | "weekly" | "monthly";
       recurrenceDays: number[];
       recurrenceCarryOver: boolean;
     },

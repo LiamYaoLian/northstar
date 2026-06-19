@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/lib/i18n/context";
 import type { Subtask } from "@/lib/db/schema";
 
@@ -27,11 +27,94 @@ function formatSubtaskEstimate(minutes: number | null | undefined, label: string
   return `${minutes}${label}`;
 }
 
+function EditableSubtaskEstimate({
+  estimatedMin,
+  estimatedMinSuffix,
+  onUpdate,
+}: {
+  estimatedMin: number | null;
+  estimatedMinSuffix: string;
+  onUpdate: (minutes: number | null) => void;
+}) {
+  const { t } = useLocale();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(estimatedMin != null ? String(estimatedMin) : "");
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing, estimatedMin]);
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      if (estimatedMin != null) onUpdate(null);
+      setEditing(false);
+      return;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      setDraft(estimatedMin != null ? String(estimatedMin) : "");
+      setEditing(false);
+      return;
+    }
+    if (parsed !== estimatedMin) onUpdate(parsed);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <label className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted">
+        <span className="sr-only">{t.taskCard.editEstimatedMin}</span>
+        <input
+          ref={inputRef}
+          type="number"
+          min={1}
+          step={1}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setEditing(false);
+            }
+          }}
+          className="w-10 rounded border border-border bg-background px-1 py-0 text-xs text-foreground"
+        />
+        <span>{estimatedMinSuffix}</span>
+      </label>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="shrink-0 rounded text-xs text-muted hover:bg-neutral-100 hover:text-foreground"
+      aria-label={t.taskCard.editEstimatedMin}
+    >
+      {estimatedMin != null && estimatedMin > 0
+        ? `${estimatedMin}${estimatedMinSuffix}`
+        : t.taskCard.addEstimatedMin}
+    </button>
+  );
+}
+
 function SortableSubtaskRow({
   subtask,
   onToggle,
   onDelete,
   onUpdateTitle,
+  onUpdateEstimatedMin,
   dragLabel,
   deleteLabel,
   editLabel,
@@ -41,6 +124,7 @@ function SortableSubtaskRow({
   onToggle?: (id: string, isDone: boolean) => void;
   onDelete?: (id: string) => void;
   onUpdateTitle?: (id: string, title: string) => void;
+  onUpdateEstimatedMin?: (id: string, minutes: number | null) => void;
   dragLabel: string;
   deleteLabel: string;
   editLabel: string;
@@ -65,6 +149,18 @@ function SortableSubtaskRow({
     : "flex-1";
 
   const estimateLabel = formatSubtaskEstimate(subtask.estimatedMin, estimatedMinSuffix);
+
+  const estimateControl = onUpdateEstimatedMin ? (
+    <EditableSubtaskEstimate
+      estimatedMin={subtask.estimatedMin}
+      estimatedMinSuffix={estimatedMinSuffix}
+      onUpdate={(minutes) => onUpdateEstimatedMin(subtask.id, minutes)}
+    />
+  ) : (
+    estimateLabel && (
+      <span className="shrink-0 text-xs text-muted">{estimateLabel}</span>
+    )
+  );
 
   function commitTitle() {
     const trimmed = title.trim();
@@ -118,16 +214,12 @@ function SortableSubtaskRow({
               }}
               className="min-w-0 flex-1 bg-transparent outline-none focus:rounded focus:ring-1 focus:ring-accent/40"
             />
-            {estimateLabel && (
-              <span className="shrink-0 text-xs text-muted">{estimateLabel}</span>
-            )}
+            {estimateControl}
           </div>
         ) : (
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span>{subtask.title}</span>
-            {estimateLabel && (
-              <span className="text-xs text-muted">{estimateLabel}</span>
-            )}
+            {estimateControl}
           </div>
         )}
       </div>
@@ -151,6 +243,7 @@ export function SortableSubtasks({
   onReorder,
   onToggle,
   onUpdateTitle,
+  onUpdateEstimatedMin,
   onDelete,
 }: {
   taskId: string;
@@ -158,6 +251,7 @@ export function SortableSubtasks({
   onReorder: (taskId: string, orderedIds: string[]) => Promise<void>;
   onToggle?: (id: string, isDone: boolean) => void;
   onUpdateTitle?: (id: string, title: string) => void;
+  onUpdateEstimatedMin?: (id: string, minutes: number | null) => void;
   onDelete?: (id: string) => void;
 }) {
   const { t } = useLocale();
@@ -211,6 +305,7 @@ export function SortableSubtasks({
               subtask={st}
               onToggle={onToggle}
               onUpdateTitle={onUpdateTitle}
+              onUpdateEstimatedMin={onUpdateEstimatedMin}
               onDelete={onDelete}
               dragLabel={t.taskCard.dragSubtask}
               deleteLabel={t.taskCard.deleteSubtask}

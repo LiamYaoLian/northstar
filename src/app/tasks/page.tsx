@@ -29,6 +29,7 @@ import {
   type PillarOption,
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
+import { recurrenceTypeUsesDays } from "@/lib/tasks/recurrence-types";
 
 type ClassifyPreview = {
   pillarName: string | null;
@@ -42,7 +43,7 @@ type EstimatePreview = {
 };
 
 type RecurrencePreview = {
-  recurrenceType: "none" | "daily" | "weekly";
+  recurrenceType: "none" | "daily" | "weekly" | "monthly";
   recurrenceDays: number[];
   recurrenceCarryOver: boolean;
   source: "openai" | "rules";
@@ -243,6 +244,39 @@ export default function TasksPage() {
     [],
   );
 
+  const applyOptimisticSubtaskPatch = useCallback(
+    (subtaskId: string, patch: Record<string, unknown>) => {
+      let snapshotTasks: TaskRow[] | null = null;
+      let snapshotToday: TaskRow[] | null = null;
+
+      const updateTaskSubtask = (task: TaskRow): TaskRow => {
+        const subtasks = task.subtasks;
+        if (!subtasks?.some((subtask) => subtask.id === subtaskId)) return task;
+        return {
+          ...task,
+          subtasks: subtasks.map((subtask) =>
+            subtask.id === subtaskId ? { ...subtask, ...patch } : subtask,
+          ),
+        };
+      };
+
+      setTasks((current) => {
+        snapshotTasks = current;
+        return current.map(updateTaskSubtask);
+      });
+      setTodayTasks((current) => {
+        snapshotToday = current;
+        return current.map(updateTaskSubtask);
+      });
+
+      return () => {
+        if (snapshotTasks) setTasks(snapshotTasks);
+        if (snapshotToday) setTodayTasks(snapshotToday);
+      };
+    },
+    [],
+  );
+
   const {
     recalculating,
     patchTask,
@@ -254,8 +288,10 @@ export default function TasksPage() {
     updateTaskTitle,
     updateEstimatedMin,
     updateSubtaskTitle,
+    updateSubtaskEstimatedMin,
     addSubtask,
     deleteSubtask,
+    deleteTask,
     reorderSubtasks,
     reorderTasks,
     logTime,
@@ -263,7 +299,9 @@ export default function TasksPage() {
     reload: load,
     errors: t.errors,
     onError: setError,
+    pillars,
     applyOptimisticTaskPatch,
+    applyOptimisticSubtaskPatch,
   });
 
   async function addTask(e: React.FormEvent) {
@@ -282,10 +320,9 @@ export default function TasksPage() {
             ? recurrence.recurrenceType !== "none"
               ? {
                   recurrenceType: recurrence.recurrenceType,
-                  recurrenceDays:
-                    recurrence.recurrenceType === "weekly"
-                      ? recurrence.recurrenceDays
-                      : null,
+                  recurrenceDays: recurrenceTypeUsesDays(recurrence.recurrenceType)
+                    ? recurrence.recurrenceDays
+                    : null,
                   recurrenceCarryOver: recurrence.recurrenceCarryOver,
                 }
               : { recurrenceType: "none" }
@@ -352,10 +389,12 @@ export default function TasksPage() {
       onApplyBreakdown={applyBreakdown}
       onAddSubtask={addSubtask}
       onDeleteSubtask={(id) => void deleteSubtask(id)}
+      onDelete={(id) => void deleteTask(id)}
       onReorderSubtasks={reorderSubtasks}
       onToggleSubtask={toggleSubtask}
       onUpdateTitle={updateTaskTitle}
       onUpdateSubtaskTitle={updateSubtaskTitle}
+      onUpdateSubtaskEstimatedMin={updateSubtaskEstimatedMin}
       onUpdateEstimatedMin={updateEstimatedMin}
       onToggleIntimidating={(id, intimidating) =>
         void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
@@ -375,8 +414,9 @@ export default function TasksPage() {
       onUpdateRecurrence={(id, value) =>
         void patchTask(id, {
           recurrenceType: value.recurrenceType,
-          recurrenceDays:
-            value.recurrenceType === "weekly" ? value.recurrenceDays : null,
+          recurrenceDays: recurrenceTypeUsesDays(value.recurrenceType)
+            ? value.recurrenceDays
+            : null,
           recurrenceCarryOver: value.recurrenceCarryOver,
         })
       }

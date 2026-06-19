@@ -20,6 +20,7 @@ type TaskActionBarProps = {
   onLogTime?: (id: string, minutes: number) => void;
   onComplete?: (id: string) => void;
   onReopen?: (id: string) => void;
+  onDelete?: (id: string) => void;
   onTimerError?: (message: string) => void;
   hasAddSubtask?: boolean;
   hasBreakdown?: boolean;
@@ -37,6 +38,7 @@ export function TaskActionBar({
   onLogTime,
   onComplete,
   onReopen,
+  onDelete,
   onTimerError,
   hasAddSubtask,
   hasBreakdown,
@@ -65,6 +67,18 @@ export function TaskActionBar({
       await action();
     } catch (err) {
       onTimerError?.(err instanceof Error ? err.message : t.errors.startTimerFailed);
+    }
+  }
+
+  async function handleDelete() {
+    if (!onDelete) return;
+    try {
+      if (runningHere) {
+        await cancel();
+      }
+      onDelete(task.id);
+    } catch (err) {
+      onTimerError?.(err instanceof Error ? err.message : t.errors.cancelTimerFailed);
     }
   }
 
@@ -201,6 +215,15 @@ export function TaskActionBar({
           <ActionButton onClick={() => onReopen(task.id)}>
             {t.taskCard.reopen}
           </ActionButton>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            className="rounded-md border border-border px-2 py-1 text-xs text-muted hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+          >
+            {t.taskCard.deleteTask}
+          </button>
         )}
       </div>
     </div>

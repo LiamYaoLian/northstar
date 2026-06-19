@@ -7,6 +7,8 @@ import {
   subtasks,
   strategicPillars,
   northStars,
+  activeTimeSessions,
+  taskCompletionEvents,
 } from "@/lib/db/schema";
 import {
   generateBreakdown,
@@ -41,6 +43,10 @@ import {
 import { toRecurrenceFields } from "@/lib/tasks/recurrence-types";
 import { needsOccurrenceReset } from "@/lib/tasks/recurrence";
 import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
+import {
+  recurrenceTypeUsesDays,
+  serializeRecurrenceDays,
+} from "@/lib/tasks/recurrence-types";
 import { resolveTimezone } from "@/lib/tasks/timezone";
 import { shouldRecordCompletionTransition } from "@/lib/tasks/completion-events";
 import {
@@ -237,10 +243,10 @@ export async function createTask(input: {
   );
 
   const recurrenceType = resolvedRecurrence.recurrenceType;
-  const recurrenceDays =
-    recurrenceType === "weekly" && resolvedRecurrence.recurrenceDays?.length
-      ? JSON.stringify(resolvedRecurrence.recurrenceDays)
-      : null;
+  const recurrenceDays = serializeRecurrenceDays(
+    recurrenceType,
+    resolvedRecurrence.recurrenceDays,
+  );
   const recurrenceCarryOver =
     recurrenceType === "weekly"
       ? Boolean(resolvedRecurrence.recurrenceCarryOver)
@@ -315,10 +321,10 @@ function resolveCreateRecurrence(
   if (input.recurrenceType === undefined) {
     return {
       recurrenceType: inferred.recurrenceType,
-      recurrenceDays:
-        inferred.recurrenceType === "weekly" && inferred.recurrenceDays.length
-          ? inferred.recurrenceDays
-          : null,
+      recurrenceDays: recurrenceTypeUsesDays(inferred.recurrenceType)
+        && inferred.recurrenceDays.length
+        ? inferred.recurrenceDays
+        : null,
       recurrenceCarryOver:
         inferred.recurrenceType === "weekly"
           ? inferred.recurrenceCarryOver
@@ -330,7 +336,7 @@ function resolveCreateRecurrence(
   return {
     recurrenceType,
     recurrenceDays:
-      recurrenceType === "weekly" && input.recurrenceDays?.length
+      recurrenceTypeUsesDays(recurrenceType) && input.recurrenceDays?.length
         ? input.recurrenceDays
         : null,
     recurrenceCarryOver:
@@ -518,7 +524,7 @@ export async function applyBreakdownPreview(
 
 export async function updateSubtask(
   subtaskId: string,
-  patch: { title?: string; isDone?: boolean },
+  patch: { title?: string; isDone?: boolean; estimatedMin?: number | null },
   options?: { tz?: string; userId?: string },
 ) {
   await ensureDbReady();
@@ -526,7 +532,7 @@ export async function updateSubtask(
   const existing = await fetchSubtaskById(subtaskId, options?.userId);
   if (!existing) return null;
 
-  const updates: { title?: string; isDone?: boolean } = {};
+  const updates: { title?: string; isDone?: boolean; estimatedMin?: number | null } = {};
   if (patch.title !== undefined) {
     const trimmed = patch.title.trim();
     if (!trimmed) return null;
@@ -534,6 +540,15 @@ export async function updateSubtask(
   }
   if (patch.isDone !== undefined) {
     updates.isDone = patch.isDone;
+  }
+  if (patch.estimatedMin !== undefined) {
+    if (
+      patch.estimatedMin !== null &&
+      (!Number.isInteger(patch.estimatedMin) || patch.estimatedMin <= 0)
+    ) {
+      return null;
+    }
+    updates.estimatedMin = patch.estimatedMin;
   }
   if (Object.keys(updates).length === 0) return existing;
 
@@ -546,10 +561,18 @@ export async function updateSubtask(
     }
   }
 
-  if (patch.title !== undefined) {
+  if (patch.title !== undefined || patch.estimatedMin !== undefined) {
+    const ts = nowIso();
+    const taskPatch: { updatedAt: string; estimatedMin?: number | null } = {
+      updatedAt: ts,
+    };
+    if (patch.estimatedMin !== undefined) {
+      const siblings = await listSubtasks(existing.parentTaskId, options?.userId);
+      taskPatch.estimatedMin = sumSubtaskEstimatedMin(siblings);
+    }
     await db
       .update(tasks)
-      .set({ updatedAt: nowIso() })
+      .set(taskPatch)
       .where(scopedTaskId(existing.parentTaskId, options?.userId));
   }
 
@@ -683,10 +706,10 @@ async function buildTaskPatch(
     safePatch.recurrenceType = recurrenceType;
   }
   if (recurrenceDays !== undefined) {
-    safePatch.recurrenceDays =
-      nextRecurrenceType === "weekly" && recurrenceDays?.length
-        ? JSON.stringify(recurrenceDays)
-        : null;
+    safePatch.recurrenceDays = serializeRecurrenceDays(
+      nextRecurrenceType as RecurrenceType,
+      recurrenceDays,
+    );
   }
   if (recurrenceCarryOver !== undefined || recurrenceType !== undefined) {
     safePatch.recurrenceCarryOver =
@@ -819,6 +842,31 @@ export async function createSubtask(
   return fetchSubtaskById(subtaskId, userId);
 }
 
+export async function deleteTask(taskId: string, userId?: string) {
+  await ensureDbReady();
+  const db = getDb();
+  const task = await fetchTaskById(taskId, userId);
+  if (!task) return false;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(subtasks)
+      .where(scopedSubtasksForTask(taskId, userId));
+    await tx
+      .delete(timeEntries)
+      .where(scopedTimeEntriesForTask(taskId, userId));
+    await tx
+      .delete(activeTimeSessions)
+      .where(scopedActiveSessionsForTask(taskId, userId));
+    await tx
+      .delete(taskCompletionEvents)
+      .where(scopedCompletionEventsForTask(taskId, userId));
+    await tx.delete(tasks).where(scopedTaskId(taskId, userId));
+  });
+
+  return true;
+}
+
 export async function deleteSubtask(subtaskId: string, userId?: string) {
   await ensureDbReady();
   const db = getDb();
@@ -928,6 +976,33 @@ function scopedSubtaskId(subtaskId: string, userId?: string) {
   return userId
     ? and(eq(subtasks.id, subtaskId), eq(subtasks.userId, userId))
     : eq(subtasks.id, subtaskId);
+}
+
+function scopedSubtasksForTask(taskId: string, userId?: string) {
+  return userId
+    ? and(eq(subtasks.parentTaskId, taskId), eq(subtasks.userId, userId))
+    : eq(subtasks.parentTaskId, taskId);
+}
+
+function scopedTimeEntriesForTask(taskId: string, userId?: string) {
+  return userId
+    ? and(eq(timeEntries.taskId, taskId), eq(timeEntries.userId, userId))
+    : eq(timeEntries.taskId, taskId);
+}
+
+function scopedActiveSessionsForTask(taskId: string, userId?: string) {
+  return userId
+    ? and(eq(activeTimeSessions.taskId, taskId), eq(activeTimeSessions.userId, userId))
+    : eq(activeTimeSessions.taskId, taskId);
+}
+
+function scopedCompletionEventsForTask(taskId: string, userId?: string) {
+  return userId
+    ? and(
+        eq(taskCompletionEvents.taskId, taskId),
+        eq(taskCompletionEvents.userId, userId),
+      )
+    : eq(taskCompletionEvents.taskId, taskId);
 }
 
 function scopedSubtaskIds(subtaskIds: string[], userId?: string) {

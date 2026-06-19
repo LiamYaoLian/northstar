@@ -1,4 +1,4 @@
-export type RecurrenceType = "none" | "daily" | "weekly";
+export type RecurrenceType = "none" | "daily" | "weekly" | "monthly";
 
 export type RecurrenceTaskFields = {
   recurrenceType: RecurrenceType;
@@ -7,6 +7,21 @@ export type RecurrenceTaskFields = {
   status: string;
   completedAt: string | null;
 };
+
+export function recurrenceTypeUsesDays(
+  type: RecurrenceType,
+): type is "weekly" | "monthly" {
+  return type === "weekly" || type === "monthly";
+}
+
+export function serializeRecurrenceDays(
+  recurrenceType: RecurrenceType,
+  recurrenceDays: number[] | null | undefined,
+): string | null {
+  if (!recurrenceTypeUsesDays(recurrenceType)) return null;
+  if (!recurrenceDays?.length) return null;
+  return JSON.stringify(recurrenceDays);
+}
 
 export function parseRecurrenceDays(json: string | null): number[] | null {
   if (json === null) return null;

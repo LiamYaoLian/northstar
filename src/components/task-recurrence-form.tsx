@@ -5,6 +5,7 @@ import { useLocale } from "@/lib/i18n/context";
 import type { ReactNode } from "react";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
+const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 export type RecurrenceFormValue = {
   recurrenceType: RecurrenceType;
@@ -19,6 +20,10 @@ type TaskRecurrenceFormProps = {
   leadingButton?: ReactNode;
 };
 
+function defaultMonthDay(): number {
+  return new Date().getDate();
+}
+
 export function TaskRecurrenceForm({
   value,
   onChange,
@@ -30,7 +35,14 @@ export function TaskRecurrenceForm({
   function setType(recurrenceType: RecurrenceType) {
     onChange({
       recurrenceType,
-      recurrenceDays: recurrenceType === "weekly" ? value.recurrenceDays : [],
+      recurrenceDays:
+        recurrenceType === "weekly"
+          ? value.recurrenceDays.filter((d) => d >= 1 && d <= 7)
+          : recurrenceType === "monthly"
+            ? value.recurrenceDays.some((d) => d >= 1 && d <= 31)
+              ? value.recurrenceDays.filter((d) => d >= 1 && d <= 31)
+              : [defaultMonthDay()]
+            : [],
       recurrenceCarryOver:
         recurrenceType === "weekly" ? value.recurrenceCarryOver : false,
     });
@@ -43,11 +55,15 @@ export function TaskRecurrenceForm({
     onChange({ ...value, recurrenceDays: days });
   }
 
+  function setMonthDay(day: number) {
+    onChange({ ...value, recurrenceDays: [day] });
+  }
+
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <div className="flex flex-wrap gap-2">
         {leadingButton}
-        {(["none", "daily", "weekly"] as const).map((type) => (
+        {(["none", "daily", "weekly", "monthly"] as const).map((type) => (
           <button
             key={type}
             type="button"
@@ -92,6 +108,26 @@ export function TaskRecurrenceForm({
             {t.recurrence.carryOver}
           </label>
           <p className="text-xs text-muted">{t.recurrence.carryOverWeeklyOnly}</p>
+        </>
+      )}
+
+      {value.recurrenceType === "monthly" && (
+        <>
+          <label className="flex items-center gap-2 text-xs text-muted">
+            {t.recurrence.monthDay}
+            <select
+              value={value.recurrenceDays[0] ?? defaultMonthDay()}
+              onChange={(e) => setMonthDay(Number(e.target.value))}
+              className="rounded-md border border-border px-2 py-1 text-xs"
+            >
+              {MONTH_DAYS.map((day) => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-xs text-muted">{t.recurrence.monthDayShortMonthHint}</p>
         </>
       )}
 

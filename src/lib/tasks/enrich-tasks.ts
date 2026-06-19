@@ -1,4 +1,4 @@
-import type { FocusTrack, Task } from "@/lib/db/schema";
+import type { FocusTrack, Subtask, Task } from "@/lib/db/schema";
 import { parseJson } from "@/lib/utils";
 
 export type StrategyPillarDto = {
@@ -18,6 +18,7 @@ export type PillarOption = {
 export type TaskRow = Task & {
   pillarName?: string;
   pillarColor?: string;
+  subtasks?: Subtask[];
 };
 
 export function parseStrategyPillars(

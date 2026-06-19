@@ -15,9 +15,13 @@ export async function PATCH(
     const url = new URL(request.url);
     const tz = parseTzFromSearchParams(url.searchParams);
     const body = await request.json();
-    const { isDone, title } = body as { isDone?: boolean; title?: string };
+    const { isDone, title, estimatedMin } = body as {
+      isDone?: boolean;
+      title?: string;
+      estimatedMin?: number | null;
+    };
 
-    if (isDone === undefined && title === undefined) {
+    if (isDone === undefined && title === undefined && estimatedMin === undefined) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
     }
 
@@ -26,6 +30,7 @@ export async function PATCH(
       {
         ...(isDone !== undefined ? { isDone: Boolean(isDone) } : {}),
         ...(title !== undefined ? { title: String(title) } : {}),
+        ...(estimatedMin !== undefined ? { estimatedMin } : {}),
       },
       { tz, userId: user.id },
     );

@@ -40,9 +40,27 @@ describe("createTaskRecurrenceSchema", () => {
     expect(result.recurrenceCarryOver).toBe(true);
   });
 
+  it("accepts monthly with day of month", () => {
+    const result = createTaskRecurrenceSchema.parse({
+      recurrenceType: "monthly",
+      recurrenceDays: [15],
+    });
+    expect(result.recurrenceDays).toEqual([15]);
+    expect(result.recurrenceCarryOver).toBe(false);
+  });
+
+  it("requires at least one day for monthly", () => {
+    expect(() =>
+      createTaskRecurrenceSchema.parse({
+        recurrenceType: "monthly",
+        recurrenceDays: [],
+      }),
+    ).toThrow();
+  });
+
   it("rejects invalid recurrence type", () => {
     expect(() =>
-      createTaskRecurrenceSchema.parse({ recurrenceType: "monthly" }),
+      createTaskRecurrenceSchema.parse({ recurrenceType: "yearly" }),
     ).toThrow();
   });
 });

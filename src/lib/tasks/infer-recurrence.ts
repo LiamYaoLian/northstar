@@ -104,6 +104,21 @@ export function normalizeRecurrenceInference(input: {
     };
   }
 
+  if (recurrenceType === "monthly") {
+    const days = (input.recurrenceDays ?? []).filter(
+      (d) => Number.isInteger(d) && d >= 1 && d <= 31,
+    );
+    if (days.length === 0) {
+      return { ...NONE, source: input.source };
+    }
+    return {
+      recurrenceType: "monthly",
+      recurrenceDays: [...new Set(days)].sort((a, b) => a - b),
+      recurrenceCarryOver: false,
+      source: input.source,
+    };
+  }
+
   const days = (input.recurrenceDays ?? []).filter(
     (d) => Number.isInteger(d) && d >= 1 && d <= 7,
   );
@@ -127,6 +142,20 @@ export function ruleBasedInferRecurrence(title: string): RecurrenceInference {
   if (/每天|每日|\bdaily\b|every\s+day/i.test(trimmed)) {
     return normalizeRecurrenceInference({
       recurrenceType: "daily",
+      source: "rules",
+    });
+  }
+
+  const monthlyDayMatch = trimmed.match(
+    /(?:每月|monthly|every\s+month)[^\d]{0,8}(\d{1,2})\s*[号日]?/i,
+  );
+  if (/每月|monthly|every\s+month/i.test(trimmed)) {
+    const day = monthlyDayMatch
+      ? Math.min(31, Math.max(1, Number(monthlyDayMatch[1])))
+      : 1;
+    return normalizeRecurrenceInference({
+      recurrenceType: "monthly",
+      recurrenceDays: [day],
       source: "rules",
     });
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
 import { TaskRecurrenceBadge } from "@/components/task-recurrence-badge";
@@ -40,8 +40,10 @@ export function TaskCard({
   onToggleSubtask,
   onUpdateTitle,
   onUpdateSubtaskTitle,
+  onUpdateSubtaskEstimatedMin,
   onAddSubtask,
   onDeleteSubtask,
+  onDelete,
   onReorderSubtasks,
   onToggleIntimidating,
   onChangePillar,
@@ -58,6 +60,14 @@ export function TaskCard({
     recurrenceDays: parseRecurrenceDays(task.recurrenceDays) ?? [],
     recurrenceCarryOver: task.recurrenceCarryOver,
   }));
+
+  useEffect(() => {
+    setRecurrenceDraft({
+      recurrenceType: task.recurrenceType as RecurrenceFormValue["recurrenceType"],
+      recurrenceDays: parseRecurrenceDays(task.recurrenceDays) ?? [],
+      recurrenceCarryOver: task.recurrenceCarryOver,
+    });
+  }, [task.recurrenceType, task.recurrenceDays, task.recurrenceCarryOver]);
   const factors = parseJson<PriorityFactors | null>(task.priorityFactors, null);
   const subtaskList = task.subtasks ?? [];
   const displayEstimatedMin = resolveTaskEstimatedMin(task.estimatedMin, subtaskList);
@@ -110,19 +120,21 @@ export function TaskCard({
               : undefined
           }
         />
+        {!onUpdateRecurrence && <TaskRecurrenceBadge task={task} />}
       </TaskCardHeader>
-
-      <TaskRecurrenceBadge task={task} />
 
       {onUpdateRecurrence && (
         <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setShowRecurrence((v) => !v)}
-            className="text-xs text-accent hover:underline"
-          >
-            {t.recurrence.editRecurrence}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <TaskRecurrenceBadge task={task} showWhenNone prominent />
+            <button
+              type="button"
+              onClick={() => setShowRecurrence((v) => !v)}
+              className="text-xs text-accent hover:underline"
+            >
+              {showRecurrence ? t.strategy.cancel : t.recurrence.editRecurrence}
+            </button>
+          </div>
           {showRecurrence && (
             <>
               <TaskRecurrenceForm
@@ -154,6 +166,7 @@ export function TaskCard({
           onReorder={onReorderSubtasks}
           onToggle={onToggleSubtask}
           onUpdateTitle={onUpdateSubtaskTitle}
+          onUpdateEstimatedMin={onUpdateSubtaskEstimatedMin}
           onDelete={onDeleteSubtask}
         />
       )}
@@ -201,6 +214,7 @@ export function TaskCard({
         onTimerError={onTimerError}
         onComplete={onComplete}
         onReopen={onReopen}
+        onDelete={onDelete}
         hasAddSubtask={Boolean(onAddSubtask)}
         hasBreakdown={Boolean(onBreakdown)}
       />
