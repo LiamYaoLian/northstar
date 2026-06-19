@@ -90,6 +90,29 @@ describe("createTaskRecurrenceSchema", () => {
     ).toThrow();
   });
 
+  it("accepts yearly with calendar month and day", () => {
+    const result = createTaskRecurrenceSchema.parse({
+      recurrenceType: "yearly",
+      recurrenceDays: [3, 15],
+    });
+    expect(result.recurrenceDays).toEqual([3, 15]);
+  });
+
+  it("requires valid yearly recurrenceDays", () => {
+    expect(() =>
+      createTaskRecurrenceSchema.parse({
+        recurrenceType: "yearly",
+        recurrenceDays: [3],
+      }),
+    ).toThrow();
+    expect(() =>
+      createTaskRecurrenceSchema.parse({
+        recurrenceType: "yearly",
+        recurrenceDays: [13, 15],
+      }),
+    ).toThrow();
+  });
+
   it("rejects invalid recurrence type", () => {
     expect(() =>
       createTaskRecurrenceSchema.parse({ recurrenceType: "yearly" }),

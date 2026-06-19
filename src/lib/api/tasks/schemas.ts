@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
   parseQuarterlyRecurrence,
+  parseYearlyRecurrence,
   serializeQuarterlyRecurrence,
+  serializeYearlyRecurrence,
 } from "@/lib/tasks/recurrence-types";
 
 export const recurrenceTypeSchema = z.enum([
@@ -10,6 +12,7 @@ export const recurrenceTypeSchema = z.enum([
   "weekly",
   "monthly",
   "quarterly",
+  "yearly",
 ]);
 
 const recurrenceBaseSchema = z.object({
@@ -29,6 +32,12 @@ function normalizeRecurrence(data: RecurrenceInput): RecurrenceInput {
         parsed.monthInQuarter,
         parsed.dayOfMonth,
       );
+    }
+  }
+  if (data.recurrenceType === "yearly" && recurrenceDays?.length) {
+    const parsed = parseYearlyRecurrence(recurrenceDays);
+    if (parsed) {
+      recurrenceDays = serializeYearlyRecurrence(parsed.month, parsed.dayOfMonth);
     }
   }
   return {
@@ -87,6 +96,17 @@ function refineRecurrence(data: RecurrenceInput, ctx: z.RefinementCtx): void {
       });
     }
   }
+
+  if (data.recurrenceType === "yearly") {
+    const parsed = parseYearlyRecurrence(data.recurrenceDays ?? []);
+    if (!parsed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "yearly recurrence requires [calendarMonth (1-12), dayOfMonth (1-31)]",
+        path: ["recurrenceDays"],
+      });
+    }
+  }
 }
 
 export const createTaskRecurrenceSchema = recurrenceBaseSchema
@@ -106,7 +126,8 @@ export const patchTaskRecurrenceSchema = recurrenceBaseSchema
     if (
       data.recurrenceType === "weekly" ||
       data.recurrenceType === "monthly" ||
-      data.recurrenceType === "quarterly"
+      data.recurrenceType === "quarterly" ||
+      data.recurrenceType === "yearly"
     ) {
       refineRecurrence(data, ctx);
     }

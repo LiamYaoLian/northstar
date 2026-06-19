@@ -50,7 +50,7 @@ type EstimatePreview = {
 };
 
 type RecurrencePreview = {
-  recurrenceType: "none" | "daily" | "weekly" | "monthly" | "quarterly";
+  recurrenceType: "none" | "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
   recurrenceDays: number[];
   recurrenceCarryOver: boolean;
   source: "openai" | "rules";

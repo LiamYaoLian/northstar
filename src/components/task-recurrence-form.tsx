@@ -3,8 +3,11 @@
 import type { QuarterMonthSlot, RecurrenceType } from "@/lib/tasks/recurrence-types";
 import {
   defaultQuarterMonthSlot,
+  defaultYearlyRecurrence,
   parseQuarterlyRecurrence,
+  parseYearlyRecurrence,
   serializeQuarterlyRecurrence,
+  serializeYearlyRecurrence,
 } from "@/lib/tasks/recurrence-types";
 import { useLocale } from "@/lib/i18n/context";
 import type { ReactNode } from "react";
@@ -12,6 +15,7 @@ import type { ReactNode } from "react";
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 const QUARTER_MONTH_SLOTS = [1, 2, 3] as const;
+const CALENDAR_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export type RecurrenceFormValue = {
   recurrenceType: RecurrenceType;
@@ -32,6 +36,11 @@ function defaultMonthDay(): number {
 
 function defaultQuarterlyDays(): number[] {
   return serializeQuarterlyRecurrence(defaultQuarterMonthSlot(), defaultMonthDay());
+}
+
+function defaultYearlyDays(): number[] {
+  const { month, dayOfMonth } = defaultYearlyRecurrence();
+  return serializeYearlyRecurrence(month, dayOfMonth);
 }
 
 export function TaskRecurrenceForm({
@@ -62,7 +71,14 @@ export function TaskRecurrenceForm({
                       )
                     : defaultQuarterlyDays();
                 })()
-              : [],
+              : recurrenceType === "yearly"
+                ? (() => {
+                    const parsed = parseYearlyRecurrence(value.recurrenceDays);
+                    return parsed
+                      ? serializeYearlyRecurrence(parsed.month, parsed.dayOfMonth)
+                      : defaultYearlyDays();
+                  })()
+                : [],
       recurrenceCarryOver:
         recurrenceType === "weekly" ? value.recurrenceCarryOver : false,
     });
@@ -100,11 +116,32 @@ export function TaskRecurrenceForm({
     });
   }
 
+  const yearlyConfig =
+    value.recurrenceType === "yearly"
+      ? parseYearlyRecurrence(value.recurrenceDays)
+      : null;
+
+  function setYearMonth(month: number) {
+    const day = yearlyConfig?.dayOfMonth ?? defaultMonthDay();
+    onChange({
+      ...value,
+      recurrenceDays: serializeYearlyRecurrence(month, day),
+    });
+  }
+
+  function setYearDay(day: number) {
+    const month = yearlyConfig?.month ?? defaultYearlyRecurrence().month;
+    onChange({
+      ...value,
+      recurrenceDays: serializeYearlyRecurrence(month, day),
+    });
+  }
+
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <div className="flex flex-wrap gap-2">
         {leadingButton}
-        {(["none", "daily", "weekly", "monthly", "quarterly"] as const).map((type) => (
+        {(["none", "daily", "weekly", "monthly", "quarterly", "yearly"] as const).map((type) => (
           <button
             key={type}
             type="button"
@@ -205,6 +242,40 @@ export function TaskRecurrenceForm({
             </select>
           </label>
           <p className="text-xs text-muted">{t.recurrence.quarterDayShortMonthHint}</p>
+        </>
+      )}
+
+      {value.recurrenceType === "yearly" && (
+        <>
+          <label className="flex items-center gap-2 text-xs text-muted">
+            {t.recurrence.yearMonth}
+            <select
+              value={yearlyConfig?.month ?? defaultYearlyRecurrence().month}
+              onChange={(e) => setYearMonth(Number(e.target.value))}
+              className="rounded-md border border-border px-2 py-1 text-xs"
+            >
+              {CALENDAR_MONTHS.map((month) => (
+                <option key={month} value={month}>
+                  {t.recurrence.calendarMonth(month)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted">
+            {t.recurrence.yearDay}
+            <select
+              value={yearlyConfig?.dayOfMonth ?? defaultMonthDay()}
+              onChange={(e) => setYearDay(Number(e.target.value))}
+              className="rounded-md border border-border px-2 py-1 text-xs"
+            >
+              {MONTH_DAYS.map((day) => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-xs text-muted">{t.recurrence.yearDayShortMonthHint}</p>
         </>
       )}
 

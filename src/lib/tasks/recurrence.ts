@@ -3,6 +3,7 @@ import {
   isQuarterMonth,
   parseQuarterlyRecurrence,
   parseRecurrenceDays,
+  parseYearlyRecurrence,
 } from "./recurrence-types";
 import {
   addLocalDays,
@@ -72,7 +73,26 @@ function scheduleMatches(
   if (task.recurrenceType === "quarterly") {
     return quarterlyDayMatches(task, instant, tz);
   }
+  if (task.recurrenceType === "yearly") {
+    return yearlyDayMatches(task, instant, tz);
+  }
   return false;
+}
+
+function yearlyDayMatches(
+  task: RecurrenceTaskFields,
+  instant: Date,
+  tz: string,
+): boolean {
+  const days = parseRecurrenceDays(task.recurrenceDays);
+  const config = parseYearlyRecurrence(days);
+  if (!config) return false;
+  const month = monthInTz(instant, tz);
+  if (month !== config.month) return false;
+  const day = dayOfMonthInTz(instant, tz);
+  const monthLength = daysInLocalMonth(instant, tz);
+  const effectiveDay = Math.min(config.dayOfMonth, monthLength);
+  return day === effectiveDay;
 }
 
 export function matchesRecurrenceDay(

@@ -41,6 +41,16 @@ describe("ruleBasedInferRecurrence", () => {
     });
   });
 
+  it("detects yearly with explicit keywords", () => {
+    expect(ruleBasedInferRecurrence("每年3月15号体检")).toMatchObject({
+      recurrenceType: "yearly",
+      recurrenceDays: [3, 15],
+    });
+    expect(ruleBasedInferRecurrence("annual review")).toMatchObject({
+      recurrenceType: "yearly",
+    });
+  });
+
   it("defaults to none without explicit recurrence signals", () => {
     expect(ruleBasedInferRecurrence("写 PRD")).toMatchObject({
       recurrenceType: "none",
@@ -80,6 +90,16 @@ describe("normalizeRecurrenceInference", () => {
       normalizeRecurrenceInference({
         recurrenceType: "quarterly",
         recurrenceDays: [],
+        source: "openai",
+      }),
+    ).toMatchObject({ recurrenceType: "none" });
+  });
+
+  it("downgrades yearly without valid month/day to none", () => {
+    expect(
+      normalizeRecurrenceInference({
+        recurrenceType: "yearly",
+        recurrenceDays: [3],
         source: "openai",
       }),
     ).toMatchObject({ recurrenceType: "none" });

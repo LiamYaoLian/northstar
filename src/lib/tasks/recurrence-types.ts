@@ -1,4 +1,10 @@
-export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "quarterly";
+export type RecurrenceType =
+  | "none"
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly";
 
 /** Which month within each calendar quarter (1 → Jan/Apr/Jul/Oct, etc.). */
 export type QuarterMonthSlot = 1 | 2 | 3;
@@ -60,6 +66,36 @@ export function serializeQuarterlyRecurrence(
   return [monthInQuarter, dayOfMonth];
 }
 
+export type YearlyRecurrence = {
+  month: number;
+  dayOfMonth: number;
+};
+
+export function defaultYearlyRecurrence(): YearlyRecurrence {
+  const now = new Date();
+  return { month: now.getMonth() + 1, dayOfMonth: now.getDate() };
+}
+
+/** Yearly stores [calendarMonth (1-12), dayOfMonth (1-31)]. */
+export function parseYearlyRecurrence(
+  days: number[] | null | undefined,
+): YearlyRecurrence | null {
+  if (!days || days.length < 2) return null;
+  const month = days[0];
+  const dayOfMonth = days[1];
+  if (month >= 1 && month <= 12 && dayOfMonth >= 1 && dayOfMonth <= 31) {
+    return { month, dayOfMonth };
+  }
+  return null;
+}
+
+export function serializeYearlyRecurrence(
+  month: number,
+  dayOfMonth: number,
+): number[] {
+  return [month, dayOfMonth];
+}
+
 export type RecurrenceTaskFields = {
   recurrenceType: RecurrenceType;
   recurrenceDays: string | null;
@@ -70,8 +106,13 @@ export type RecurrenceTaskFields = {
 
 export function recurrenceTypeUsesDays(
   type: RecurrenceType,
-): type is "weekly" | "monthly" | "quarterly" {
-  return type === "weekly" || type === "monthly" || type === "quarterly";
+): type is "weekly" | "monthly" | "quarterly" | "yearly" {
+  return (
+    type === "weekly" ||
+    type === "monthly" ||
+    type === "quarterly" ||
+    type === "yearly"
+  );
 }
 
 export function serializeRecurrenceDays(

@@ -21,10 +21,13 @@ import {
   FEB_LAST_10AM_NY,
   APR_FIFTEENTH_10AM_NY,
   MAY_FIFTEENTH_10AM_NY,
+  MAR_FIFTEENTH_10AM_NY,
+  MAR_FIFTEENTH_2026_10AM_NY,
   dailyTask,
   makeRecurrenceTask,
   monthlyOnDay,
   quarterlyOnDay,
+  yearlyOnDate,
   weeklyMonOnly,
   weeklyMonWed,
 } from "./recurrence-test-helpers";
@@ -426,6 +429,31 @@ describe("quarterly recurrence", () => {
     });
     expect(
       needsOccurrenceReset(doneThisQuarter, APR_FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(true);
+  });
+});
+
+describe("yearly recurrence", () => {
+  it("matches only on the configured calendar month and day", () => {
+    const task = yearlyOnDate(3, 15);
+    expect(matchesRecurrenceDay(task, MAR_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+    expect(matchesRecurrenceDay(task, FEB_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(false);
+    expect(matchesRecurrenceDay(task, APR_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(false);
+  });
+
+  it("shows on today when due and not completed this cycle", () => {
+    expect(
+      shouldShowOnToday(yearlyOnDate(3, 15), MAR_FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(true);
+  });
+
+  it("resets on the next year occurrence", () => {
+    const doneThisYear = yearlyOnDate(3, 15, {
+      status: "done",
+      completedAt: MAR_FIFTEENTH_10AM_NY.toISOString(),
+    });
+    expect(
+      needsOccurrenceReset(doneThisYear, MAR_FIFTEENTH_2026_10AM_NY, TEST_TZ),
     ).toBe(true);
   });
 });

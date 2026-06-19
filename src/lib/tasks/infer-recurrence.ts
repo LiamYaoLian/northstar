@@ -1,7 +1,10 @@
 import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
 import {
+  defaultYearlyRecurrence,
   parseQuarterlyRecurrence,
+  parseYearlyRecurrence,
   serializeQuarterlyRecurrence,
+  serializeYearlyRecurrence,
 } from "@/lib/tasks/recurrence-types";
 
 export type RecurrenceInference = {
@@ -139,6 +142,19 @@ export function normalizeRecurrenceInference(input: {
     };
   }
 
+  if (recurrenceType === "yearly") {
+    const parsed = parseYearlyRecurrence(input.recurrenceDays ?? []);
+    if (!parsed) {
+      return { ...NONE, source: input.source };
+    }
+    return {
+      recurrenceType: "yearly",
+      recurrenceDays: serializeYearlyRecurrence(parsed.month, parsed.dayOfMonth),
+      recurrenceCarryOver: false,
+      source: input.source,
+    };
+  }
+
   const days = (input.recurrenceDays ?? []).filter(
     (d) => Number.isInteger(d) && d >= 1 && d <= 7,
   );
@@ -195,6 +211,32 @@ export function ruleBasedInferRecurrence(title: string): RecurrenceInference {
     return normalizeRecurrenceInference({
       recurrenceType: "quarterly",
       recurrenceDays: [monthInQuarter, day],
+      source: "rules",
+    });
+  }
+
+  if (/每年|yearly|every\s+year|annually|\bannual\b/i.test(trimmed)) {
+    const defaults = defaultYearlyRecurrence();
+    let month = defaults.month;
+    let day = defaults.dayOfMonth;
+
+    const cnMonthDay = trimmed.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[号日]?/);
+    if (cnMonthDay) {
+      month = Math.min(12, Math.max(1, Number(cnMonthDay[1])));
+      day = Math.min(31, Math.max(1, Number(cnMonthDay[2])));
+    } else {
+      const dayWithHao = trimmed.match(/(\d{1,2})\s*号/);
+      const dayWithRi = trimmed.match(/(\d{1,2})\s*日/);
+      if (dayWithHao) {
+        day = Math.min(31, Math.max(1, Number(dayWithHao[1])));
+      } else if (dayWithRi) {
+        day = Math.min(31, Math.max(1, Number(dayWithRi[1])));
+      }
+    }
+
+    return normalizeRecurrenceInference({
+      recurrenceType: "yearly",
+      recurrenceDays: [month, day],
       source: "rules",
     });
   }

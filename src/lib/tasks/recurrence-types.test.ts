@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   parseQuarterlyRecurrence,
   parseRecurrenceDays,
+  parseYearlyRecurrence,
   serializeQuarterlyRecurrence,
+  serializeYearlyRecurrence,
   toRecurrenceFields,
 } from "./recurrence-types";
 import { WEEKLY_MON_WED } from "./recurrence-test-helpers";
@@ -32,6 +34,24 @@ describe("parseQuarterlyRecurrence", () => {
 describe("serializeQuarterlyRecurrence", () => {
   it("returns two-element array", () => {
     expect(serializeQuarterlyRecurrence(3, 1)).toEqual([3, 1]);
+  });
+});
+
+describe("parseYearlyRecurrence", () => {
+  it("parses [calendarMonth, dayOfMonth]", () => {
+    expect(parseYearlyRecurrence([3, 15])).toEqual({ month: 3, dayOfMonth: 15 });
+  });
+
+  it("rejects invalid month or day", () => {
+    expect(parseYearlyRecurrence([13, 15])).toBeNull();
+    expect(parseYearlyRecurrence([3, 32])).toBeNull();
+    expect(parseYearlyRecurrence([3])).toBeNull();
+  });
+});
+
+describe("serializeYearlyRecurrence", () => {
+  it("returns two-element array", () => {
+    expect(serializeYearlyRecurrence(12, 31)).toEqual([12, 31]);
   });
 });
 

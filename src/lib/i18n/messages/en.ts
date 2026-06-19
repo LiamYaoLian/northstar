@@ -224,6 +224,7 @@ export const en: Messages = {
     weekly: "Weekly",
     monthly: "Monthly",
     quarterly: "Quarterly",
+    yearly: "Yearly",
     monthDay: "Day of month",
     monthDayShortMonthHint:
       "If the month has fewer days, the task appears on the last day of that month.",
@@ -237,6 +238,27 @@ export const en: Messages = {
         2: "Month 2 (Feb, May, Aug, Nov)",
         3: "Month 3 (Mar, Jun, Sep, Dec)",
       })[slot],
+    yearMonth: "Month",
+    yearDay: "Day",
+    yearDayShortMonthHint:
+      "If the month has fewer days, the task appears on the last day of that month.",
+    calendarMonth: (month) =>
+      (
+        [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ] as const
+      )[month - 1] ?? String(month),
     carryOver: "Carry over missed weeks",
     carryOverWeeklyOnly: "Carry-over applies to weekly tasks only.",
     subtaskResetHint: "Subtasks reset when a new cycle opens.",
@@ -247,6 +269,23 @@ export const en: Messages = {
     monthlyOn: (day) => `Monthly · ${day}`,
     quarterlyOn: (monthInQuarter, day) =>
       `Quarterly · M${monthInQuarter} · ${day}`,
+    yearlyOn: (month, day) => {
+      const names = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ] as const;
+      return `Yearly · ${names[month - 1] ?? month} ${day}`;
+    },
     carryOverShort: "Carry over",
   },
   weekday: {

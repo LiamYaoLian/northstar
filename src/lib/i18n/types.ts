@@ -215,12 +215,17 @@ export type Messages = {
     weekly: string;
     monthly: string;
     quarterly: string;
+    yearly: string;
     monthDay: string;
     monthDayShortMonthHint: string;
     quarterDay: string;
     quarterDayShortMonthHint: string;
     quarterMonth: string;
     quarterMonthSlot: (slot: 1 | 2 | 3) => string;
+    yearMonth: string;
+    yearDay: string;
+    yearDayShortMonthHint: string;
+    calendarMonth: (month: number) => string;
     carryOver: string;
     carryOverWeeklyOnly: string;
     subtaskResetHint: string;
@@ -230,6 +235,7 @@ export type Messages = {
     weeklyOn: (days: string) => string;
     monthlyOn: (day: number) => string;
     quarterlyOn: (monthInQuarter: number, day: number) => string;
+    yearlyOn: (month: number, day: number) => string;
     carryOverShort: string;
   };
   weekday: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
