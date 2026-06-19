@@ -1,6 +1,7 @@
 import type { FocusTrack, PriorityFactors, Subtask, Task } from "@/lib/db/schema";
 
 import type { BreakdownPreviewResult } from "@/lib/tasks/subtask-diff";
+import type { ProjectOption } from "@/lib/tasks/enrich-tasks";
 
 export type PillarOption = {
   id: string;
@@ -12,6 +13,7 @@ export type PillarOption = {
 export type TaskWithMeta = Task & {
   pillarName?: string;
   pillarColor?: string;
+  projectName?: string;
   subtasks?: Subtask[];
 };
 
@@ -19,6 +21,8 @@ export type TaskCardProps = {
   task: TaskWithMeta;
   rank?: number;
   pillars?: PillarOption[];
+  projects?: ProjectOption[];
+  workPillarId?: string;
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onComplete?: (id: string) => void;
   onReopen?: (id: string) => void;
@@ -45,6 +49,8 @@ export type TaskCardProps = {
     pillarId: string | null,
     focusTrack?: string | null,
   ) => void;
+  onChangeProject?: (taskId: string, projectId: string | null) => void;
+  onProjectCreated?: (project: ProjectOption) => void;
   onUpdateEstimatedMin?: (taskId: string, minutes: number | null) => void;
   onUpdateTaskDates?: (
     taskId: string,

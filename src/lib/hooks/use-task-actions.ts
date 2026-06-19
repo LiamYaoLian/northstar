@@ -2,7 +2,8 @@ import { useCallback, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { Messages } from "@/lib/i18n/types";
 import { findWorkPillar, isWorkPillar } from "@/lib/pillars";
-import type { PillarOption } from "@/lib/tasks/enrich-tasks";
+import type { PillarOption, ProjectOption } from "@/lib/tasks/enrich-tasks";
+import { buildProjectOptimisticPatch } from "@/lib/tasks/project-optimistic";
 import type {
   BreakdownPreviewResult,
   ProposedSubtask,
@@ -15,6 +16,7 @@ type UseTaskActionsOptions = {
   errors: TaskActionErrors;
   onError: (message: string) => void;
   pillars?: PillarOption[];
+  projects?: ProjectOption[];
   applyOptimisticTaskPatch?: (
     id: string,
     patch: Record<string, unknown>,
@@ -41,6 +43,8 @@ function buildPillarOptimisticPatch(
     const workPillar = findWorkPillar(pillars);
     if (pillarId === null || !pillar || !isWorkPillar(pillar, workPillar)) {
       patch.focusTrack = null;
+      patch.projectId = null;
+      patch.projectName = null;
     }
   }
 
@@ -52,6 +56,7 @@ export function useTaskActions({
   errors,
   onError,
   pillars,
+  projects,
   applyOptimisticTaskPatch,
   applyOptimisticSubtaskPatch,
 }: UseTaskActionsOptions) {
@@ -109,6 +114,18 @@ export function useTaskActions({
       optimisticPatchTask(taskId, body, optimisticPatch);
     },
     [optimisticPatchTask, pillars],
+  );
+
+  const changeProject = useCallback(
+    (taskId: string, projectId: string | null) => {
+      const body = { projectId };
+      const optimisticPatch =
+        projects != null
+          ? buildProjectOptimisticPatch(projects, projectId)
+          : body;
+      optimisticPatchTask(taskId, body, optimisticPatch);
+    },
+    [optimisticPatchTask, projects],
   );
 
   const recalculatePriority = useCallback(async () => {
@@ -333,6 +350,7 @@ export function useTaskActions({
     recalculating,
     patchTask,
     changePillar,
+    changeProject,
     recalculatePriority,
     breakdownTask,
     applyBreakdown,

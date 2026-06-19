@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import {
-  createTask,
-  listTasksWithSubtasks,
-  listSubtasks,
-} from "@/lib/services/tasks";
+import { createTask, listTasksWithSubtasks, listSubtasks } from "@/lib/services/tasks";
+import { ProjectValidationError } from "@/lib/services/projects";
 import { requireUser } from "@/lib/auth/require-user";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
 import { parseCreateTaskRecurrenceFromBody } from "@/lib/api/tasks/schemas";
-import { toApiError } from "@/lib/auth/errors";
+import { toApiError, UnauthorizedError } from "@/lib/auth/errors";
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +20,9 @@ export async function GET(request: Request) {
   } catch (err) {
     const tzErr = tzErrorResponse(err);
     if (tzErr) return tzErr;
-    console.error("GET /api/tasks", err);
+    if (!(err instanceof UnauthorizedError)) {
+      console.error("GET /api/tasks", err);
+    }
     return toApiError(err, "Failed to list tasks");
   }
 }
@@ -42,6 +41,9 @@ export async function POST(request: Request) {
     const subtasks = task ? await listSubtasks(task.id, user.id) : [];
     return NextResponse.json({ task, subtasks });
   } catch (err) {
+    if (err instanceof ProjectValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     console.error("POST /api/tasks", err);
     return toApiError(err, "Failed to create task");
   }

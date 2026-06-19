@@ -94,6 +94,22 @@ export function filterTasksByPillarAndProject<T extends Task>(
   return filterTasksByProject(filterTasksByPillar(taskList, pillarId), projectId);
 }
 
+export function toProjectOptions(
+  projects: Array<{
+    id: string;
+    name: string;
+    pillarId: string;
+    focusTrack: string | null;
+  }>,
+): ProjectOption[] {
+  return projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    pillarId: project.pillarId,
+    focusTrack: project.focusTrack,
+  }));
+}
+
 export function mergeFilteredTaskReorder(
   allIds: string[],
   filteredIds: string[],

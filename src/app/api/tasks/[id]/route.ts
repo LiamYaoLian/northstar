@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { deleteTask, updateTask } from "@/lib/services/tasks";
+import { updateTask } from "@/lib/services/tasks";
+import { ProjectValidationError } from "@/lib/services/projects";
 import { patchTaskRecurrenceSchema } from "@/lib/api/tasks/schemas";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
@@ -43,6 +44,9 @@ export async function PATCH(
   } catch (err) {
     const tzErr = tzErrorResponse(err);
     if (tzErr) return tzErr;
+    if (err instanceof ProjectValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     console.error("PATCH /api/tasks/[id]", err);
     return toApiError(err, "Update failed");
   }

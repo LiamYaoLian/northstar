@@ -26,6 +26,7 @@ export type Messages = {
     updateFailed: string;
     updateTaskFailed: string;
     addTaskFailed: string;
+    createProjectFailed: string;
     breakdownFailed: string;
     updateSubtaskFailed: string;
     invalidTaskDateRange: string;
@@ -71,6 +72,15 @@ export type Messages = {
     statusDone: string;
     statusAll: string;
     activeEmpty: string;
+  };
+  projects: {
+    project: string;
+    projects: string;
+    noProject: string;
+    createProject: string;
+    allProjects: string;
+    filterByProject: string;
+    newProjectName: string;
   };
   completed: {
     title: string;
@@ -180,6 +190,7 @@ export type Messages = {
     category: string;
     uncategorized: string;
     focusTrack: string;
+    project: string;
   };
   onboarding: {
     title: string;

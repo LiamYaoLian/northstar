@@ -21,13 +21,18 @@ function devServerHint(status: number, url: string): string {
 import { clientTimezone } from "@/lib/tasks/timezone";
 import { withAutoTimezone } from "@/lib/api/with-tz-query";
 
+let signOutInFlight = false;
+
 export async function apiFetch<T>(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<T> {
   const rawUrl = typeof input === "string" ? input : input.url;
   const url = withAutoTimezone(rawUrl, clientTimezone());
-  const res = await fetch(typeof input === "string" ? url : new Request(url, input), init);
+  const res = await fetch(typeof input === "string" ? url : new Request(url, input), {
+    credentials: "same-origin",
+    ...init,
+  });
   let data: unknown;
   try {
     data = await res.json();
@@ -39,11 +44,12 @@ export async function apiFetch<T>(
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
       const pathname = window.location.pathname;
-      // Already on a public auth page — avoid redirect loop (e.g. TimerProvider on /login).
-      if (!pathname.startsWith("/login")) {
-        const loginUrl = new URL("/login", window.location.origin);
-        loginUrl.searchParams.set("callbackUrl", pathname);
-        window.location.assign(loginUrl.toString());
+      if (!pathname.startsWith("/login") && !signOutInFlight) {
+        signOutInFlight = true;
+        const callbackUrl = encodeURIComponent(pathname);
+        void import("next-auth/react").then(({ signOut }) =>
+          signOut({ callbackUrl: `/login?callbackUrl=${callbackUrl}` }),
+        );
       }
     }
     const base =

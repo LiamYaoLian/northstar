@@ -32,6 +32,7 @@ export const en: Messages = {
     updateFailed: "Update failed",
     updateTaskFailed: "Failed to update task",
     addTaskFailed: "Failed to add task",
+    createProjectFailed: "Could not create project.",
     breakdownFailed: "Breakdown failed",
     updateSubtaskFailed: "Failed to update subtask",
     invalidTaskDateRange: "Start date must be on or before due date",
@@ -77,6 +78,15 @@ export const en: Messages = {
     statusDone: "Done",
     statusAll: "All",
     activeEmpty: "No active tasks. Add one above, or check the Done tab.",
+  },
+  projects: {
+    project: "Project",
+    projects: "Projects",
+    noProject: "No project",
+    createProject: "New project…",
+    allProjects: "All projects",
+    filterByProject: "Filter by project",
+    newProjectName: "Project name",
   },
   completed: {
     title: "Completion log",
@@ -187,6 +197,7 @@ export const en: Messages = {
     category: "Category",
     uncategorized: "Uncategorized",
     focusTrack: "Sub-track",
+    project: "Project",
   },
   onboarding: {
     title: "Define your strategy",

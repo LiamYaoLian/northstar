@@ -83,6 +83,7 @@ export function TaskCategoryBadge({ task }: TaskCategoryBadgeProps) {
   const focusLabel = task.focusTrack
     ? translateFocusTrack(task.focusTrack, locale)
     : undefined;
+  const projectLabel = task.projectName;
 
   return (
     <span
@@ -91,6 +92,7 @@ export function TaskCategoryBadge({ task }: TaskCategoryBadgeProps) {
     >
       {pillarLabel}
       {focusLabel ? ` · ${focusLabel}` : ""}
+      {projectLabel ? ` · ${projectLabel}` : ""}
     </span>
   );
 }

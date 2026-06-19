@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { CategoryFilter } from "@/components/category-filter";
+import { ProjectFilter } from "@/components/project-filter";
+import { ProjectSelectWithCreate } from "@/components/project-select-with-create";
 import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
 import { TaskStatusFilterBar } from "@/components/task-status-filter";
@@ -21,12 +24,17 @@ import {
   TaskRecurrenceForm,
   defaultRecurrenceFormValue,
 } from "@/components/task-recurrence-form";
+import { findWorkPillar, WORK_PILLAR_NAME } from "@/lib/pillars";
 import {
   enrichTasksWithPillars,
+  enrichTasksWithProjects,
   filterTasksByPillar,
+  filterTasksByProject,
   mergeFilteredTaskReorder,
   parseStrategyPillars,
+  toProjectOptions,
   type PillarOption,
+  type ProjectOption,
   type TaskRow,
 } from "@/lib/tasks/enrich-tasks";
 import { recurrenceTypeUsesDays } from "@/lib/tasks/recurrence-types";
@@ -58,6 +66,7 @@ type RecurrencePreview = {
 
 export default function TasksPage() {
   const router = useRouter();
+  const { status: sessionStatus } = useSession();
   const { locale, t } = useLocale();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [todayTasks, setTodayTasks] = useState<TaskRow[]>([]);
@@ -65,7 +74,10 @@ export default function TasksPage() {
   const [newTaskPillarId, setNewTaskPillarId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pillars, setPillars] = useState<PillarOption[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [todayOnly, setTodayOnly] = useState(false);
   const [newTaskStartAt, setNewTaskStartAt] = useState(() =>
@@ -85,7 +97,7 @@ export default function TasksPage() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [todayData, tasksData, strategyData] = await Promise.all([
+      const [todayData, tasksData, strategyData, projectsData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks?status=today"),
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
         apiFetch<{
@@ -99,6 +111,14 @@ export default function TasksPage() {
             }[];
           } | null;
         }>("/api/strategy"),
+        apiFetch<{
+          projects: Array<{
+            id: string;
+            name: string;
+            pillarId: string;
+            focusTrack: string | null;
+          }>;
+        }>("/api/projects"),
       ]);
       if (!strategyData.hasStrategy) {
         router.replace("/onboarding");
@@ -108,33 +128,48 @@ export default function TasksPage() {
       const strategyPillars = parseStrategyPillars(
         strategyData.strategy?.pillars ?? [],
       );
+      const projectOptions = toProjectOptions(projectsData.projects);
       setPillars(strategyPillars);
-      setTodayTasks(
-        enrichTasksWithPillars(todayData.tasks, strategyPillars),
-      );
-      setTasks(enrichTasksWithPillars(tasksData.tasks, strategyPillars));
+      setProjects(projectOptions);
+      const enrich = (list: TaskRow[]) =>
+        enrichTasksWithProjects(
+          enrichTasksWithPillars(list, strategyPillars),
+          projectOptions,
+        );
+      setTodayTasks(enrich(todayData.tasks));
+      setTasks(enrich(tasksData.tasks));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.errors.loadFailed);
     }
   }, [router, t.errors.loadFailed]);
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated") return;
     void load();
-  }, [load]);
+  }, [load, sessionStatus]);
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated") return;
     return registerOnStop(() => {
       void load();
     });
-  }, [load, registerOnStop]);
+  }, [load, registerOnStop, sessionStatus]);
 
   useEffect(() => {
     if (newTaskPillarId) setAutoClassify(null);
   }, [newTaskPillarId]);
 
   useEffect(() => {
+    if (newTaskPillarId) return;
+    if (autoClassify?.pillarName !== WORK_PILLAR_NAME) {
+      setNewTaskProjectId("");
+    }
+  }, [autoClassify, newTaskPillarId]);
+
+
+  useEffect(() => {
     const trimmed = title.trim();
-    if (!trimmed || pillars.length === 0) {
+    if (!trimmed || pillars.length === 0 || sessionStatus !== "authenticated") {
       setAutoClassify(null);
       setAutoEstimate(null);
       setAutoRecurrence(null);
@@ -184,7 +219,7 @@ export default function TasksPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [title, pillars, newTaskPillarId, recurrenceTouched]);
+  }, [title, pillars, newTaskPillarId, recurrenceTouched, sessionStatus]);
 
   const autoLabel = useMemo(() => {
     if (!autoClassify?.pillarName) return null;
@@ -288,10 +323,37 @@ export default function TasksPage() {
     [],
   );
 
+  const workPillar = useMemo(() => findWorkPillar(pillars), [pillars]);
+  const showProjectFilters =
+    Boolean(workPillar) && categoryFilter === workPillar?.id;
+  const effectiveCreateWorkPillar = useMemo(() => {
+    if (newTaskPillarId) {
+      return newTaskPillarId === workPillar?.id;
+    }
+    return autoClassify?.pillarName === WORK_PILLAR_NAME;
+  }, [newTaskPillarId, workPillar, autoClassify]);
+  const showCreateProjectPicker =
+    Boolean(workPillar) && effectiveCreateWorkPillar;
+
+  const handleProjectCreated = useCallback((project: ProjectOption) => {
+    setProjects((current) => [...current, project]);
+  }, []);
+
+  const handleCategoryFilterChange = useCallback(
+    (pillarId: string | null) => {
+      setCategoryFilter(pillarId);
+      if (!workPillar || pillarId !== workPillar.id) {
+        setProjectFilter(null);
+      }
+    },
+    [workPillar],
+  );
+
   const {
     recalculating,
     patchTask,
     changePillar,
+    changeProject,
     recalculatePriority,
     breakdownTask,
     applyBreakdown,
@@ -312,6 +374,7 @@ export default function TasksPage() {
     errors: t.errors,
     onError: setError,
     pillars,
+    projects,
     applyOptimisticTaskPatch,
     applyOptimisticSubtaskPatch,
   });
@@ -328,6 +391,9 @@ export default function TasksPage() {
       setError(t.errors.invalidTaskDateRange);
       return;
     }
+    const resolvedPillarId =
+      newTaskPillarId ||
+      (newTaskProjectId && workPillar ? workPillar.id : undefined);
     try {
       setError(null);
       await apiFetch("/api/tasks", {
@@ -338,7 +404,8 @@ export default function TasksPage() {
           autoBreakdown: true,
           startAt,
           ...(dueAt ? { dueAt } : {}),
-          ...(newTaskPillarId ? { pillarId: newTaskPillarId } : {}),
+          ...(resolvedPillarId ? { pillarId: resolvedPillarId } : {}),
+          ...(newTaskProjectId ? { projectId: newTaskProjectId } : {}),
           ...(recurrenceTouched
             ? recurrence.recurrenceType !== "none"
               ? {
@@ -354,6 +421,7 @@ export default function TasksPage() {
       });
       setTitle("");
       setNewTaskPillarId("");
+      setNewTaskProjectId("");
       setNewTaskStartAt(defaultTaskStartAtInputValue(clientTimezone()));
       setNewTaskDueAt("");
       setRecurrence(defaultRecurrenceFormValue);
@@ -370,18 +438,19 @@ export default function TasksPage() {
   const filteredTasks = useMemo(() => {
     const byStatus = filterTasksByStatus(sourceTasks, statusFilter);
     const byPillar = filterTasksByPillar(byStatus, categoryFilter);
+    const byProject = filterTasksByProject(byPillar, projectFilter);
     if (statusFilter === "done") {
-      return sortDoneTasksByCompletedAt(byPillar);
+      return sortDoneTasksByCompletedAt(byProject);
     }
     if (todayOnly) {
-      return sortTasks(byPillar, "priority");
+      return sortTasks(byProject, "priority");
     }
-    return byPillar;
-  }, [sourceTasks, categoryFilter, statusFilter, todayOnly]);
+    return byProject;
+  }, [sourceTasks, categoryFilter, projectFilter, statusFilter, todayOnly]);
 
   const handleReorder = useCallback(
     async (orderedIds: string[]) => {
-      if (categoryFilter) {
+      if (categoryFilter || projectFilter) {
         await reorderTasks(
           mergeFilteredTaskReorder(
             tasks.map((task) => task.id),
@@ -393,7 +462,7 @@ export default function TasksPage() {
       }
       await reorderTasks(orderedIds);
     },
-    [categoryFilter, filteredTasks, reorderTasks, tasks],
+    [categoryFilter, projectFilter, filteredTasks, reorderTasks, tasks],
   );
 
   const taskMap = new Map(filteredTasks.map((task) => [task.id, task]));
@@ -409,7 +478,11 @@ export default function TasksPage() {
       task={task}
       rank={rank}
       pillars={pillars}
+      projects={projects}
+      workPillarId={workPillar?.id}
       onChangePillar={changePillar}
+      onChangeProject={changeProject}
+      onProjectCreated={handleProjectCreated}
       onBreakdown={breakdownTask}
       onApplyBreakdown={applyBreakdown}
       onAddSubtask={addSubtask}
@@ -476,6 +549,9 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-4">
+      {sessionStatus === "loading" ? (
+        <p className="text-sm text-muted">{t.common.loading}</p>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 className="text-lg font-semibold">{t.tasks.title}</h2>
         <div className="flex flex-col items-end gap-1">
@@ -516,7 +592,13 @@ export default function TasksPage() {
             <select
               className="rounded-md border border-border px-3 py-2 text-sm"
               value={newTaskPillarId}
-              onChange={(e) => setNewTaskPillarId(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setNewTaskPillarId(value);
+                if (!workPillar || value !== workPillar.id) {
+                  setNewTaskProjectId("");
+                }
+              }}
               aria-label={t.tasks.categoryOnCreate}
             >
               <option value="">{t.tasks.autoCategory}</option>
@@ -526,6 +608,18 @@ export default function TasksPage() {
                 </option>
               ))}
             </select>
+          )}
+          {showCreateProjectPicker && workPillar && (
+            <ProjectSelectWithCreate
+              value={newTaskProjectId}
+              projects={projects}
+              workPillarId={workPillar.id}
+              onChange={(projectId) =>
+                setNewTaskProjectId(projectId ?? "")
+              }
+              onProjectCreated={handleProjectCreated}
+              onError={setError}
+            />
           )}
           <button
             type="submit"
@@ -622,8 +716,16 @@ export default function TasksPage() {
       <CategoryFilter
         pillars={pillars}
         selectedPillarId={categoryFilter}
-        onChange={setCategoryFilter}
+        onChange={handleCategoryFilterChange}
       />
+
+      {showProjectFilters && (
+        <ProjectFilter
+          projects={projects}
+          selectedProjectId={projectFilter}
+          onChange={setProjectFilter}
+        />
+      )}
 
       <TaskStatusFilterBar value={statusFilter} onChange={setStatusFilter} />
 

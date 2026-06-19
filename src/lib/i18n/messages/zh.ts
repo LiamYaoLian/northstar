@@ -32,6 +32,7 @@ export const zh: Messages = {
     updateFailed: "更新失败",
     updateTaskFailed: "更新任务失败",
     addTaskFailed: "添加任务失败",
+    createProjectFailed: "创建项目失败",
     breakdownFailed: "拆解失败",
     updateSubtaskFailed: "更新子任务失败",
     invalidTaskDateRange: "开始日期不能晚于截止日期",
@@ -77,6 +78,15 @@ export const zh: Messages = {
     statusDone: "已完成",
     statusAll: "全部",
     activeEmpty: "暂无进行中任务。可在上方添加，或查看「已完成」。",
+  },
+  projects: {
+    project: "项目",
+    projects: "项目",
+    noProject: "无项目",
+    createProject: "新建项目…",
+    allProjects: "全部项目",
+    filterByProject: "按项目筛选",
+    newProjectName: "项目名称",
   },
   completed: {
     title: "完成记录",
@@ -187,6 +197,7 @@ export const zh: Messages = {
     category: "类别",
     uncategorized: "未分类",
     focusTrack: "子赛道",
+    project: "项目",
   },
   onboarding: {
     title: "定义你的战略",

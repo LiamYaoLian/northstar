@@ -226,9 +226,9 @@ flowchart LR
 - [x] Service：`projects.ts` CRUD；扩展 `createTask` / `buildTaskPatch` 的 project 校验与 focusTrack 默认
 - [x] 数据流：`enrichTasksWithProjects`、`filterTasksByProject`、`filterTasksByPillarAndProject`；`buildProjectOptimisticPatch`
 - [x] 单元/集成测试（39 passing + 12 UI todos）— 见下方测试清单
-- [ ] API routes：`/api/projects`、tasks 扩展
-- [ ] UI：TaskCard `TaskProjectSelect` + badge；Tasks 页 project 创建/筛选/reorder 合并逻辑
-- [ ] i18n
+- [x] API routes：`/api/projects`、tasks 扩展
+- [x] UI：TaskCard `TaskProjectSelect` + badge；Tasks 页 project 创建/筛选/reorder 合并逻辑
+- [x] i18n
 
 ## 测试清单（TDD — 已完成）
 

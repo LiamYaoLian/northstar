@@ -22,6 +22,7 @@ import {
   TaskCategoryBadge,
   TaskCategorySelect,
 } from "./task-category-select";
+import { TaskProjectSelect } from "./task-project-select";
 import { TaskCardHeader } from "./task-card-header";
 import { TaskManualSubtaskForm } from "./task-manual-subtask-form";
 import { TaskMetadataBadges } from "./task-metadata-badges";
@@ -29,11 +30,14 @@ import { TaskPriorityPanel } from "./task-priority-panel";
 import type { PriorityFactors, TaskCardProps } from "./types";
 import { useTaskCardForms } from "./use-task-card-forms";
 import { useTimer } from "@/components/timer-provider";
+import { isWorkPillarOption, resolveSelectedPillar } from "./utils";
 
 export function TaskCard({
   task,
   rank,
   pillars,
+  projects,
+  workPillarId,
   onComplete,
   onReopen,
   onLogTime,
@@ -50,6 +54,8 @@ export function TaskCard({
   onReorderSubtasks,
   onToggleIntimidating,
   onChangePillar,
+  onChangeProject,
+  onProjectCreated,
   onUpdateEstimatedMin,
   onUpdateTaskDates,
   onUpdateRecurrence,
@@ -76,6 +82,9 @@ export function TaskCard({
   const subtaskList = task.subtasks ?? [];
   const displayEstimatedMin = resolveTaskEstimatedMin(task.estimatedMin, subtaskList);
   const canEditCategory = Boolean(pillars && onChangePillar);
+  const selectedPillar = resolveSelectedPillar(task, pillars);
+  const showProjectSelect =
+    Boolean(projects && onChangeProject) && isWorkPillarOption(selectedPillar);
   const canEditEstimatedMin = Boolean(onUpdateEstimatedMin) && subtaskList.length === 0;
   const canEditDueDate = task.recurrenceType === "none";
 
@@ -151,6 +160,16 @@ export function TaskCard({
         ) : (
           <TaskCategoryBadge task={task} />
         )}
+        {showProjectSelect && projects && onChangeProject && workPillarId ? (
+          <TaskProjectSelect
+            task={task}
+            projects={projects}
+            workPillarId={workPillarId}
+            onChangeProject={onChangeProject}
+            onProjectCreated={onProjectCreated ?? (() => {})}
+            onError={onTimerError}
+          />
+        ) : null}
         <TaskMetadataBadges
           estimatedMin={displayEstimatedMin}
           startAt={task.startAt}
