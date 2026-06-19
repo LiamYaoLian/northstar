@@ -97,10 +97,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   project_id TEXT,
   status TEXT NOT NULL DEFAULT 'todo',
   intimidation_score INTEGER NOT NULL DEFAULT 1,
-  priority_score REAL NOT NULL DEFAULT 0,
   estimated_min INTEGER,
   due_at TEXT,
-  manual_sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   completed_at TEXT,
@@ -177,7 +175,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_north_stars_user_id ON north_stars (user_i
 CREATE INDEX IF NOT EXISTS idx_pillars_user_sort ON strategic_pillars (user_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_strategy_revisions_user_created ON strategy_revisions (user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks (user_id, status);
-CREATE INDEX IF NOT EXISTS idx_tasks_user_manual_sort ON tasks (user_id, manual_sort_order);
 CREATE INDEX IF NOT EXISTS idx_subtasks_user_parent ON subtasks (user_id, parent_task_id);
 CREATE INDEX IF NOT EXISTS idx_time_entries_user_started_at ON time_entries (user_id, started_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_active_time_sessions_user ON active_time_sessions (user_id);

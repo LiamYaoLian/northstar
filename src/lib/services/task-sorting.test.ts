@@ -1,13 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  filterActiveTasks,
   filterTasksByStatus,
   filterTasksDueToday,
-  rankAndLimit,
   sortDoneTasksByCompletedAt,
-  sortTasks,
   sortTasksByTime,
-  takeTopTasks,
 } from "./task-sorting";
 import { makeTask } from "@/lib/test-fixtures";
 import {
@@ -15,61 +11,10 @@ import {
   MONDAY_10AM_NY,
   MONDAY_8PM_NY,
   TUESDAY_10AM_NY,
-  WEDNESDAY_10AM_NY,
-  dailyTask,
   makeRecurringTaskRow,
   weeklyMonOnly,
   weeklyMonWed,
 } from "@/lib/tasks/recurrence-test-helpers";
-import { filterTasksByPillar } from "@/lib/tasks/enrich-tasks";
-
-describe("sortTasks", () => {
-  const rows = [
-    makeTask({ id: "a", priorityScore: 0.3, manualSortOrder: 2 }),
-    makeTask({ id: "b", priorityScore: 0.9, manualSortOrder: 0 }),
-    makeTask({ id: "c", priorityScore: 0.5, manualSortOrder: 1 }),
-  ];
-
-  it("sorts by priority score descending", () => {
-    expect(sortTasks(rows, "priority").map((t) => t.id)).toEqual(["b", "c", "a"]);
-  });
-
-  it("sorts by manual order", () => {
-    expect(sortTasks(rows, "manual").map((t) => t.id)).toEqual(["b", "c", "a"]);
-  });
-});
-
-describe("filterActiveTasks", () => {
-  it("excludes done tasks", () => {
-    const rows = [
-      makeTask({ id: "open", status: "todo" }),
-      makeTask({ id: "closed", status: "done" }),
-    ];
-    expect(filterActiveTasks(rows).map((t) => t.id)).toEqual(["open"]);
-  });
-});
-
-describe("rankAndLimit", () => {
-  it("sorts by priority and slices without filtering done", () => {
-    const rows = [
-      makeTask({ id: "low", priorityScore: 0.1, status: "todo" }),
-      makeTask({ id: "high", priorityScore: 0.9, status: "todo" }),
-      makeTask({ id: "done", priorityScore: 1, status: "done" }),
-    ];
-    expect(rankAndLimit(rows, 2).map((t) => t.id)).toEqual(["done", "high"]);
-  });
-});
-
-describe("takeTopTasks", () => {
-  it("returns highest-priority active tasks up to limit", () => {
-    const rows = [
-      makeTask({ id: "low", priorityScore: 0.1, status: "todo" }),
-      makeTask({ id: "high", priorityScore: 0.9, status: "todo" }),
-      makeTask({ id: "done", priorityScore: 1, status: "done" }),
-    ];
-    expect(takeTopTasks(rows, 1).map((t) => t.id)).toEqual(["high"]);
-  });
-});
 
 describe("filterTasksDueToday", () => {
   it("includes one-off todo tasks regardless of calendar day", () => {
@@ -154,35 +99,6 @@ describe("filterTasksDueToday", () => {
   });
 });
 
-describe("Today flow: pillar filter then rankAndLimit", () => {
-  it("returns up to 5 tasks from the selected pillar due today", () => {
-    const pool = [
-      makeRecurringTaskRow({
-        id: "w1",
-        pillarId: "p-work",
-        priorityScore: 0.9,
-        status: "todo",
-      }),
-      makeRecurringTaskRow({
-        id: "w2",
-        pillarId: "p-work",
-        priorityScore: 0.8,
-        status: "todo",
-      }),
-      makeRecurringTaskRow({
-        id: "h1",
-        pillarId: "p-health",
-        priorityScore: 1,
-        status: "todo",
-      }),
-    ];
-
-    const workOnly = filterTasksByPillar(pool, "p-work");
-    expect(rankAndLimit(workOnly, 5).map((t) => t.id)).toEqual(["w1", "w2"]);
-    expect(rankAndLimit(workOnly, 1).map((t) => t.id)).toEqual(["w1"]);
-  });
-});
-
 describe("filterTasksByStatus", () => {
   const rows = [
     makeTask({ id: "open", status: "todo" }),
@@ -218,18 +134,15 @@ describe("sortTasksByTime", () => {
       makeTask({
         id: "late",
         startAt: "2025-01-08T10:00:00.000Z",
-        priorityScore: 0.9,
       }),
       makeTask({
         id: "early",
         startAt: "2025-01-06T10:00:00.000Z",
-        priorityScore: 0.1,
       }),
       makeTask({
         id: "none",
         startAt: null,
         dueAt: null,
-        priorityScore: 1,
       }),
     ]);
     expect(sorted.map((t) => t.id)).toEqual(["early", "late", "none"]);
@@ -241,32 +154,28 @@ describe("sortTasksByTime", () => {
         id: "due-later",
         startAt: null,
         dueAt: "2025-01-10",
-        priorityScore: 0.5,
       }),
       makeTask({
         id: "due-soon",
         startAt: null,
         dueAt: "2025-01-07",
-        priorityScore: 0.5,
       }),
     ]);
     expect(sorted.map((t) => t.id)).toEqual(["due-soon", "due-later"]);
   });
 
-  it("uses priority as tie-breaker for the same time", () => {
+  it("uses id as tie-breaker for the same time", () => {
     const sorted = sortTasksByTime([
       makeTask({
-        id: "low",
+        id: "aaa",
         startAt: "2025-01-06T10:00:00.000Z",
-        priorityScore: 0.2,
       }),
       makeTask({
-        id: "high",
+        id: "bbb",
         startAt: "2025-01-06T10:00:00.000Z",
-        priorityScore: 0.9,
       }),
     ]);
-    expect(sorted.map((t) => t.id)).toEqual(["high", "low"]);
+    expect(sorted.map((t) => t.id)).toEqual(["aaa", "bbb"]);
   });
 });
 

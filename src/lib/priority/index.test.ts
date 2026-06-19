@@ -1,43 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
-  boardOrderNeedsScoreSync,
   computeTaskPriority,
-  priorityScoreFromRank,
   rerankAll,
   suggestFocusTrack,
 } from "./index";
 import { makeTask, testPillars } from "@/lib/test-fixtures";
-
-describe("priorityScoreFromRank", () => {
-  it("gives top item the highest score", () => {
-    expect(priorityScoreFromRank(0, 5)).toBe(1);
-    expect(priorityScoreFromRank(4, 5)).toBe(0.2);
-  });
-
-  it("handles single item", () => {
-    expect(priorityScoreFromRank(0, 1)).toBe(1);
-  });
-});
-
-describe("boardOrderNeedsScoreSync", () => {
-  it("detects higher item with lower score", () => {
-    expect(
-      boardOrderNeedsScoreSync([
-        { priorityScore: 0.33 },
-        { priorityScore: 0.36 },
-      ]),
-    ).toBe(true);
-  });
-
-  it("passes when scores match board order", () => {
-    expect(
-      boardOrderNeedsScoreSync([
-        { priorityScore: 0.75 },
-        { priorityScore: 0.5 },
-      ]),
-    ).toBe(false);
-  });
-});
 
 describe("computeTaskPriority", () => {
   it("increases score for overdue deadlines", () => {
@@ -69,14 +36,13 @@ describe("suggestFocusTrack", () => {
 describe("rerankAll", () => {
   it("ranks active tasks by score and assigns ranks", () => {
     const tasks = [
-      makeTask({ id: "low", priorityScore: 0.1, intimidationScore: 1 }),
+      makeTask({ id: "low", intimidationScore: 1 }),
       makeTask({
         id: "high",
-        priorityScore: 0.1,
         intimidationScore: 4,
         createdAt: "2020-01-01T00:00:00.000Z",
       }),
-      makeTask({ id: "done", status: "done", priorityScore: 1 }),
+      makeTask({ id: "done", status: "done" }),
     ];
     const results = rerankAll(tasks, testPillars, [], "进大厂");
     expect(results).toHaveLength(2);

@@ -299,23 +299,6 @@ export function useTaskActions({
     [reload, errors.reorderSubtasksFailed, onError],
   );
 
-  const reorderTasks = useCallback(
-    async (orderedIds: string[]) => {
-      try {
-        await apiFetch("/api/tasks/reorder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderedIds }),
-        });
-        await reload();
-      } catch (err) {
-        onError(err instanceof Error ? err.message : errors.reorderTasksFailed);
-        throw err;
-      }
-    },
-    [reload, errors.reorderTasksFailed, onError],
-  );
-
   const logTime = useCallback(
     async (taskId: string, minutes: number) => {
       try {
@@ -348,7 +331,6 @@ export function useTaskActions({
     deleteSubtask,
     deleteTask,
     reorderSubtasks,
-    reorderTasks,
     logTime,
   };
 }

@@ -44,18 +44,6 @@ async function initSchema(client: Client, db: Db) {
     );
   }
   await applyMigrations(client, db);
-
-  if (!process.env.TURSO_DATABASE_URL) {
-    const cols = await client.execute("PRAGMA table_info(tasks)");
-    const hasManualSort = cols.rows.some(
-      (row) => row.name === "manual_sort_order",
-    );
-    if (!hasManualSort) {
-      await client.execute(
-        "ALTER TABLE tasks ADD COLUMN manual_sort_order INTEGER NOT NULL DEFAULT 0",
-      );
-    }
-  }
 }
 
 const client = createDbClient();

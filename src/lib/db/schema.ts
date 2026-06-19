@@ -149,11 +149,9 @@ export const tasks = sqliteTable(
     projectId: text("project_id"),
     status: text("status").notNull().default("todo"), // todo | in_progress | done
     intimidationScore: integer("intimidation_score").notNull().default(1),
-    priorityScore: real("priority_score").notNull().default(0),
     estimatedMin: integer("estimated_min"),
     startAt: text("start_at"),
     dueAt: text("due_at"),
-    manualSortOrder: integer("manual_sort_order").notNull().default(0),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     completedAt: text("completed_at"),
@@ -163,10 +161,7 @@ export const tasks = sqliteTable(
       .notNull()
       .default(false),
   },
-  (table) => [
-    index("idx_tasks_user_status").on(table.userId, table.status),
-    index("idx_tasks_user_manual_sort").on(table.userId, table.manualSortOrder),
-  ],
+  (table) => [index("idx_tasks_user_status").on(table.userId, table.status)],
 );
 
 export const subtasks = sqliteTable(

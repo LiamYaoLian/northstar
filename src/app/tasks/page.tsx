@@ -97,7 +97,7 @@ export default function TasksPage() {
       setError(null);
       const [todayData, tasksData, strategyData, projectsData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks?status=today"),
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=priority"),
+        apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
         apiFetch<{
           hasStrategy: boolean;
           strategy: {

@@ -15,7 +15,6 @@ function renderTaskCard(
 ) {
   const task = makeTask({
     title: "Prepare deck",
-    priorityScore: 0.82,
   }) as React.ComponentProps<typeof TaskCard>["task"];
   task.pillarName = "工作";
   task.pillarColor = "#3b82f6";

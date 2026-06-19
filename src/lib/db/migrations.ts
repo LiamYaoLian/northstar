@@ -151,7 +151,6 @@ export async function addUserScopedIndexes(client: Client): Promise<void> {
   await client.execute("CREATE INDEX IF NOT EXISTS idx_pillars_user_sort ON strategic_pillars (user_id, sort_order)");
   await client.execute("CREATE INDEX IF NOT EXISTS idx_strategy_revisions_user_created ON strategy_revisions (user_id, created_at)");
   await client.execute("CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks (user_id, status)");
-  await client.execute("CREATE INDEX IF NOT EXISTS idx_tasks_user_manual_sort ON tasks (user_id, manual_sort_order)");
   await client.execute("CREATE INDEX IF NOT EXISTS idx_subtasks_user_parent ON subtasks (user_id, parent_task_id)");
   await client.execute("CREATE INDEX IF NOT EXISTS idx_time_entries_user_started_at ON time_entries (user_id, started_at)");
   await client.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_completion_events_user_task_completed ON task_completion_events (user_id, task_id, completed_at)");
@@ -159,12 +158,17 @@ export async function addUserScopedIndexes(client: Client): Promise<void> {
   await client.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_review_snapshots_user_period ON review_snapshots (user_id, period_start, period_end)");
 }
 
-export async function dropUnusedPriorityMetadataColumnsIfExist(
-  client: Client,
-): Promise<void> {
+export async function dropLegacyTaskSortColumnsIfExist(client: Client): Promise<void> {
+  await client.execute("DROP INDEX IF EXISTS idx_tasks_user_manual_sort");
+
   const cols = await client.execute("PRAGMA table_info(tasks)");
   const names = new Set(cols.rows.map((row) => String(row.name)));
-  for (const column of ["priority_factors", "priority_computed_at"]) {
+  for (const column of [
+    "priority_factors",
+    "priority_computed_at",
+    "priority_score",
+    "manual_sort_order",
+  ]) {
     if (!names.has(column)) continue;
     try {
       await client.execute(`ALTER TABLE tasks DROP COLUMN ${column}`);
@@ -407,7 +411,7 @@ export async function dedupeCompletionEvents(client: Client): Promise<number> {
 
 export async function applyMigrations(client: Client, db: Db) {
   await addAuthTablesIfMissing(client);
-  await dropUnusedPriorityMetadataColumnsIfExist(client);
+  await dropLegacyTaskSortColumnsIfExist(client);
   await safeDropIsPinnedIfExists(client);
   await dropIsEntryPointIfExists(client);
   await removeDeferFeatureIfPresent(client);

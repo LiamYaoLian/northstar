@@ -46,7 +46,7 @@ function CalendarPageContent() {
     try {
       setError(null);
       const [tasksData, strategyData, projectsData] = await Promise.all([
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
+        apiFetch<{ tasks: TaskRow[] }>("/api/tasks"),
         apiFetch<{
           hasStrategy: boolean;
           strategy: {

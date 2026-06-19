@@ -197,24 +197,3 @@ export function suggestFocusTrack(
   if (/投资|理财|研报|仓位|复盘/.test(t)) return "投资";
   return tracks[0]?.name ?? null;
 }
-
-export function boardOrderNeedsScoreSync(
-  activeInBoardOrder: Pick<Task, "priorityScore">[],
-): boolean {
-  for (let i = 0; i < activeInBoardOrder.length - 1; i++) {
-    if (
-      activeInBoardOrder[i].priorityScore + 1e-6 <
-      activeInBoardOrder[i + 1].priorityScore
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Map board rank (0 = top) to a 0–1 priority score. */
-export function priorityScoreFromRank(index: number, total: number): number {
-  if (total <= 0) return 0;
-  if (total === 1) return 1;
-  return Math.round(((total - index) / total) * 1000) / 1000;
-}

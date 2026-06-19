@@ -43,13 +43,8 @@ import {
 import type { RecurrenceInference } from "@/lib/tasks/infer-recurrence";
 import type { ClassifyResult } from "@/lib/tasks/classify";
 import {
-  applyManualReorderScores,
-  syncActivePriorityFromManualOrder,
-} from "@/lib/services/task-priority-sync";
-import {
-  sortTasks,
   filterTasksDueToday,
-  type TaskSortMode,
+  sortTasksByTime,
 } from "@/lib/services/task-sorting";
 import {
   subtaskIdsForResetPlan,
@@ -70,8 +65,6 @@ import {
 import { id, nowIso } from "@/lib/utils";
 import { and, eq, inArray } from "drizzle-orm";
 import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
-
-export type { TaskSortMode };
 
 export async function openRecurringOccurrences(
   db: ReturnType<typeof getDb>,
@@ -122,7 +115,6 @@ export async function openRecurringOccurrences(
 
 export async function listTasks(
   status?: string,
-  sort: TaskSortMode = "priority",
   tz?: string,
   userId?: string,
 ) {
@@ -136,19 +128,11 @@ export async function listTasks(
     ? await allRows.where(eq(tasks.userId, userId))
     : await allRows;
   const filtered = status ? all.filter((t) => t.status === status) : all;
-
-  await syncActivePriorityFromManualOrder(db, filtered, userId);
-  const syncedRows = db.select().from(tasks);
-  const synced = userId
-    ? await syncedRows.where(eq(tasks.userId, userId))
-    : await syncedRows;
-  const rows = status ? synced.filter((t) => t.status === status) : synced;
-  return sortTasks(rows, sort);
+  return sortTasksByTime(filtered);
 }
 
 export async function listDueTodayTasksWithSubtasks(
   tz?: string,
-  sort: TaskSortMode = "priority",
   now = new Date(),
   userId?: string,
 ) {
@@ -162,7 +146,7 @@ export async function listDueTodayTasksWithSubtasks(
     ? await allRows.where(eq(tasks.userId, userId))
     : await allRows;
   const dueToday = filterTasksDueToday(all, resolvedTz, now);
-  const sorted = sortTasks(dueToday, sort);
+  const sorted = sortTasksByTime(dueToday);
   const subtaskRows = db.select().from(subtasks);
   const allSubtasks = userId
     ? await subtaskRows.where(eq(subtasks.userId, userId))
@@ -176,17 +160,16 @@ export async function listDueTodayTasksWithSubtasks(
 
 export async function listTasksWithSubtasks(
   status?: string,
-  sort: TaskSortMode = "priority",
   tz?: string,
   userId?: string,
 ) {
   if (status === "today") {
-    return listDueTodayTasksWithSubtasks(tz, sort, new Date(), userId);
+    return listDueTodayTasksWithSubtasks(tz, new Date(), userId);
   }
 
   await ensureDbReady();
   const db = getDb();
-  const taskList = await listTasks(status, sort, tz, userId);
+  const taskList = await listTasks(status, tz, userId);
   const subtaskRows = db.select().from(subtasks);
   const allSubtasks = userId
     ? await subtaskRows.where(eq(subtasks.userId, userId))
@@ -255,15 +238,6 @@ export async function createTask(input: {
   const resolvedRecurrence = resolveCreateRecurrence(input, inferredRecurrence);
 
   const taskId = id();
-  const taskRows = db.select().from(tasks);
-  const allTasks = userId
-    ? await taskRows.where(eq(tasks.userId, userId))
-    : await taskRows;
-  const maxOrder = allTasks.reduce(
-    (max, t) => Math.max(max, t.manualSortOrder ?? 0),
-    0,
-  );
-
   const recurrenceType = resolvedRecurrence.recurrenceType;
   const recurrenceDays = serializeRecurrenceDays(
     recurrenceType,
@@ -294,14 +268,12 @@ export async function createTask(input: {
     projectId: project?.id ?? null,
     status: "todo",
     intimidationScore: input.intimidationScore ?? 2,
-    priorityScore: 0,
     estimatedMin: input.estimatedMin ?? estimate.estimatedMin ?? null,
     startAt: normalizedStart,
     dueAt: normalizedDue,
     recurrenceType,
     recurrenceDays,
     recurrenceCarryOver,
-    manualSortOrder: maxOrder + 1,
     createdAt: ts,
     updatedAt: ts,
   });
@@ -987,19 +959,6 @@ async function reindexSubtasks(parentTaskId: string, userId?: string) {
       .set({ sortOrder: i })
       .where(scopedSubtaskId(s.id, userId));
   }
-}
-
-export async function reorderTasks(orderedIds: string[], userId?: string) {
-  await ensureDbReady();
-  if (userId) {
-    const owned = await getDb()
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.userId, userId), inArray(tasks.id, orderedIds)));
-    if (owned.length !== orderedIds.length) return null;
-  }
-  await applyManualReorderScores(getDb(), orderedIds, userId);
-  return listTasks(undefined, "manual", undefined, userId);
 }
 
 export async function reorderSubtasks(taskId: string, orderedIds: string[], userId?: string) {

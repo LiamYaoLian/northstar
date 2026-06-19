@@ -13,9 +13,8 @@ export async function GET(request: Request) {
     const user = await requireUser();
     const tz = parseTzFromSearchParams(searchParams);
     const status = searchParams.get("status") ?? undefined;
-    const sort = searchParams.get("sort") === "manual" ? "manual" : "priority";
     return NextResponse.json({
-      tasks: await listTasksWithSubtasks(status, sort, tz, user.id),
+      tasks: await listTasksWithSubtasks(status, tz, user.id),
     });
   } catch (err) {
     const tzErr = tzErrorResponse(err);
