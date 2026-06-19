@@ -51,11 +51,11 @@ describe("TaskCard", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders title, rank, and priority score", () => {
+  it("renders title and rank", () => {
     renderTaskCard();
     expect(screen.getByText("Prepare deck")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
-    expect(screen.getByText(/82/)).toBeTruthy();
+    expect(screen.queryByText(/优先级/)).toBeNull();
   });
 
   it("updates task title on blur when onUpdateTitle is provided", async () => {

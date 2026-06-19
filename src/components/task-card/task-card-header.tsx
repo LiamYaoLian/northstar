@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type { TaskWithMeta } from "./types";
-import { formatPriorityScore } from "./utils";
 
 type TaskCardHeaderProps = {
   task: TaskWithMeta;
   rank?: number;
-  priorityLabel: string;
   editLabel?: string;
   onUpdateTitle?: (taskId: string, title: string) => void;
   children: React.ReactNode;
@@ -16,7 +14,6 @@ type TaskCardHeaderProps = {
 export function TaskCardHeader({
   task,
   rank,
-  priorityLabel,
   editLabel,
   onUpdateTitle,
   children,
@@ -73,9 +70,6 @@ export function TaskCardHeader({
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
           {children}
         </div>
-      </div>
-      <div className="text-right text-xs text-muted">
-        {priorityLabel} {formatPriorityScore(task.priorityScore)}
       </div>
     </div>
   );

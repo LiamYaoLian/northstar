@@ -153,7 +153,6 @@ export const en: Messages = {
     editDueDate: "Edit due date",
     dueDisabledForRecurrence: "Due dates don't apply to recurring tasks",
     intimidating: "Intimidating",
-    priority: "Priority",
     subtaskPlaceholder: "Subtask, e.g. list 3 key talking points",
     addingSubtask: "Adding...",
     addSubtask: "Add subtask",

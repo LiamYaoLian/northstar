@@ -9,10 +9,6 @@ export function isTaskIntimidating(intimidationScore: number): boolean {
   return intimidationScore >= 4;
 }
 
-export function formatPriorityScore(priorityScore: number): string {
-  return (priorityScore * 100).toFixed(0);
-}
-
 export function getDefaultLogMinutes(estimatedMin: number | null): number {
   return estimatedMin ?? 30;
 }

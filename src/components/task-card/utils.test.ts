@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  formatPriorityScore,
   getDefaultLogMinutes,
   getSubtaskProgress,
   isTaskIntimidating,
@@ -25,10 +24,6 @@ describe("task-card utils", () => {
   it("detects intimidating tasks", () => {
     expect(isTaskIntimidating(4)).toBe(true);
     expect(isTaskIntimidating(3)).toBe(false);
-  });
-
-  it("formats priority percentage", () => {
-    expect(formatPriorityScore(0.756)).toBe("76");
   });
 
   it("defaults log minutes to 30", () => {

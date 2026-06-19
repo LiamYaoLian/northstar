@@ -153,7 +153,6 @@ export const zh: Messages = {
     editDueDate: "编辑截止日期",
     dueDisabledForRecurrence: "重复任务不设截止日期",
     intimidating: "恐吓任务",
-    priority: "优先级",
     subtaskPlaceholder: "子任务，如：列出 3 个核心信息点",
     addingSubtask: "添加中...",
     addSubtask: "添加子任务",

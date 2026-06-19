@@ -144,7 +144,6 @@ export function TaskCard({
       <TaskCardHeader
         task={task}
         rank={rank}
-        priorityLabel={t.taskCard.priority}
         editLabel={t.taskCard.editTask}
         onUpdateTitle={onUpdateTitle}
       >

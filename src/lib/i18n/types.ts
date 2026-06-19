@@ -147,7 +147,6 @@ export type Messages = {
     clearStartDate: string;
     dueDisabledForRecurrence: string;
     intimidating: string;
-    priority: string;
     subtaskPlaceholder: string;
     addingSubtask: string;
     addSubtask: string;
