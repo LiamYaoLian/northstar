@@ -49,8 +49,6 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     status: "todo",
     intimidationScore: 2,
     priorityScore: 0.5,
-    priorityFactors: null,
-    priorityComputedAt: null,
     estimatedMin: 60,
     startAt: null,
     dueAt: null,

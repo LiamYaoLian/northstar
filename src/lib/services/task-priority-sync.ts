@@ -57,8 +57,6 @@ async function applyPriorityResults(
       .update(tasks)
       .set({
         priorityScore: priorityScoreFromRank(index, results.length),
-        priorityFactors: JSON.stringify(r.factors),
-        priorityComputedAt: ts,
         manualSortOrder: index,
         updatedAt: ts,
       })
@@ -96,7 +94,6 @@ export async function syncActivePriorityFromManualOrder(
         .update(tasks)
         .set({
           priorityScore: score,
-          priorityComputedAt: ts,
           updatedAt: ts,
         })
         .where(scopedTaskId(task.id, userId));
@@ -118,7 +115,6 @@ export async function applyManualReorderScores(
       .set({
         manualSortOrder: index,
         priorityScore: priorityScoreFromRank(index, total),
-        priorityComputedAt: ts,
         updatedAt: ts,
       })
       .where(scopedTaskId(taskId, userId));

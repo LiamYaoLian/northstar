@@ -98,8 +98,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   status TEXT NOT NULL DEFAULT 'todo',
   intimidation_score INTEGER NOT NULL DEFAULT 1,
   priority_score REAL NOT NULL DEFAULT 0,
-  priority_factors TEXT,
-  priority_computed_at TEXT,
   estimated_min INTEGER,
   due_at TEXT,
   manual_sort_order INTEGER NOT NULL DEFAULT 0,

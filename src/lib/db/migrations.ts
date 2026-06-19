@@ -159,6 +159,24 @@ export async function addUserScopedIndexes(client: Client): Promise<void> {
   await client.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_review_snapshots_user_period ON review_snapshots (user_id, period_start, period_end)");
 }
 
+export async function dropUnusedPriorityMetadataColumnsIfExist(
+  client: Client,
+): Promise<void> {
+  const cols = await client.execute("PRAGMA table_info(tasks)");
+  const names = new Set(cols.rows.map((row) => String(row.name)));
+  for (const column of ["priority_factors", "priority_computed_at"]) {
+    if (!names.has(column)) continue;
+    try {
+      await client.execute(`ALTER TABLE tasks DROP COLUMN ${column}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!message.includes("no such column")) {
+        throw err;
+      }
+    }
+  }
+}
+
 export async function safeDropIsPinnedIfExists(client: Client): Promise<void> {
   const cols = await client.execute("PRAGMA table_info(tasks)");
   const hasIsPinned = cols.rows.some((row) => row.name === "is_pinned");
@@ -389,6 +407,7 @@ export async function dedupeCompletionEvents(client: Client): Promise<number> {
 
 export async function applyMigrations(client: Client, db: Db) {
   await addAuthTablesIfMissing(client);
+  await dropUnusedPriorityMetadataColumnsIfExist(client);
   await safeDropIsPinnedIfExists(client);
   await dropIsEntryPointIfExists(client);
   await removeDeferFeatureIfPresent(client);

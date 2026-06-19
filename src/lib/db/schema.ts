@@ -150,8 +150,6 @@ export const tasks = sqliteTable(
     status: text("status").notNull().default("todo"), // todo | in_progress | done
     intimidationScore: integer("intimidation_score").notNull().default(1),
     priorityScore: real("priority_score").notNull().default(0),
-    priorityFactors: text("priority_factors"), // JSON
-    priorityComputedAt: text("priority_computed_at"),
     estimatedMin: integer("estimated_min"),
     startAt: text("start_at"),
     dueAt: text("due_at"),

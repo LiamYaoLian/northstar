@@ -44,7 +44,6 @@ import type { RecurrenceInference } from "@/lib/tasks/infer-recurrence";
 import type { ClassifyResult } from "@/lib/tasks/classify";
 import {
   applyManualReorderScores,
-  persistPriorities,
   syncActivePriorityFromManualOrder,
 } from "@/lib/services/task-priority-sync";
 import {

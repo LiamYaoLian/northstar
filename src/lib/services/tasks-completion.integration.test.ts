@@ -71,8 +71,6 @@ describe("updateTask undoes accidental completions", () => {
       status: "todo",
       intimidationScore: 2,
       priorityScore: 0,
-      priorityFactors: null,
-      priorityComputedAt: null,
       estimatedMin: 30,
       dueAt: null,
       manualSortOrder: 999,
