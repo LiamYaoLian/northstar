@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  formatFactorPercent,
   formatPriorityScore,
   getDefaultLogMinutes,
   getSubtaskProgress,
@@ -28,9 +27,8 @@ describe("task-card utils", () => {
     expect(isTaskIntimidating(3)).toBe(false);
   });
 
-  it("formats priority and factor percentages", () => {
+  it("formats priority percentage", () => {
     expect(formatPriorityScore(0.756)).toBe("76");
-    expect(formatFactorPercent(0.333)).toBe("33");
   });
 
   it("defaults log minutes to 30", () => {

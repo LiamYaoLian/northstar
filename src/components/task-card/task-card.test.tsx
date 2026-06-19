@@ -16,14 +16,6 @@ function renderTaskCard(
   const task = makeTask({
     title: "Prepare deck",
     priorityScore: 0.82,
-    priorityFactors: JSON.stringify({
-      strategicUrgency: 0.5,
-      deadlinePressure: 0.2,
-      intimidationEscalation: 0,
-      dependencyBlocker: 0,
-      staleness: 0.1,
-      recentlyDonePenalty: 0,
-    }),
   }) as React.ComponentProps<typeof TaskCard>["task"];
   task.pillarName = "工作";
   task.pillarColor = "#3b82f6";
@@ -77,16 +69,6 @@ describe("TaskCard", () => {
     await user.tab();
 
     expect(onUpdateTitle).toHaveBeenCalledWith("t1", "Ship deck");
-  });
-
-  it("shows priority factor panel when why button clicked", async () => {
-    const user = userEvent.setup();
-    renderTaskCard();
-
-    await user.click(screen.getByRole("button", { name: /为什么排这里/i }));
-
-    expect(screen.getByText(/战略纠偏: 50/)).toBeTruthy();
-    expect(screen.getByText(/截止压力: 20/)).toBeTruthy();
   });
 
   it("calls onComplete when complete clicked", async () => {

@@ -167,16 +167,11 @@ export type Messages = {
     breakdownConfirm: string;
     breakdownCancel: string;
     breakdownApplying: string;
-    whyRanked: string;
     unmarkIntimidating: string;
     markIntimidating: string;
     logTime: string;
     complete: string;
     reopen: string;
-    factorStrategic: string;
-    factorDeadline: string;
-    factorIntimidation: string;
-    factorStaleness: string;
     deleteSubtask: string;
     deleteTask: string;
     editTask: string;

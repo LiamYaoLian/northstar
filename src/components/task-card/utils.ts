@@ -13,10 +13,6 @@ export function formatPriorityScore(priorityScore: number): string {
   return (priorityScore * 100).toFixed(0);
 }
 
-export function formatFactorPercent(value: number): string {
-  return (value * 100).toFixed(0);
-}
-
 export function getDefaultLogMinutes(estimatedMin: number | null): number {
   return estimatedMin ?? 30;
 }

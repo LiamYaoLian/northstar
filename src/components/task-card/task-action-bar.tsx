@@ -17,7 +17,6 @@ type TaskActionBarProps = {
   showAiBreakdown: boolean;
   onToggleManual: () => void;
   onToggleAiBreakdown: () => void;
-  onToggleWhy: () => void;
   onToggleIntimidating?: (id: string, intimidating: boolean) => void;
   onLogTime?: (id: string, minutes: number) => void;
   onComplete?: (id: string) => void;
@@ -34,7 +33,6 @@ export function TaskActionBar({
   showAiBreakdown,
   onToggleManual,
   onToggleAiBreakdown,
-  onToggleWhy,
   onToggleIntimidating,
   onLogTime,
   onComplete,
@@ -140,7 +138,6 @@ export function TaskActionBar({
               😨
             </button>
           )}
-          <ActionButton onClick={onToggleWhy}>{t.taskCard.whyRanked}</ActionButton>
           {onComplete && task.status !== "done" && (
             <ActionButton onClick={() => onComplete(task.id)}>
               {t.taskCard.complete}

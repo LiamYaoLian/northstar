@@ -1,4 +1,4 @@
-import type { FocusTrack, PriorityFactors, Subtask, Task } from "@/lib/db/schema";
+import type { FocusTrack, Subtask, Task } from "@/lib/db/schema";
 
 import type { BreakdownPreviewResult } from "@/lib/tasks/subtask-diff";
 import type { ProjectOption } from "@/lib/tasks/enrich-tasks";
@@ -66,4 +66,3 @@ export type TaskCardProps = {
   ) => void;
 };
 
-export type { PriorityFactors };

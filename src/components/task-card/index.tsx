@@ -12,7 +12,7 @@ import {
   recurrenceFormMatchesTask,
 } from "@/components/task-recurrence-form";
 import { useLocale } from "@/lib/i18n/context";
-import { parseJson, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { parseRecurrenceDays } from "@/lib/tasks/recurrence-types";
 import { resolveTaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
 import { TaskBreakdownDiff } from "./task-breakdown-diff";
@@ -26,8 +26,7 @@ import { TaskProjectSelect } from "./task-project-select";
 import { TaskCardHeader } from "./task-card-header";
 import { TaskManualSubtaskForm } from "./task-manual-subtask-form";
 import { TaskMetadataBadges } from "./task-metadata-badges";
-import { TaskPriorityPanel } from "./task-priority-panel";
-import type { PriorityFactors, TaskCardProps } from "./types";
+import type { TaskCardProps } from "./types";
 import { useTaskCardForms } from "./use-task-card-forms";
 import { useTimer } from "@/components/timer-provider";
 import { isWorkPillarOption, resolveSelectedPillar } from "./utils";
@@ -63,7 +62,6 @@ export function TaskCard({
   const { t } = useLocale();
   const { isRunningOnTask, overtime, cancel } = useTimer();
   const runningHere = isRunningOnTask(task.id);
-  const [showWhy, setShowWhy] = useState(false);
   const [showRecurrence, setShowRecurrence] = useState(false);
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceFormValue>(() => ({
     recurrenceType: task.recurrenceType as RecurrenceFormValue["recurrenceType"],
@@ -78,7 +76,6 @@ export function TaskCard({
       recurrenceCarryOver: task.recurrenceCarryOver,
     });
   }, [task.recurrenceType, task.recurrenceDays, task.recurrenceCarryOver]);
-  const factors = parseJson<PriorityFactors | null>(task.priorityFactors, null);
   const subtaskList = task.subtasks ?? [];
   const displayEstimatedMin = resolveTaskEstimatedMin(task.estimatedMin, subtaskList);
   const canEditCategory = Boolean(pillars && onChangePillar);
@@ -268,7 +265,6 @@ export function TaskCard({
         showAiBreakdown={forms.showAiBreakdown}
         onToggleManual={forms.toggleManual}
         onToggleAiBreakdown={forms.toggleAiBreakdown}
-        onToggleWhy={() => setShowWhy((v) => !v)}
         onToggleIntimidating={onToggleIntimidating}
         onLogTime={onLogTime}
         onTimerError={onTimerError}
@@ -277,8 +273,6 @@ export function TaskCard({
         hasAddSubtask={Boolean(onAddSubtask)}
         hasBreakdown={Boolean(onBreakdown)}
       />
-
-      {showWhy && factors && <TaskPriorityPanel factors={factors} />}
     </Card>
   );
 }
