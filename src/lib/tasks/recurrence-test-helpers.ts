@@ -17,6 +17,10 @@ export const FIFTEENTH_10AM_NY = new Date("2025-01-15T15:00:00.000Z");
 export const FEB_FIFTEENTH_10AM_NY = new Date("2025-02-15T15:00:00.000Z");
 /** 2025-02-28 Fri 10am NY */
 export const FEB_LAST_10AM_NY = new Date("2025-02-28T15:00:00.000Z");
+/** 2025-04-15 Tue 10am NY (EDT) */
+export const APR_FIFTEENTH_10AM_NY = new Date("2025-04-15T14:00:00.000Z");
+/** 2025-05-15 Thu 10am NY (EDT) */
+export const MAY_FIFTEENTH_10AM_NY = new Date("2025-05-15T14:00:00.000Z");
 
 export const WEEKLY_MON_WED = JSON.stringify([1, 3]);
 export const WEEKLY_MON_ONLY = JSON.stringify([1]);
@@ -74,6 +78,19 @@ export function monthlyOnDay(
   return makeRecurrenceTask({
     recurrenceType: "monthly",
     recurrenceDays: JSON.stringify([day]),
+    recurrenceCarryOver: false,
+    ...overrides,
+  });
+}
+
+export function quarterlyOnDay(
+  day: number,
+  monthInQuarter: 1 | 2 | 3 = 1,
+  overrides: Partial<RecurrenceTaskFields> = {},
+): RecurrenceTaskFields {
+  return makeRecurrenceTask({
+    recurrenceType: "quarterly",
+    recurrenceDays: JSON.stringify([monthInQuarter, day]),
     recurrenceCarryOver: false,
     ...overrides,
   });

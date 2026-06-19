@@ -1,11 +1,13 @@
-import { parseRecurrenceDays, type RecurrenceType } from "./recurrence-types";
+import { parseRecurrenceDays, parseQuarterlyRecurrence, type RecurrenceType } from "./recurrence-types";
 
 export type RecurrenceLabelMessages = {
   daily: string;
   weekly: string;
   monthly: string;
+  quarterly: string;
   weeklyOn: (days: string) => string;
   monthlyOn: (day: number) => string;
+  quarterlyOn: (monthInQuarter: number, day: number) => string;
   carryOverShort: string;
   weekday: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
 };
@@ -36,6 +38,12 @@ export function formatRecurrenceFrequency(
   } else if (recurrenceType === "monthly") {
     const day = parseRecurrenceDays(recurrenceDays)?.find((d) => d >= 1 && d <= 31);
     label = day != null ? messages.monthlyOn(day) : messages.monthly;
+  } else if (recurrenceType === "quarterly") {
+    const config = parseQuarterlyRecurrence(parseRecurrenceDays(recurrenceDays));
+    label =
+      config != null
+        ? messages.quarterlyOn(config.monthInQuarter, config.dayOfMonth)
+        : messages.quarterly;
   } else {
     return null;
   }

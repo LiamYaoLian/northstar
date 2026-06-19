@@ -5,8 +5,11 @@ const messages = {
   daily: "每天",
   weekly: "每周",
   monthly: "每月",
+  quarterly: "每季度",
   weeklyOn: (days: string) => `每周 ${days}`,
   monthlyOn: (day: number) => `每月 ${day} 日`,
+  quarterlyOn: (monthInQuarter: number, day: number) =>
+    `每季度第 ${monthInQuarter} 月 ${day} 日`,
   carryOverShort: "补做",
   weekday: {
     1: "一",
@@ -46,5 +49,11 @@ describe("formatRecurrenceFrequency", () => {
     expect(
       formatRecurrenceFrequency("monthly", JSON.stringify([15]), false, messages),
     ).toBe("每月 15 日");
+  });
+
+  it("formats quarterly recurrence with month slot and day", () => {
+    expect(
+      formatRecurrenceFrequency("quarterly", JSON.stringify([2, 1]), false, messages),
+    ).toBe("每季度第 2 月 1 日");
   });
 });

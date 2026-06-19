@@ -53,7 +53,7 @@ export type TaskCardProps = {
   onUpdateRecurrence?: (
     taskId: string,
     value: {
-      recurrenceType: "none" | "daily" | "weekly" | "monthly";
+      recurrenceType: "none" | "daily" | "weekly" | "monthly" | "quarterly";
       recurrenceDays: number[];
       recurrenceCarryOver: boolean;
     },

@@ -1,9 +1,39 @@
 import { describe, it, expect } from "vitest";
 import {
+  parseQuarterlyRecurrence,
   parseRecurrenceDays,
+  serializeQuarterlyRecurrence,
   toRecurrenceFields,
 } from "./recurrence-types";
 import { WEEKLY_MON_WED } from "./recurrence-test-helpers";
+
+describe("parseQuarterlyRecurrence", () => {
+  it("parses [monthInQuarter, dayOfMonth]", () => {
+    expect(parseQuarterlyRecurrence([2, 15])).toEqual({
+      monthInQuarter: 2,
+      dayOfMonth: 15,
+    });
+  });
+
+  it("treats legacy [day] as slot 1", () => {
+    expect(parseQuarterlyRecurrence([15])).toEqual({
+      monthInQuarter: 1,
+      dayOfMonth: 15,
+    });
+  });
+
+  it("rejects invalid slots or days", () => {
+    expect(parseQuarterlyRecurrence([4, 15])).toBeNull();
+    expect(parseQuarterlyRecurrence([2, 32])).toBeNull();
+    expect(parseQuarterlyRecurrence([])).toBeNull();
+  });
+});
+
+describe("serializeQuarterlyRecurrence", () => {
+  it("returns two-element array", () => {
+    expect(serializeQuarterlyRecurrence(3, 1)).toEqual([3, 1]);
+  });
+});
 
 describe("parseRecurrenceDays", () => {
   it("parses valid ISO weekday JSON array", () => {

@@ -1,11 +1,17 @@
 "use client";
 
-import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
+import type { QuarterMonthSlot, RecurrenceType } from "@/lib/tasks/recurrence-types";
+import {
+  defaultQuarterMonthSlot,
+  parseQuarterlyRecurrence,
+  serializeQuarterlyRecurrence,
+} from "@/lib/tasks/recurrence-types";
 import { useLocale } from "@/lib/i18n/context";
 import type { ReactNode } from "react";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+const QUARTER_MONTH_SLOTS = [1, 2, 3] as const;
 
 export type RecurrenceFormValue = {
   recurrenceType: RecurrenceType;
@@ -22,6 +28,10 @@ type TaskRecurrenceFormProps = {
 
 function defaultMonthDay(): number {
   return new Date().getDate();
+}
+
+function defaultQuarterlyDays(): number[] {
+  return serializeQuarterlyRecurrence(defaultQuarterMonthSlot(), defaultMonthDay());
 }
 
 export function TaskRecurrenceForm({
@@ -42,7 +52,17 @@ export function TaskRecurrenceForm({
             ? value.recurrenceDays.some((d) => d >= 1 && d <= 31)
               ? value.recurrenceDays.filter((d) => d >= 1 && d <= 31)
               : [defaultMonthDay()]
-            : [],
+            : recurrenceType === "quarterly"
+              ? (() => {
+                  const parsed = parseQuarterlyRecurrence(value.recurrenceDays);
+                  return parsed
+                    ? serializeQuarterlyRecurrence(
+                        parsed.monthInQuarter,
+                        parsed.dayOfMonth,
+                      )
+                    : defaultQuarterlyDays();
+                })()
+              : [],
       recurrenceCarryOver:
         recurrenceType === "weekly" ? value.recurrenceCarryOver : false,
     });
@@ -59,11 +79,32 @@ export function TaskRecurrenceForm({
     onChange({ ...value, recurrenceDays: [day] });
   }
 
+  const quarterlyConfig =
+    value.recurrenceType === "quarterly"
+      ? parseQuarterlyRecurrence(value.recurrenceDays)
+      : null;
+
+  function setQuarterMonth(monthInQuarter: QuarterMonthSlot) {
+    const day = quarterlyConfig?.dayOfMonth ?? defaultMonthDay();
+    onChange({
+      ...value,
+      recurrenceDays: serializeQuarterlyRecurrence(monthInQuarter, day),
+    });
+  }
+
+  function setQuarterDay(day: number) {
+    const monthInQuarter = quarterlyConfig?.monthInQuarter ?? defaultQuarterMonthSlot();
+    onChange({
+      ...value,
+      recurrenceDays: serializeQuarterlyRecurrence(monthInQuarter, day),
+    });
+  }
+
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <div className="flex flex-wrap gap-2">
         {leadingButton}
-        {(["none", "daily", "weekly", "monthly"] as const).map((type) => (
+        {(["none", "daily", "weekly", "monthly", "quarterly"] as const).map((type) => (
           <button
             key={type}
             type="button"
@@ -128,6 +169,42 @@ export function TaskRecurrenceForm({
             </select>
           </label>
           <p className="text-xs text-muted">{t.recurrence.monthDayShortMonthHint}</p>
+        </>
+      )}
+
+      {value.recurrenceType === "quarterly" && (
+        <>
+          <label className="flex items-center gap-2 text-xs text-muted">
+            {t.recurrence.quarterMonth}
+            <select
+              value={quarterlyConfig?.monthInQuarter ?? defaultQuarterMonthSlot()}
+              onChange={(e) =>
+                setQuarterMonth(Number(e.target.value) as QuarterMonthSlot)
+              }
+              className="rounded-md border border-border px-2 py-1 text-xs"
+            >
+              {QUARTER_MONTH_SLOTS.map((slot) => (
+                <option key={slot} value={slot}>
+                  {t.recurrence.quarterMonthSlot(slot)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted">
+            {t.recurrence.quarterDay}
+            <select
+              value={quarterlyConfig?.dayOfMonth ?? defaultMonthDay()}
+              onChange={(e) => setQuarterDay(Number(e.target.value))}
+              className="rounded-md border border-border px-2 py-1 text-xs"
+            >
+              {MONTH_DAYS.map((day) => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-xs text-muted">{t.recurrence.quarterDayShortMonthHint}</p>
         </>
       )}
 

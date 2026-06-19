@@ -26,6 +26,21 @@ describe("ruleBasedInferRecurrence", () => {
     });
   });
 
+  it("detects quarterly with explicit keywords", () => {
+    expect(ruleBasedInferRecurrence("每季度1号复盘")).toMatchObject({
+      recurrenceType: "quarterly",
+      recurrenceDays: [1, 1],
+    });
+    expect(ruleBasedInferRecurrence("quarterly review")).toMatchObject({
+      recurrenceType: "quarterly",
+      recurrenceDays: [1, 1],
+    });
+    expect(ruleBasedInferRecurrence("每季度第2个月15号")).toMatchObject({
+      recurrenceType: "quarterly",
+      recurrenceDays: [2, 15],
+    });
+  });
+
   it("defaults to none without explicit recurrence signals", () => {
     expect(ruleBasedInferRecurrence("写 PRD")).toMatchObject({
       recurrenceType: "none",
@@ -58,5 +73,15 @@ describe("normalizeRecurrenceInference", () => {
       recurrenceType: "daily",
       recurrenceCarryOver: false,
     });
+  });
+
+  it("downgrades quarterly without days to none", () => {
+    expect(
+      normalizeRecurrenceInference({
+        recurrenceType: "quarterly",
+        recurrenceDays: [],
+        source: "openai",
+      }),
+    ).toMatchObject({ recurrenceType: "none" });
   });
 });

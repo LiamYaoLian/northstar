@@ -19,9 +19,12 @@ import {
   FIFTEENTH_10AM_NY,
   FEB_FIFTEENTH_10AM_NY,
   FEB_LAST_10AM_NY,
+  APR_FIFTEENTH_10AM_NY,
+  MAY_FIFTEENTH_10AM_NY,
   dailyTask,
   makeRecurrenceTask,
   monthlyOnDay,
+  quarterlyOnDay,
   weeklyMonOnly,
   weeklyMonWed,
 } from "./recurrence-test-helpers";
@@ -387,5 +390,42 @@ describe("monthly recurrence", () => {
     expect(
       matchesRecurrenceDay(task, FEB_FIFTEENTH_10AM_NY, TEST_TZ),
     ).toBe(false);
+  });
+});
+
+describe("quarterly recurrence", () => {
+  it("matches only on the configured day in quarter-start months (slot 1)", () => {
+    const task = quarterlyOnDay(15, 1);
+    expect(matchesRecurrenceDay(task, FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+    expect(matchesRecurrenceDay(task, APR_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+    expect(matchesRecurrenceDay(task, FEB_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(false);
+  });
+
+  it("matches slot 2 months (Feb, May, Aug, Nov)", () => {
+    const task = quarterlyOnDay(15, 2);
+    expect(matchesRecurrenceDay(task, FEB_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+    expect(matchesRecurrenceDay(task, MAY_FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+    expect(matchesRecurrenceDay(task, FIFTEENTH_10AM_NY, TEST_TZ)).toBe(false);
+  });
+
+  it("supports legacy single-day encoding as slot 1", () => {
+    const task = quarterlyOnDay(15);
+    expect(matchesRecurrenceDay(task, FIFTEENTH_10AM_NY, TEST_TZ)).toBe(true);
+  });
+
+  it("shows on today when due and not completed this cycle", () => {
+    expect(
+      shouldShowOnToday(quarterlyOnDay(15, 1), FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(true);
+  });
+
+  it("resets on the next quarter occurrence", () => {
+    const doneThisQuarter = quarterlyOnDay(15, 1, {
+      status: "done",
+      completedAt: FIFTEENTH_10AM_NY.toISOString(),
+    });
+    expect(
+      needsOccurrenceReset(doneThisQuarter, APR_FIFTEENTH_10AM_NY, TEST_TZ),
+    ).toBe(true);
   });
 });

@@ -1,11 +1,16 @@
 import type { RecurrenceTaskFields } from "./recurrence-types";
-import { parseRecurrenceDays } from "./recurrence-types";
+import {
+  isQuarterMonth,
+  parseQuarterlyRecurrence,
+  parseRecurrenceDays,
+} from "./recurrence-types";
 import {
   addLocalDays,
   dayOfMonthInTz,
   daysInLocalMonth,
   endOfLocalDay,
   isoWeekdayInTz,
+  monthInTz,
   startOfLocalDay,
 } from "./timezone";
 
@@ -34,6 +39,24 @@ function monthlyDayMatches(
   });
 }
 
+function quarterlyDayMatches(
+  task: RecurrenceTaskFields,
+  instant: Date,
+  tz: string,
+): boolean {
+  const days = parseRecurrenceDays(task.recurrenceDays);
+  const config = parseQuarterlyRecurrence(days);
+  if (!config) return false;
+  const month = monthInTz(instant, tz);
+  if (!isQuarterMonth(month, config.monthInQuarter)) {
+    return false;
+  }
+  const day = dayOfMonthInTz(instant, tz);
+  const monthLength = daysInLocalMonth(instant, tz);
+  const effectiveDay = Math.min(config.dayOfMonth, monthLength);
+  return day === effectiveDay;
+}
+
 function scheduleMatches(
   task: RecurrenceTaskFields,
   instant: Date,
@@ -45,6 +68,9 @@ function scheduleMatches(
   }
   if (task.recurrenceType === "monthly") {
     return monthlyDayMatches(task, instant, tz);
+  }
+  if (task.recurrenceType === "quarterly") {
+    return quarterlyDayMatches(task, instant, tz);
   }
   return false;
 }

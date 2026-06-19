@@ -222,8 +222,18 @@ export const zh: Messages = {
     daily: "每天",
     weekly: "每周",
     monthly: "每月",
+    quarterly: "每季度",
     monthDay: "每月第几天",
     monthDayShortMonthHint: "若当月天数不足，则在该月最后一天出现。",
+    quarterDay: "每季度第几天",
+    quarterDayShortMonthHint: "若当月天数不足，则在该月最后一天出现。",
+    quarterMonth: "季度内第几月",
+    quarterMonthSlot: (slot) =>
+      ({
+        1: "第 1 月（1、4、7、10 月）",
+        2: "第 2 月（2、5、8、11 月）",
+        3: "第 3 月（3、6、9、12 月）",
+      })[slot],
     carryOver: "错过周期补做",
     carryOverWeeklyOnly: "补做仅适用于每周任务。",
     subtaskResetHint: "新周期开始时子任务会重置。",
@@ -232,6 +242,7 @@ export const zh: Messages = {
     editRecurrence: "重复",
     weeklyOn: (days) => `每周 ${days}`,
     monthlyOn: (day) => `每月 ${day} 日`,
+    quarterlyOn: (monthInQuarter, day) => `每季度第 ${monthInQuarter} 月 ${day} 日`,
     carryOverShort: "补做",
   },
   weekday: {

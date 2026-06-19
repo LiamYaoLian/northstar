@@ -58,6 +58,38 @@ describe("createTaskRecurrenceSchema", () => {
     ).toThrow();
   });
 
+  it("accepts quarterly with month slot and day of month", () => {
+    const result = createTaskRecurrenceSchema.parse({
+      recurrenceType: "quarterly",
+      recurrenceDays: [2, 1],
+    });
+    expect(result.recurrenceDays).toEqual([2, 1]);
+    expect(result.recurrenceCarryOver).toBe(false);
+  });
+
+  it("normalizes legacy quarterly single-day to slot 1", () => {
+    const result = createTaskRecurrenceSchema.parse({
+      recurrenceType: "quarterly",
+      recurrenceDays: [15],
+    });
+    expect(result.recurrenceDays).toEqual([1, 15]);
+  });
+
+  it("requires valid quarterly recurrenceDays", () => {
+    expect(() =>
+      createTaskRecurrenceSchema.parse({
+        recurrenceType: "quarterly",
+        recurrenceDays: [],
+      }),
+    ).toThrow();
+    expect(() =>
+      createTaskRecurrenceSchema.parse({
+        recurrenceType: "quarterly",
+        recurrenceDays: [4, 15],
+      }),
+    ).toThrow();
+  });
+
   it("rejects invalid recurrence type", () => {
     expect(() =>
       createTaskRecurrenceSchema.parse({ recurrenceType: "yearly" }),

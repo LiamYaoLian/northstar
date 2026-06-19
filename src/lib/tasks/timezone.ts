@@ -181,6 +181,10 @@ export function dayOfMonthInTz(instant: Date, tz: string): number {
   return getLocalParts(instant, tz).day;
 }
 
+export function monthInTz(instant: Date, tz: string): number {
+  return getLocalParts(instant, tz).month;
+}
+
 /** Format instant as `YYYY-MM-DDTHH:mm` for `<input type="datetime-local">`. */
 export function localDateTimeInputString(instant: Date, tz: string): string {
   const { year, month, day, hour, minute } = getLocalParts(instant, tz);

@@ -223,9 +223,20 @@ export const en: Messages = {
     daily: "Daily",
     weekly: "Weekly",
     monthly: "Monthly",
+    quarterly: "Quarterly",
     monthDay: "Day of month",
     monthDayShortMonthHint:
       "If the month has fewer days, the task appears on the last day of that month.",
+    quarterDay: "Day of month",
+    quarterDayShortMonthHint:
+      "If the month has fewer days, the task appears on the last day of that month.",
+    quarterMonth: "Month within quarter",
+    quarterMonthSlot: (slot) =>
+      ({
+        1: "Month 1 (Jan, Apr, Jul, Oct)",
+        2: "Month 2 (Feb, May, Aug, Nov)",
+        3: "Month 3 (Mar, Jun, Sep, Dec)",
+      })[slot],
     carryOver: "Carry over missed weeks",
     carryOverWeeklyOnly: "Carry-over applies to weekly tasks only.",
     subtaskResetHint: "Subtasks reset when a new cycle opens.",
@@ -234,6 +245,8 @@ export const en: Messages = {
     editRecurrence: "Recurrence",
     weeklyOn: (days) => `Weekly ${days}`,
     monthlyOn: (day) => `Monthly · ${day}`,
+    quarterlyOn: (monthInQuarter, day) =>
+      `Quarterly · M${monthInQuarter} · ${day}`,
     carryOverShort: "Carry over",
   },
   weekday: {

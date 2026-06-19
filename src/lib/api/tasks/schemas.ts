@@ -1,6 +1,16 @@
 import { z } from "zod";
+import {
+  parseQuarterlyRecurrence,
+  serializeQuarterlyRecurrence,
+} from "@/lib/tasks/recurrence-types";
 
-export const recurrenceTypeSchema = z.enum(["none", "daily", "weekly", "monthly"]);
+export const recurrenceTypeSchema = z.enum([
+  "none",
+  "daily",
+  "weekly",
+  "monthly",
+  "quarterly",
+]);
 
 const recurrenceBaseSchema = z.object({
   recurrenceType: recurrenceTypeSchema.optional().default("none"),
@@ -11,8 +21,19 @@ const recurrenceBaseSchema = z.object({
 type RecurrenceInput = z.infer<typeof recurrenceBaseSchema>;
 
 function normalizeRecurrence(data: RecurrenceInput): RecurrenceInput {
+  let recurrenceDays = data.recurrenceDays;
+  if (data.recurrenceType === "quarterly" && recurrenceDays?.length) {
+    const parsed = parseQuarterlyRecurrence(recurrenceDays);
+    if (parsed) {
+      recurrenceDays = serializeQuarterlyRecurrence(
+        parsed.monthInQuarter,
+        parsed.dayOfMonth,
+      );
+    }
+  }
   return {
     ...data,
+    recurrenceDays,
     recurrenceCarryOver:
       data.recurrenceType === "weekly" ? data.recurrenceCarryOver : false,
   };
@@ -54,6 +75,18 @@ function refineRecurrence(data: RecurrenceInput, ctx: z.RefinementCtx): void {
       });
     }
   }
+
+  if (data.recurrenceType === "quarterly") {
+    const parsed = parseQuarterlyRecurrence(data.recurrenceDays ?? []);
+    if (!parsed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "quarterly recurrence requires [monthInQuarter (1-3), dayOfMonth (1-31)]",
+        path: ["recurrenceDays"],
+      });
+    }
+  }
 }
 
 export const createTaskRecurrenceSchema = recurrenceBaseSchema
@@ -70,7 +103,11 @@ export const patchTaskRecurrenceSchema = recurrenceBaseSchema
     }),
   )
   .superRefine((data, ctx) => {
-    if (data.recurrenceType === "weekly" || data.recurrenceType === "monthly") {
+    if (
+      data.recurrenceType === "weekly" ||
+      data.recurrenceType === "monthly" ||
+      data.recurrenceType === "quarterly"
+    ) {
       refineRecurrence(data, ctx);
     }
   });

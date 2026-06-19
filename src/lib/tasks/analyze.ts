@@ -95,8 +95,8 @@ ${JSON.stringify(pillarOptions, null, 2)}
 - 仅当 pillar 为「工作」时填写 focusTrack（进大厂 / 探索方向 / 投资 之一），否则 focusTrack 为 null
 - confidence 为 0-1，表示归类把握程度
 - estimatedMin 为完成整项任务的合理分钟数（正整数）；若标题已含时长（如「晨跑 30min」）应尊重该时长
-- recurrenceType 为 none | daily | weekly | monthly：习惯/例行（晨跑、冥想、记账）倾向 daily；标题含具体周几用 weekly 并填 recurrenceDays（1=周一…7=周日）；每月固定日期（如每月15号、monthly review）用 monthly 并填 recurrenceDays（1-31）；一次性交付（交报告、买机票）为 none
-- recurrenceDays 仅 weekly（1-7）或 monthly（1-31）时填写整数数组，否则 null
+- recurrenceType 为 none | daily | weekly | monthly | quarterly：习惯/例行（晨跑、冥想、记账）倾向 daily；标题含具体周几用 weekly 并填 recurrenceDays（1=周一…7=周日）；每月固定日期（如每月15号、monthly review）用 monthly 并填 recurrenceDays（1-31）；每季度固定日期用 quarterly 并填 recurrenceDays 为 [monthInQuarter, dayOfMonth]：monthInQuarter 为 1|2|3（1=1/4/7/10月，2=2/5/8/11月，3=3/6/9/12月），dayOfMonth 为 1-31；一次性交付（交报告、买机票）为 none
+- recurrenceDays：weekly 填 1-7；monthly 填 1-31；quarterly 填 [monthInQuarter, dayOfMonth]；其他为 null
 - recurrenceCarryOver 默认 false；仅 weekly 且语义含补做/顺延时为 true
 - 只返回 JSON：{"pillarName":"...","focusTrack":null,"confidence":0.9,"estimatedMin":45,"recurrenceType":"daily","recurrenceDays":null,"recurrenceCarryOver":false}`;
 

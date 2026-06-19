@@ -1,4 +1,8 @@
 import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
+import {
+  parseQuarterlyRecurrence,
+  serializeQuarterlyRecurrence,
+} from "@/lib/tasks/recurrence-types";
 
 export type RecurrenceInference = {
   recurrenceType: RecurrenceType;
@@ -119,6 +123,22 @@ export function normalizeRecurrenceInference(input: {
     };
   }
 
+  if (recurrenceType === "quarterly") {
+    const parsed = parseQuarterlyRecurrence(input.recurrenceDays ?? []);
+    if (!parsed) {
+      return { ...NONE, source: input.source };
+    }
+    return {
+      recurrenceType: "quarterly",
+      recurrenceDays: serializeQuarterlyRecurrence(
+        parsed.monthInQuarter,
+        parsed.dayOfMonth,
+      ),
+      recurrenceCarryOver: false,
+      source: input.source,
+    };
+  }
+
   const days = (input.recurrenceDays ?? []).filter(
     (d) => Number.isInteger(d) && d >= 1 && d <= 7,
   );
@@ -142,6 +162,39 @@ export function ruleBasedInferRecurrence(title: string): RecurrenceInference {
   if (/每天|每日|\bdaily\b|every\s+day/i.test(trimmed)) {
     return normalizeRecurrenceInference({
       recurrenceType: "daily",
+      source: "rules",
+    });
+  }
+
+  const quarterMonthMatch = trimmed.match(
+    /每季度第\s*([123一二三])\s*个?\s*月|quarter\s*month\s*([123])/i,
+  );
+  if (/每季度|quarterly|every\s+quarter/i.test(trimmed)) {
+    const cnMonth: Record<string, number> = { 一: 1, 二: 2, 三: 3 };
+    const monthToken = quarterMonthMatch?.[1] ?? quarterMonthMatch?.[2];
+    const monthInQuarter = monthToken
+      ? cnMonth[monthToken] ?? Math.min(3, Math.max(1, Number(monthToken)))
+      : 1;
+
+    let day = 1;
+    const dayWithHao = trimmed.match(/(\d{1,2})\s*号/);
+    const dayWithRi = trimmed.match(/(\d{1,2})\s*日/);
+    if (dayWithHao) {
+      day = Math.min(31, Math.max(1, Number(dayWithHao[1])));
+    } else if (dayWithRi) {
+      day = Math.min(31, Math.max(1, Number(dayWithRi[1])));
+    } else {
+      const dayOnly = trimmed.match(
+        /(?:quarterly|every\s+quarter)\s+(\d{1,2})\b/i,
+      );
+      if (dayOnly) {
+        day = Math.min(31, Math.max(1, Number(dayOnly[1])));
+      }
+    }
+
+    return normalizeRecurrenceInference({
+      recurrenceType: "quarterly",
+      recurrenceDays: [monthInQuarter, day],
       source: "rules",
     });
   }
