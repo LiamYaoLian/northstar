@@ -7,7 +7,6 @@ import { CategoryFilter } from "@/components/category-filter";
 import { ProjectFilter } from "@/components/project-filter";
 import { ProjectSelectWithCreate } from "@/components/project-select-with-create";
 import { TaskCard } from "@/components/task-card";
-import { SortableTaskList } from "@/components/sortable-task-list";
 import { TaskStatusFilterBar } from "@/components/task-status-filter";
 import { apiFetch } from "@/lib/api-client";
 import { useTimer } from "@/components/timer-provider";
@@ -17,7 +16,7 @@ import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
 import {
   filterTasksByStatus,
   sortDoneTasksByCompletedAt,
-  sortTasks,
+  sortTasksByTime,
   type TaskStatusFilter,
 } from "@/lib/services/task-sorting";
 import {
@@ -30,7 +29,6 @@ import {
   enrichTasksWithProjects,
   filterTasksByPillar,
   filterTasksByProject,
-  mergeFilteredTaskReorder,
   parseStrategyPillars,
   toProjectOptions,
   type PillarOption,
@@ -99,7 +97,7 @@ export default function TasksPage() {
       setError(null);
       const [todayData, tasksData, strategyData, projectsData] = await Promise.all([
         apiFetch<{ tasks: TaskRow[] }>("/api/tasks?status=today"),
-        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=manual"),
+        apiFetch<{ tasks: TaskRow[] }>("/api/tasks?sort=priority"),
         apiFetch<{
           hasStrategy: boolean;
           strategy: {
@@ -365,7 +363,6 @@ export default function TasksPage() {
     deleteSubtask,
     deleteTask,
     reorderSubtasks,
-    reorderTasks,
     logTime,
   } = useTaskActions({
     reload: load,
@@ -440,31 +437,8 @@ export default function TasksPage() {
     if (statusFilter === "done") {
       return sortDoneTasksByCompletedAt(byProject);
     }
-    if (todayOnly) {
-      return sortTasks(byProject, "priority");
-    }
-    return byProject;
-  }, [sourceTasks, categoryFilter, projectFilter, statusFilter, todayOnly]);
-
-  const handleReorder = useCallback(
-    async (orderedIds: string[]) => {
-      if (categoryFilter || projectFilter) {
-        await reorderTasks(
-          mergeFilteredTaskReorder(
-            tasks.map((task) => task.id),
-            filteredTasks.map((task) => task.id),
-            orderedIds,
-          ),
-        );
-        return;
-      }
-      await reorderTasks(orderedIds);
-    },
-    [categoryFilter, projectFilter, filteredTasks, reorderTasks, tasks],
-  );
-
-  const taskMap = new Map(filteredTasks.map((task) => [task.id, task]));
-  const canReorder = statusFilter !== "done" && !todayOnly;
+    return sortTasksByTime(byProject);
+  }, [sourceTasks, categoryFilter, projectFilter, statusFilter]);
 
   const renderTaskCard = (
     task: TaskRow,
@@ -718,24 +692,12 @@ export default function TasksPage() {
 
       {filteredTasks.length === 0 ? (
         <p className="text-sm text-muted">{emptyMessage}</p>
-      ) : canReorder ? (
-        <SortableTaskList
-          taskIds={filteredTasks.map((task) => task.id)}
-          onReorder={handleReorder}
-        >
-          {(taskId) => {
-            const task = taskMap.get(taskId);
-            if (!task) return null;
-            return renderTaskCard(task, "complete");
-          }}
-        </SortableTaskList>
       ) : (
         <div className="space-y-3">
-          {filteredTasks.map((task, i) =>
+          {filteredTasks.map((task) =>
             renderTaskCard(
               task,
               statusFilter === "done" ? "reopen" : "complete",
-              todayOnly && statusFilter !== "done" ? i + 1 : undefined,
             ),
           )}
         </div>

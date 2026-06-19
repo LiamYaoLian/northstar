@@ -65,3 +65,29 @@ export function sortDoneTasksByCompletedAt(tasks: Task[]): Task[] {
     return bTime - aTime;
   });
 }
+
+function taskTimeSortKey(task: Task): number | null {
+  if (task.startAt) {
+    const start = Date.parse(task.startAt);
+    if (Number.isFinite(start)) return start;
+  }
+  if (task.dueAt) {
+    const due = Date.parse(task.dueAt);
+    if (Number.isFinite(due)) return due;
+  }
+  return null;
+}
+
+export function sortTasksByTime(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    const aKey = taskTimeSortKey(a);
+    const bKey = taskTimeSortKey(b);
+    if (aKey == null && bKey == null) {
+      return b.priorityScore - a.priorityScore || a.id.localeCompare(b.id);
+    }
+    if (aKey == null) return 1;
+    if (bKey == null) return -1;
+    if (aKey !== bKey) return aKey - bKey;
+    return b.priorityScore - a.priorityScore || a.id.localeCompare(b.id);
+  });
+}

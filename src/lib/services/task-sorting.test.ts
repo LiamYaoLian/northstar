@@ -6,6 +6,7 @@ import {
   rankAndLimit,
   sortDoneTasksByCompletedAt,
   sortTasks,
+  sortTasksByTime,
   takeTopTasks,
 } from "./task-sorting";
 import { makeTask } from "@/lib/test-fixtures";
@@ -208,6 +209,64 @@ describe("filterTasksByStatus", () => {
 
   it("all returns every task", () => {
     expect(filterTasksByStatus(rows, "all")).toHaveLength(3);
+  });
+});
+
+describe("sortTasksByTime", () => {
+  it("sorts by startAt ascending with unscheduled tasks last", () => {
+    const sorted = sortTasksByTime([
+      makeTask({
+        id: "late",
+        startAt: "2025-01-08T10:00:00.000Z",
+        priorityScore: 0.9,
+      }),
+      makeTask({
+        id: "early",
+        startAt: "2025-01-06T10:00:00.000Z",
+        priorityScore: 0.1,
+      }),
+      makeTask({
+        id: "none",
+        startAt: null,
+        dueAt: null,
+        priorityScore: 1,
+      }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual(["early", "late", "none"]);
+  });
+
+  it("falls back to dueAt when startAt is missing", () => {
+    const sorted = sortTasksByTime([
+      makeTask({
+        id: "due-later",
+        startAt: null,
+        dueAt: "2025-01-10",
+        priorityScore: 0.5,
+      }),
+      makeTask({
+        id: "due-soon",
+        startAt: null,
+        dueAt: "2025-01-07",
+        priorityScore: 0.5,
+      }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual(["due-soon", "due-later"]);
+  });
+
+  it("uses priority as tie-breaker for the same time", () => {
+    const sorted = sortTasksByTime([
+      makeTask({
+        id: "low",
+        startAt: "2025-01-06T10:00:00.000Z",
+        priorityScore: 0.2,
+      }),
+      makeTask({
+        id: "high",
+        startAt: "2025-01-06T10:00:00.000Z",
+        priorityScore: 0.9,
+      }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual(["high", "low"]);
   });
 });
 
