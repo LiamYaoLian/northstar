@@ -13,6 +13,7 @@ type CalendarMonthViewProps = {
   dragLabel: string;
   moreLabel: (count: number) => string;
   weekdayLabels: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
+  onTaskEdit?: (taskId: string) => void;
 };
 
 export function CalendarMonthView({
@@ -23,6 +24,7 @@ export function CalendarMonthView({
   dragLabel,
   moreLabel,
   weekdayLabels,
+  onTaskEdit,
 }: CalendarMonthViewProps) {
   return (
     <div className="space-y-1">
@@ -48,6 +50,7 @@ export function CalendarMonthView({
               moreLabel={moreLabel}
               maxVisible={3}
               compact
+              onTaskEdit={onTaskEdit}
             />
           ))}
         </div>

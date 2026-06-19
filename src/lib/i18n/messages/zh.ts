@@ -26,6 +26,7 @@ export const zh: Messages = {
     subTracks: "子赛道",
     allCategories: "全部",
     filterByCategory: "按类别筛选",
+    close: "关闭",
   },
   errors: {
     loadFailed: "加载失败",
@@ -264,7 +265,7 @@ export const zh: Messages = {
   },
   calendar: {
     title: "日历",
-    subtitle: "拖拽任务到 15 分钟格子 · 未安排任务在侧栏",
+    subtitle: "拖拽任务到 15 分钟格子 · 未安排任务在侧栏 · 双击任务编辑",
     unscheduledTitle: "未安排",
     unscheduledEmpty: "没有未设置开始日期的任务。",
     quickAddPlaceholder: "添加未安排任务…",
@@ -278,5 +279,7 @@ export const zh: Messages = {
     weekRange: (start, end) => `${start} – ${end}`,
     calendarMonthTitle: (year, month) => `${year} 年 ${month} 月`,
     recurringNoUnscheduled: "重复任务不能移回未安排",
+    editTask: "编辑任务",
+    doubleClickEdit: "双击编辑任务",
   },
 };

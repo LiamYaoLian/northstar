@@ -17,6 +17,7 @@ type CalendarUnscheduledPanelProps = {
   tz: string;
   onAddTask: (title: string) => Promise<void>;
   adding?: boolean;
+  onTaskEdit?: (taskId: string) => void;
 };
 
 export function CalendarUnscheduledPanel({
@@ -24,6 +25,7 @@ export function CalendarUnscheduledPanel({
   tz,
   onAddTask,
   adding = false,
+  onTaskEdit,
 }: CalendarUnscheduledPanelProps) {
   const { t } = useLocale();
   const [title, setTitle] = useState("");
@@ -78,6 +80,7 @@ export function CalendarUnscheduledPanel({
               task={task}
               draggableId={unscheduledDraggableId(task.id)}
               dragLabel={t.calendar.dragTask}
+              onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
             />
           ))
         )}

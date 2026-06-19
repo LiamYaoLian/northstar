@@ -13,6 +13,7 @@ type CalendarDayColumnProps = {
   placements: CalendarTaskPlacement[];
   todayDateStr: string;
   dragLabel: string;
+  onTaskEdit?: (taskId: string) => void;
 };
 
 export function CalendarDayColumn({
@@ -20,6 +21,7 @@ export function CalendarDayColumn({
   placements,
   todayDateStr,
   dragLabel,
+  onTaskEdit,
 }: CalendarDayColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: dayColumnDroppableId(day.dateStr),
@@ -56,6 +58,7 @@ export function CalendarDayColumn({
             draggableId={occurrenceDraggableId(task.id, day.dateStr, timeStr)}
             dragLabel={dragLabel}
             heightPx={heightPx}
+            onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
           />
         </div>
       ))}

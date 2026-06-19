@@ -20,6 +20,7 @@ export type Messages = {
     subTracks: string;
     allCategories: string;
     filterByCategory: string;
+    close: string;
   };
   errors: {
     loadFailed: string;
@@ -256,5 +257,7 @@ export type Messages = {
     weekRange: (start: string, end: string) => string;
     calendarMonthTitle: (year: number, month: number) => string;
     recurringNoUnscheduled: string;
+    editTask: string;
+    doubleClickEdit: string;
   };
 };

@@ -3,6 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Repeat } from "lucide-react";
+import { useLocale } from "@/lib/i18n/context";
 import { CALENDAR_SLOT_HEIGHT_PX } from "@/lib/tasks/calendar-time-grid";
 import type { TaskRow } from "@/lib/tasks/enrich-tasks";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ type CalendarTaskChipProps = {
   dragLabel: string;
   heightPx?: number;
   isOverlay?: boolean;
+  onEdit?: () => void;
 };
 
 export function CalendarTaskChip({
@@ -21,7 +23,9 @@ export function CalendarTaskChip({
   dragLabel,
   heightPx = CALENDAR_SLOT_HEIGHT_PX,
   isOverlay = false,
+  onEdit,
 }: CalendarTaskChipProps) {
+  const { t } = useLocale();
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: draggableId,
@@ -50,6 +54,15 @@ export function CalendarTaskChip({
         !tall && "justify-center",
       )}
       {...(isOverlay ? {} : { ...attributes, ...listeners })}
+      onDoubleClick={
+        onEdit
+          ? (event) => {
+              event.stopPropagation();
+              onEdit();
+            }
+          : undefined
+      }
+      title={onEdit ? t.calendar.doubleClickEdit : undefined}
       aria-label={dragLabel}
     >
       <div className="flex min-h-0 min-w-0 items-center gap-1">

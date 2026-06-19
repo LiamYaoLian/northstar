@@ -20,6 +20,7 @@ type CalendarDayCellProps = {
   showWeekdayLabel?: boolean;
   weekdayLabel?: string;
   compact?: boolean;
+  onTaskEdit?: (taskId: string) => void;
 };
 
 export function CalendarDayCell({
@@ -32,6 +33,7 @@ export function CalendarDayCell({
   showWeekdayLabel = false,
   weekdayLabel,
   compact = false,
+  onTaskEdit,
 }: CalendarDayCellProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: dayDroppableId(day.dateStr),
@@ -77,6 +79,7 @@ export function CalendarDayCell({
             task={task}
             draggableId={occurrenceDraggableId(task.id, day.dateStr)}
             dragLabel={dragLabel}
+            onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
           />
         ))}
         {overflow > 0 && moreLabel ? (

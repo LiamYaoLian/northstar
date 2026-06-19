@@ -52,6 +52,7 @@ type CalendarBoardProps = {
   onScheduleTask: (taskId: string, startAt: string | null) => void;
   onAddUnscheduledTask: (title: string) => Promise<void>;
   addingTask?: boolean;
+  onTaskEdit?: (taskId: string) => void;
 };
 
 export function CalendarBoard({
@@ -66,6 +67,7 @@ export function CalendarBoard({
   onScheduleTask,
   onAddUnscheduledTask,
   addingTask = false,
+  onTaskEdit,
 }: CalendarBoardProps) {
   const { locale, t } = useLocale();
   const tz = clientTimezone();
@@ -174,6 +176,7 @@ export function CalendarBoard({
             tz={tz}
             onAddTask={onAddUnscheduledTask}
             adding={addingTask}
+            onTaskEdit={onTaskEdit}
           />
 
           <div className="min-w-0 flex-1 space-y-3">
@@ -237,6 +240,7 @@ export function CalendarBoard({
                 todayDateStr={todayDateStr}
                 dragLabel={t.calendar.dragTask}
                 weekdayLabels={t.weekday}
+                onTaskEdit={onTaskEdit}
               />
             ) : (
               <CalendarMonthView
@@ -247,6 +251,7 @@ export function CalendarBoard({
                 dragLabel={t.calendar.dragTask}
                 moreLabel={t.calendar.moreTasks}
                 weekdayLabels={t.weekday}
+                onTaskEdit={onTaskEdit}
               />
             )}
           </div>

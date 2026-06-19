@@ -26,6 +26,7 @@ export const en: Messages = {
     subTracks: "Sub-tracks",
     allCategories: "All",
     filterByCategory: "Filter by category",
+    close: "Close",
   },
   errors: {
     loadFailed: "Failed to load",
@@ -301,7 +302,7 @@ export const en: Messages = {
   },
   calendar: {
     title: "Calendar",
-    subtitle: "Drag tasks into 15-minute slots · Unscheduled tasks stay in the sidebar",
+    subtitle: "Drag tasks into 15-minute slots · Unscheduled tasks in sidebar · Double-click to edit",
     unscheduledTitle: "Unscheduled",
     unscheduledEmpty: "No tasks without a start date.",
     quickAddPlaceholder: "Add unscheduled task…",
@@ -319,5 +320,7 @@ export const en: Messages = {
         year: "numeric",
       }),
     recurringNoUnscheduled: "Recurring tasks cannot be moved to unscheduled",
+    editTask: "Edit task",
+    doubleClickEdit: "Double-click to edit task",
   },
 };

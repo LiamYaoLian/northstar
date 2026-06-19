@@ -19,6 +19,7 @@ type CalendarWeekViewProps = {
   todayDateStr: string;
   dragLabel: string;
   weekdayLabels: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
+  onTaskEdit?: (taskId: string) => void;
 };
 
 export function CalendarWeekView({
@@ -28,6 +29,7 @@ export function CalendarWeekView({
   todayDateStr,
   dragLabel,
   weekdayLabels,
+  onTaskEdit,
 }: CalendarWeekViewProps) {
   const placementsByDay = useMemo(
     () => buildWeekTaskPlacements(tasks, days, tz),
@@ -100,6 +102,7 @@ export function CalendarWeekView({
               placements={placementsByDay.get(day.dateStr) ?? []}
               todayDateStr={todayDateStr}
               dragLabel={dragLabel}
+              onTaskEdit={onTaskEdit}
             />
           </div>
         ))}
