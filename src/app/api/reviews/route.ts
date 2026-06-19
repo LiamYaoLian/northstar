@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const user = await requireUser();
     const period = parsePeriod(url.searchParams.get("period"));
     const tz = resolveTimezone(url.searchParams.get("tz"));
-    const dashboard = await getReviewDashboard(period, tz, new Date(), user.id);
+    const dashboard = await getReviewDashboard(user.id, period, tz, new Date());
     if (!dashboard) {
       return NextResponse.json({ error: "Strategy not found" }, { status: 404 });
     }
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const user = await requireUser();
     const period = parsePeriod(body.period ?? null);
     const tz = resolveTimezone(body.tz);
-    const snapshot = await saveReviewSnapshot(period, tz, new Date(), user.id);
+    const snapshot = await saveReviewSnapshot(user.id, period, tz, new Date());
     if (!snapshot) {
       return NextResponse.json({ error: "Strategy not found" }, { status: 404 });
     }

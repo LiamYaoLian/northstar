@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const user = await requireUser();
     const tz = parseTzFromSearchParams(url.searchParams);
     const period = parseAlignmentPeriod(url.searchParams.get("period"));
-    return NextResponse.json(await getAlignmentDashboard(tz, period, new Date(), user.id));
+    return NextResponse.json(await getAlignmentDashboard(user.id, tz, period, new Date()));
   } catch (err) {
     const tzErr = tzErrorResponse(err);
     if (tzErr) return tzErr;

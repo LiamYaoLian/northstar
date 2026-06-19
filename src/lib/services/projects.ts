@@ -14,28 +14,24 @@ export class ProjectValidationError extends Error {
   }
 }
 
-function scopedProjectId(projectId: string, userId?: string) {
-  return userId
-    ? and(eq(projects.id, projectId), eq(projects.userId, userId))
-    : eq(projects.id, projectId);
+function scopedProjectId(projectId: string, userId: string) {
+  return and(eq(projects.id, projectId), eq(projects.userId, userId));
 }
 
-function scopedPillarId(pillarId: string, userId?: string) {
-  return userId
-    ? and(eq(strategicPillars.id, pillarId), eq(strategicPillars.userId, userId))
-    : eq(strategicPillars.id, pillarId);
+function scopedPillarId(pillarId: string, userId: string) {
+  return and(eq(strategicPillars.id, pillarId), eq(strategicPillars.userId, userId));
 }
 
-async function fetchWorkPillar(userId?: string) {
+async function fetchWorkPillar(userId: string) {
   const db = getDb();
-  const pillarRows = db.select().from(strategicPillars);
-  const pillarList = userId
-    ? await pillarRows.where(eq(strategicPillars.userId, userId))
-    : await pillarRows;
+  const pillarList = await db
+    .select()
+    .from(strategicPillars)
+    .where(eq(strategicPillars.userId, userId));
   return findWorkPillar(pillarList);
 }
 
-async function assertWorkPillarId(pillarId: string, userId?: string) {
+async function assertWorkPillarId(pillarId: string, userId: string) {
   const workPillar = await fetchWorkPillar(userId);
   if (!workPillar || workPillar.id !== pillarId) {
     throw new ProjectValidationError("Projects are only allowed on the Work pillar");
@@ -87,7 +83,7 @@ export async function listProjects(
 
 export async function getProjectById(
   projectId: string,
-  userId?: string,
+  userId: string,
   db = getDb(),
 ) {
   await ensureDbReady();
@@ -206,7 +202,7 @@ export async function updateProject(
 export async function assertAssignableProject(
   projectId: string,
   pillarId: string | null,
-  userId?: string,
+  userId: string,
   db = getDb(),
 ) {
   const project = await getProjectById(projectId, userId, db);
@@ -222,7 +218,7 @@ export async function assertAssignableProject(
   return project;
 }
 
-export async function fetchPillarById(pillarId: string, userId?: string) {
+export async function fetchPillarById(pillarId: string, userId: string) {
   await ensureDbReady();
   const db = getDb();
   const [pillar] = await db

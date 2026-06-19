@@ -18,41 +18,40 @@ import { resolveTimezone } from "@/lib/tasks/timezone";
 import { eq } from "drizzle-orm";
 
 export async function getAlignmentDashboard(
+  userId: string,
   tzInput?: string,
   periodInput: AlignmentPeriod = "week",
   now = new Date(),
-  userId?: string,
 ) {
   await ensureDbReady();
   const tz = resolveTimezone(tzInput);
   const period = periodInput;
   const { periodStart, periodEnd } = resolveAlignmentPeriod(period, tz, now);
   const db = getDb();
-  const pillarRows = db.select().from(strategicPillars);
-  const pillars = (userId
-    ? await pillarRows.where(eq(strategicPillars.userId, userId))
-    : await pillarRows
-  ).sort(
-    (a, b) => a.sortOrder - b.sortOrder,
-  );
-  const taskRows = db.select().from(tasks);
-  const taskList = userId
-    ? await taskRows.where(eq(tasks.userId, userId))
-    : await taskRows;
-  const entryRows = db.select().from(timeEntries);
-  const allEntries = userId
-    ? await entryRows.where(eq(timeEntries.userId, userId))
-    : await entryRows;
+  const pillars = (
+    await db
+      .select()
+      .from(strategicPillars)
+      .where(eq(strategicPillars.userId, userId))
+  ).sort((a, b) => a.sortOrder - b.sortOrder);
+  const taskList = await db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.userId, userId));
+  const allEntries = await db
+    .select()
+    .from(timeEntries)
+    .where(eq(timeEntries.userId, userId));
   const entries =
     period === "all"
       ? allEntries
       : filterTimeEntriesInDateRange(allEntries, periodStart, periodEnd, tz);
 
   const alignment = computeAlignment(pillars, taskList, entries);
-  const driftScore = Math.round(
-    alignment.pillars.reduce((sum, pillar) => sum + Math.abs(pillar.drift), 0) *
-      10,
-  ) / 10;
+  const driftScore =
+    Math.round(
+      alignment.pillars.reduce((sum, pillar) => sum + Math.abs(pillar.drift), 0) * 10,
+    ) / 10;
   const workPillar = findWorkPillar(pillars);
   const workTracks = workPillar
     ? computeWorkFocusTracks(workPillar, taskList, entries)

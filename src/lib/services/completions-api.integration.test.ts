@@ -4,10 +4,15 @@ import { parseCompletionsQuery } from "@/lib/api/completions/parse-completions-q
 import { listCompletionEvents } from "@/lib/services/completions";
 import { taskCompletionEvents } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { anyUserIdWithStrategy } from "@/lib/test-helpers/auth";
 
 describe("completions API query path", () => {
+  let userId: string;
+
   beforeAll(async () => {
     await ensureDbReady();
+    userId = await anyUserIdWithStrategy();
   });
 
   it("returns all events when pillarId is omitted from query string", async () => {
@@ -16,8 +21,11 @@ describe("completions API query path", () => {
     );
     expect(parsed.pillarId).toBeUndefined();
 
-    const rows = await getDb().select().from(taskCompletionEvents);
-    const events = await listCompletionEvents(parsed);
+    const rows = await getDb()
+      .select()
+      .from(taskCompletionEvents)
+      .where(eq(taskCompletionEvents.userId, userId));
+    const events = await listCompletionEvents({ ...parsed, userId });
     expect(events.length).toBe(rows.length);
   });
 });

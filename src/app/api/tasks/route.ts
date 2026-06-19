@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const tz = parseTzFromSearchParams(searchParams);
     const status = searchParams.get("status") ?? undefined;
     return NextResponse.json({
-      tasks: await listTasksWithSubtasks(status, tz, user.id),
+      tasks: await listTasksWithSubtasks(user.id, status, tz),
     });
   } catch (err) {
     const tzErr = tzErrorResponse(err);

@@ -14,35 +14,36 @@ import {
 import { id, nowIso } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 
-export async function hasStrategy(userId?: string) {
+export async function hasStrategy(userId: string) {
   await ensureDbReady();
-  const query = getDb().select().from(northStars);
-  const stars = userId
-    ? await query.where(eq(northStars.userId, userId))
-    : await query;
+  const stars = await getDb()
+    .select()
+    .from(northStars)
+    .where(eq(northStars.userId, userId));
   return stars.length > 0;
 }
 
-export async function getStrategy(userId?: string) {
+export async function getStrategy(userId: string) {
   await ensureDbReady();
   const db = getDb();
-  const starRows = db.select().from(northStars);
-  const stars = userId
-    ? await starRows.where(eq(northStars.userId, userId))
-    : await starRows;
+  const stars = await db
+    .select()
+    .from(northStars)
+    .where(eq(northStars.userId, userId));
   const star = stars[0];
   if (!star) return null;
-  const pillarRows = db.select().from(strategicPillars);
-  const pillars = (userId
-    ? await pillarRows.where(eq(strategicPillars.userId, userId))
-    : await pillarRows
-  ).sort(
-    (a, b) => a.sortOrder - b.sortOrder,
-  );
+  const pillars = (
+    await db
+      .select()
+      .from(strategicPillars)
+      .where(eq(strategicPillars.userId, userId))
+  ).sort((a, b) => a.sortOrder - b.sortOrder);
   return { northStar: star, pillars };
 }
 
-export async function saveStrategy(userId: string | undefined, input: {
+export async function saveStrategy(
+  userId: string,
+  input: {
   statement: string;
   horizon: string;
   hoursPerWeek: number;
@@ -59,23 +60,21 @@ export async function saveStrategy(userId: string | undefined, input: {
     isHardConstraint?: boolean;
   }>;
   source?: string;
-}) {
+  },
+) {
   await ensureDbReady();
   const db = getDb();
   const ts = nowIso();
-  const existingQuery = db.select().from(northStars);
-  const existingRows = userId
-    ? await existingQuery.where(eq(northStars.userId, userId))
-    : await existingQuery;
+  const existingRows = await db
+    .select()
+    .from(northStars)
+    .where(eq(northStars.userId, userId));
   const existing = existingRows[0];
 
   if (existing) {
-    const deletePillars = db.delete(strategicPillars);
-    if (userId) {
-      await deletePillars.where(eq(strategicPillars.userId, userId));
-    } else {
-      await deletePillars;
-    }
+    await db
+      .delete(strategicPillars)
+      .where(eq(strategicPillars.userId, userId));
     await db
       .update(northStars)
       .set({
@@ -89,7 +88,7 @@ export async function saveStrategy(userId: string | undefined, input: {
   } else {
     await db.insert(northStars).values({
       id: id(),
-      userId: userId ?? null,
+      userId,
       statement: input.statement,
       horizon: input.horizon,
       hoursPerWeek: input.hoursPerWeek,
@@ -102,7 +101,7 @@ export async function saveStrategy(userId: string | undefined, input: {
   for (const [i, p] of input.pillars.entries()) {
     await db.insert(strategicPillars).values({
       id: id(),
-      userId: userId ?? null,
+      userId,
       name: p.name,
       description: p.description ?? null,
       targetPct: p.targetPct,
@@ -117,13 +116,13 @@ export async function saveStrategy(userId: string | undefined, input: {
     });
   }
 
-  const pillarRows = db.select().from(strategicPillars);
-  const pillars = userId
-    ? await pillarRows.where(eq(strategicPillars.userId, userId))
-    : await pillarRows;
+  const pillars = await db
+    .select()
+    .from(strategicPillars)
+    .where(eq(strategicPillars.userId, userId));
   await db.insert(strategyRevisions).values({
     id: id(),
-    userId: userId ?? null,
+    userId,
     northStarStatement: input.statement,
     horizon: input.horizon,
     pillars: JSON.stringify(pillars),
@@ -135,12 +134,15 @@ export async function saveStrategy(userId: string | undefined, input: {
   return getStrategy(userId);
 }
 
-export async function updateNorthStar(input: {
+export async function updateNorthStar(
+  input: {
   statement: string;
   horizon: string;
   hoursPerWeek: number;
   workTrack: string;
-}, userId?: string) {
+  },
+  userId: string,
+) {
   const strategy = await getStrategy(userId);
   if (!strategy) return null;
 
@@ -176,13 +178,13 @@ export async function updateNorthStar(input: {
     })
     .where(eq(northStars.id, strategy.northStar.id));
 
-  const revisionPillarRows = db.select().from(strategicPillars);
-  const pillars = userId
-    ? await revisionPillarRows.where(eq(strategicPillars.userId, userId))
-    : await revisionPillarRows;
+  const pillars = await db
+    .select()
+    .from(strategicPillars)
+    .where(eq(strategicPillars.userId, userId));
   await db.insert(strategyRevisions).values({
     id: id(),
-    userId: userId ?? null,
+    userId,
     northStarStatement: statement,
     horizon,
     pillars: JSON.stringify(pillars),
@@ -195,7 +197,7 @@ export async function updateNorthStar(input: {
 }
 
 export async function applyLifeBalanceTemplate(
-  userId: string | undefined,
+  userId: string,
   workTrack = "big_tech",
   overrides?: {
     statement?: string;

@@ -20,7 +20,7 @@ export type ListCompletionEventsQuery = {
   pillarId?: string | null;
   tz: string;
   limit?: number;
-  userId?: string;
+  userId: string;
 };
 
 export type CompletionSummary = {
@@ -50,7 +50,7 @@ type DbCompletionDeleter = Pick<Db, "delete">;
 
 export async function recordCompletionEvent(
   tx: DbWriter,
-  userId: string | undefined,
+  userId: string,
   task: Task,
   tz: string,
   now = new Date(),
@@ -64,19 +64,17 @@ export async function recordCompletionEvent(
       and(
         eq(taskCompletionEvents.taskId, task.id),
         eq(taskCompletionEvents.completedAt, completedAtIso),
-        userId
-          ? eq(taskCompletionEvents.userId, userId)
-          : isNull(taskCompletionEvents.userId),
+        eq(taskCompletionEvents.userId, userId),
       ),
     );
   if (existing[0]) {
     return rowToEvent(existing[0]);
   }
 
-  const pillarRows = tx.select().from(strategicPillars);
-  const pillars = userId
-    ? await pillarRows.where(eq(strategicPillars.userId, userId))
-    : await pillarRows;
+  const pillars = await tx
+    .select()
+    .from(strategicPillars)
+    .where(eq(strategicPillars.userId, userId));
   const snapshot = resolvePillarSnapshotForCompletion(task, pillars);
   const ts = nowIso();
   const completedAt = new Date(completedAtIso);
@@ -91,7 +89,7 @@ export async function recordCompletionEvent(
 
   await tx.insert(taskCompletionEvents).values({
     id: payload.id,
-    userId: userId ?? task.userId ?? null,
+    userId,
     taskId: payload.taskId,
     completedAt: payload.completedAt,
     occurrenceDate: payload.occurrenceDate,
@@ -109,7 +107,7 @@ export async function recordCompletionEvent(
 
 export async function deleteCompletionEventForTaskCompletion(
   tx: DbCompletionDeleter,
-  userId: string | undefined,
+  userId: string,
   taskId: string,
   completedAt: string | null,
 ): Promise<void> {
@@ -120,9 +118,7 @@ export async function deleteCompletionEventForTaskCompletion(
       and(
         eq(taskCompletionEvents.taskId, taskId),
         eq(taskCompletionEvents.completedAt, completedAt),
-        userId
-          ? eq(taskCompletionEvents.userId, userId)
-          : isNull(taskCompletionEvents.userId),
+        eq(taskCompletionEvents.userId, userId),
       ),
     );
 }
@@ -135,10 +131,8 @@ export async function listCompletionEvents(
   const conditions = [
     gte(taskCompletionEvents.occurrenceDate, query.since),
     lte(taskCompletionEvents.occurrenceDate, query.until),
+    eq(taskCompletionEvents.userId, query.userId),
   ];
-  if (query.userId) {
-    conditions.push(eq(taskCompletionEvents.userId, query.userId));
-  }
   if (query.pillarId !== undefined) {
     conditions.push(
       query.pillarId === null

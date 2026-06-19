@@ -13,10 +13,10 @@ export async function GET(request: Request) {
     const user = await requireUser();
     const query = parseCompletionsSummaryQuery(url.searchParams);
     const rows = await listTimeEntriesForExport(
+      user.id,
       query.since,
       query.until,
       query.tz,
-      user.id,
     );
     const csv = timeEntriesToCsv(rows);
     return new NextResponse(csv, {

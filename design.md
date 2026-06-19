@@ -17,7 +17,7 @@ MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Toda
 | Review 快照 | week/month 周期可在 Alignment 顶部保存；`#snapshots` 展示最近历史 |
 | CSV 导出 | Alignment 支持 completions CSV 与 time entries CSV；导出使用当前 period 与 pillar 筛选 |
 | UX 收尾 | Today 筛选空状态、Tasks 进行中空状态、错误重试与 i18n 文案已补齐 |
-| 非 MVP 债务 | optimistic UI、多用户 auth、拖延雷达周期化仍保留为后续可选 |
+| 多用户 Auth | Auth.js magic link 登录；业务数据按 `user_id` 隔离；legacy 数据通过 `NORTHSTAR_DEFAULT_USER_EMAIL` 迁移 |
 
 ---
 
@@ -34,13 +34,14 @@ MVP 功能闭环已完成。当前实现以 4 个主导航页面为核心：Toda
 | 战略先行 | 无策略则引导 onboarding；所有任务归属 pillar，Work 可细分 focus track |
 | 自动排序 | 优先级由多因子加权计算，用户可手动拖拽微调，二者通过 `manualSortOrder` 与 `priorityScore` 联动 |
 | 轻量 AI | LLM 可选（`OPENAI_API_KEY`）；无 key 时规则 fallback，不阻塞核心流程 |
-| 单用户本地优先 | SQLite（Turso 或本地 `data/northstar.db`），无多租户 auth |
+| 多用户 + 本地优先 | SQLite（Turso 或 `data/northstar.db`）；Auth.js 会话；每用户独立 strategy / tasks |
 
 ### 1.3 页面与导航
 
 | 路由 | 用途 |
 |------|------|
-| `/` | 重定向至 `/today` |
+| `/login` | Email magic link 登录（dev 无 SMTP 时链接打印在终端） |
+| `/` | 重定向至 `/today`（未登录 → `/login`） |
 | `/onboarding` | 5 步策略引导（horizon → brain dump critique → work track → north star → 种子任务） |
 | `/today` | Top 5 今日任务（pillar 过滤 + 优先级）；底部折叠「今日已完成」 |
 | `/tasks` | 全量任务板（状态分段、手动排序、创建、分类预览） |
@@ -175,7 +176,7 @@ Schema 定义于 `src/lib/db/schema.ts`，新库 DDL 在 `src/lib/db/init-sql.ts
 
 时间记录**不删除**；recurring 任务 lazy reset 只清 `status` / `completedAt` / 子任务勾选。
 
-**`active_time_sessions`** — 运行中计时器（单用户单 session；stop 写入 `time_entries` 后删除）
+**`active_time_sessions`** — 运行中计时器（每用户单 session；stop 写入 `time_entries` 后删除）
 
 | 字段 | 说明 |
 |------|------|
@@ -605,6 +606,7 @@ Vitest 覆盖核心逻辑与服务：
 | 回顾 | `review/period.test.ts`, `review/build-snapshot.test.ts`, `reviews.integration.test.ts` |
 | 导出 | `export/completions-csv.test.ts`, `export/time-entries-csv.test.ts` |
 | 策略 | `strategy/work-track.test.ts`, `strategy-update.integration.test.ts` |
+| Auth / 隔离 | `auth/errors.test.ts`, `auth-migration.test.ts`, `auth-isolation.integration.test.ts`, `auth-plan.test.ts` |
 | API schema | `schemas.test.ts`, `parse-tz-query.test.ts` |
 | 组件 | `task-card.test.tsx`, `sortable-subtasks.test.tsx` |
 
@@ -631,7 +633,7 @@ Turso 空库时可 `npm run db:sync-turso` 从本地同步。
 
 | 项 | 说明 |
 |----|------|
-| 单用户 | 无 auth / 多 workspace |
+| Middleware | 仅检查 session cookie 存在性；API 以 `requireUser()` 为安全边界 |
 | Onboarding raw fetch | 创建 seed 任务不带 tz，不影响首屏 openOcc |
 | Daily done 跨日 | 首次 list 请求前 Tasks 板仍显示 done，直到 openOcc |
 | 无 optimistic UI | 完成/ PATCH 后 full reload |

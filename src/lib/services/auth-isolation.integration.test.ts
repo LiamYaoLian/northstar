@@ -6,6 +6,7 @@ import { getStrategy, saveStrategy } from "@/lib/services/strategy";
 import {
   addTimeEntry,
   createTask,
+  deleteTask,
   listTasks,
   listTimeEntries,
   updateTask,
@@ -83,10 +84,10 @@ describe("auth-plan user isolation", () => {
     );
 
     const tz = "America/New_York";
-    expect((await listTasks(undefined, tz, userA)).map((t) => t.id)).toContain(
+    expect((await listTasks(userA, undefined, tz)).map((t) => t.id)).toContain(
       taskA?.id,
     );
-    expect((await listTasks(undefined, tz, userA)).map((t) => t.id)).not.toContain(
+    expect((await listTasks(userA, undefined, tz)).map((t) => t.id)).not.toContain(
       taskB?.id,
     );
   });
@@ -127,5 +128,39 @@ describe("auth-plan user isolation", () => {
     };
     expect(await listCompletionEvents({ ...query, userId: userA })).toHaveLength(0);
     expect(await listCompletionEvents({ ...query, userId: userB })).toHaveLength(1);
+  });
+
+  it("refuses to update another user's task", async () => {
+    const userA = await createTestUser("patch-a");
+    const userB = await createTestUser("patch-b");
+    await saveStrategy(userA, strategyInput("patch A"));
+    await saveStrategy(userB, strategyInput("patch B"));
+    const taskB = await createTask(
+      { title: "B only patch", autoBreakdown: false },
+      userB,
+    );
+
+    const tz = "America/New_York";
+    const updated = await updateTask(
+      taskB!.id,
+      { title: "Hijacked" },
+      { tz, userId: userA },
+    );
+    expect(updated).toBeNull();
+  });
+
+  it("refuses to delete another user's task", async () => {
+    const userA = await createTestUser("delete-a");
+    const userB = await createTestUser("delete-b");
+    await saveStrategy(userB, strategyInput("delete B"));
+    const taskB = await createTask(
+      { title: "B only delete", autoBreakdown: false },
+      userB,
+    );
+
+    expect(await deleteTask(taskB!.id, userA)).toBe(false);
+    expect(
+      (await listTasks(userB, undefined, "America/New_York")).some((t) => t.id === taskB?.id),
+    ).toBe(true);
   });
 });
