@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import type { CalendarDay } from "@/lib/tasks/calendar";
 import {
+  buildWeekTaskPlacements,
   CALENDAR_SLOT_HEIGHT_PX,
   DAY_TIME_SLOTS,
-  buildWeekTaskSlotMap,
 } from "@/lib/tasks/calendar-time-grid";
 import type { TaskRow } from "@/lib/tasks/enrich-tasks";
 import { isoWeekdayInTz } from "@/lib/tasks/timezone";
@@ -29,8 +29,8 @@ export function CalendarWeekView({
   dragLabel,
   weekdayLabels,
 }: CalendarWeekViewProps) {
-  const tasksBySlotKey = useMemo(
-    () => buildWeekTaskSlotMap(tasks, days, tz),
+  const placementsByDay = useMemo(
+    () => buildWeekTaskPlacements(tasks, days, tz),
     [tasks, days, tz],
   );
 
@@ -97,7 +97,7 @@ export function CalendarWeekView({
           >
             <CalendarDayColumn
               day={day}
-              tasksBySlotKey={tasksBySlotKey}
+              placements={placementsByDay.get(day.dateStr) ?? []}
               todayDateStr={todayDateStr}
               dragLabel={dragLabel}
             />

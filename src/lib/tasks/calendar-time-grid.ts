@@ -72,8 +72,88 @@ export function occurrenceSlotKey(dateStr: string, timeStr: string): string {
   return `${dateStr}T${snapTimeStr(timeStr)}`;
 }
 
-type CalendarTaskFields = Pick<Task, "recurrenceType" | "startAt" | "status"> &
+type CalendarTaskFields = Pick<
+  Task,
+  "recurrenceType" | "startAt" | "status" | "estimatedMin" | "id"
+> &
   Parameters<typeof taskAppearsOnDay>[0];
+
+export type CalendarTaskPlacement = {
+  task: CalendarTaskFields;
+  timeStr: string;
+  topPx: number;
+  heightPx: number;
+};
+
+export function taskDurationMinutes(
+  estimatedMin: number | null | undefined,
+): number {
+  if (estimatedMin != null && estimatedMin > 0) return estimatedMin;
+  return CALENDAR_SLOT_MINUTES;
+}
+
+export function taskBlockHeightPx(
+  estimatedMin: number | null | undefined,
+): number {
+  return (
+    (taskDurationMinutes(estimatedMin) / CALENDAR_SLOT_MINUTES) *
+    CALENDAR_SLOT_HEIGHT_PX
+  );
+}
+
+export function slotIndexForTimeStr(timeStr: string): number {
+  const snapped = snapTimeStr(timeStr);
+  const [hourRaw, minuteRaw] = snapped.split(":");
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return 0;
+  return Math.floor((hour * 60 + minute) / CALENDAR_SLOT_MINUTES);
+}
+
+export function clampTaskBlockHeight(
+  topPx: number,
+  heightPx: number,
+  columnHeightPx: number,
+): number {
+  return Math.max(CALENDAR_SLOT_HEIGHT_PX, Math.min(heightPx, columnHeightPx - topPx));
+}
+
+export function buildDayTaskPlacements(
+  tasks: CalendarTaskFields[],
+  dayDateStr: string,
+  tz: string,
+): CalendarTaskPlacement[] {
+  const columnHeight = DAY_TIME_SLOTS.length * CALENDAR_SLOT_HEIGHT_PX;
+  const placements: CalendarTaskPlacement[] = [];
+
+  for (const task of tasks) {
+    const timeStr = getTaskSlotTime(task, dayDateStr, tz);
+    if (!timeStr) continue;
+
+    const topPx = slotIndexForTimeStr(timeStr) * CALENDAR_SLOT_HEIGHT_PX;
+    const heightPx = clampTaskBlockHeight(
+      topPx,
+      taskBlockHeightPx(task.estimatedMin),
+      columnHeight,
+    );
+
+    placements.push({ task, timeStr, topPx, heightPx });
+  }
+
+  return placements;
+}
+
+export function buildWeekTaskPlacements(
+  tasks: CalendarTaskFields[],
+  days: DayLike[],
+  tz: string,
+): Map<string, CalendarTaskPlacement[]> {
+  const map = new Map<string, CalendarTaskPlacement[]>();
+  for (const day of days) {
+    map.set(day.dateStr, buildDayTaskPlacements(tasks, day.dateStr, tz));
+  }
+  return map;
+}
 
 export function getTaskSlotTime(
   task: CalendarTaskFields,
@@ -121,15 +201,13 @@ export function buildWeekTaskSlotMap(
 ): Map<string, CalendarTaskFields[]> {
   const map = new Map<string, CalendarTaskFields[]>();
   for (const day of days) {
-    for (const task of tasks) {
-      const timeStr = getTaskSlotTime(task, day.dateStr, tz);
-      if (!timeStr) continue;
-      const key = `${day.dateStr}:${timeStr}`;
+    for (const placement of buildDayTaskPlacements(tasks, day.dateStr, tz)) {
+      const key = `${day.dateStr}:${placement.timeStr}`;
       const list = map.get(key);
       if (list) {
-        list.push(task);
+        list.push(placement.task);
       } else {
-        map.set(key, [task]);
+        map.set(key, [placement.task]);
       }
     }
   }

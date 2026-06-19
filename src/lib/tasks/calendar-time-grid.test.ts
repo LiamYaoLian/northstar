@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDayTaskPlacements,
   buildDayTimeSlots,
   buildWeekTaskSlotMap,
   CALENDAR_SLOT_HEIGHT_PX,
@@ -8,9 +9,11 @@ import {
   getTaskSlotTime,
   parseSlotDroppableId,
   slotDroppableId,
+  slotIndexForTimeStr,
   slotTimeFromDropPosition,
   snapTimeStr,
   startAtForCalendarSlot,
+  taskBlockHeightPx,
   tasksForSlot,
 } from "./calendar-time-grid";
 import { localDateTimeInputToIso } from "./timezone";
@@ -105,5 +108,38 @@ describe("calendar-time-grid", () => {
     expect(
       slotTimeFromDropPosition(columnTop + CALENDAR_SLOT_HEIGHT_PX * 4, columnTop, columnHeight),
     ).toBe("01:00");
+  });
+
+  it("scales block height with estimated minutes", () => {
+    expect(taskBlockHeightPx(60)).toBe(CALENDAR_SLOT_HEIGHT_PX * 4);
+    expect(taskBlockHeightPx(null)).toBe(CALENDAR_SLOT_HEIGHT_PX);
+  });
+
+  it("builds placements with proportional height", () => {
+    const task = makeTask({
+      id: "t1",
+      recurrenceType: "none",
+      estimatedMin: 45,
+      startAt: localDateTimeInputToIso("2025-01-06T10:00", TEST_TZ),
+      status: "todo",
+    });
+    const [placement] = buildDayTaskPlacements([task], "2025-01-06", TEST_TZ);
+    expect(placement?.heightPx).toBe(CALENDAR_SLOT_HEIGHT_PX * 3);
+    expect(placement?.topPx).toBe(slotIndexForTimeStr("10:00") * CALENDAR_SLOT_HEIGHT_PX);
+  });
+
+  it("clamps block height to end of day", () => {
+    const task = makeTask({
+      id: "t1",
+      recurrenceType: "none",
+      estimatedMin: 240,
+      startAt: localDateTimeInputToIso("2025-01-06T23:00", TEST_TZ),
+      status: "todo",
+    });
+    const [placement] = buildDayTaskPlacements([task], "2025-01-06", TEST_TZ);
+    expect(placement?.topPx).toBe(slotIndexForTimeStr("23:00") * CALENDAR_SLOT_HEIGHT_PX);
+    expect(placement?.topPx + placement!.heightPx).toBeLessThanOrEqual(
+      DAY_TIME_SLOTS.length * CALENDAR_SLOT_HEIGHT_PX,
+    );
   });
 });
