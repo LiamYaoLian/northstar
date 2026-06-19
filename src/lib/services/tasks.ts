@@ -74,15 +74,6 @@ import type { StrategicPillar, Subtask, Task } from "@/lib/db/schema";
 
 export type { TaskSortMode };
 
-export async function recalculatePriorities(tz?: string, userId?: string) {
-  await ensureDbReady();
-  const db = getDb();
-  const resolvedTz = resolveTimezone(tz);
-  await openRecurringOccurrences(db, resolvedTz, new Date(), userId);
-  const computedAt = await persistPriorities(resolvedTz, userId);
-  return { computedAt };
-}
-
 export async function openRecurringOccurrences(
   db: ReturnType<typeof getDb>,
   tz: string,

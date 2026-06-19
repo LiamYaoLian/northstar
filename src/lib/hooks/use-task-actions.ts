@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { Messages } from "@/lib/i18n/types";
 import { findWorkPillar, isWorkPillar } from "@/lib/pillars";
@@ -60,8 +60,6 @@ export function useTaskActions({
   applyOptimisticTaskPatch,
   applyOptimisticSubtaskPatch,
 }: UseTaskActionsOptions) {
-  const [recalculating, setRecalculating] = useState(false);
-
   const optimisticPatchTask = useCallback(
     (
       id: string,
@@ -127,18 +125,6 @@ export function useTaskActions({
     },
     [optimisticPatchTask, projects],
   );
-
-  const recalculatePriority = useCallback(async () => {
-    try {
-      setRecalculating(true);
-      await apiFetch("/api/tasks/recalculate-priorities", { method: "POST" });
-      await reload();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : errors.recalculateFailed);
-    } finally {
-      setRecalculating(false);
-    }
-  }, [reload, errors.recalculateFailed, onError]);
 
   const breakdownTask = useCallback(
     async (taskId: string, userPrompt?: string): Promise<BreakdownPreviewResult | null> => {
@@ -347,11 +333,9 @@ export function useTaskActions({
   );
 
   return {
-    recalculating,
     patchTask,
     changePillar,
     changeProject,
-    recalculatePriority,
     breakdownTask,
     applyBreakdown,
     toggleSubtask,

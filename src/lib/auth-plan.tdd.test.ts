@@ -105,7 +105,6 @@ describe("auth-plan TDD contract", () => {
     it.todo("GET /api/tasks returns 401 when unauthenticated");
     it.todo("PATCH /api/tasks/[id] cannot mutate another user's task");
     it.todo("POST /api/tasks/reorder rejects ids not owned by the session user");
-    it.todo("POST /api/tasks/recalculate-priorities updates only the session user's tasks");
     it.todo("POST /api/tasks/classify uses only the session user's strategy context");
     it.todo("POST /api/tasks/[id]/breakdown cannot inspect another user's task");
     it.todo("POST /api/tasks/[id]/breakdown/apply cannot mutate another user's task");

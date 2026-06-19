@@ -350,11 +350,9 @@ export default function TasksPage() {
   );
 
   const {
-    recalculating,
     patchTask,
     changePillar,
     changeProject,
-    recalculatePriority,
     breakdownTask,
     applyBreakdown,
     toggleSubtask,
@@ -554,17 +552,6 @@ export default function TasksPage() {
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 className="text-lg font-semibold">{t.tasks.title}</h2>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            type="button"
-            disabled={recalculating}
-            onClick={() => void recalculatePriority()}
-            className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
-          >
-            {recalculating ? t.tasks.recalculating : t.tasks.recalculatePriority}
-          </button>
-          <p className="text-xs text-muted">{t.tasks.hint}</p>
-        </div>
       </div>
 
       {error && (

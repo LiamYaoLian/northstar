@@ -36,7 +36,6 @@ export type Messages = {
     reorderTasksFailed: string;
     reorderSubtasksFailed: string;
     logTimeFailed: string;
-    recalculateFailed: string;
     startTimerFailed: string;
     stopTimerFailed: string;
     cancelTimerFailed: string;
@@ -46,8 +45,6 @@ export type Messages = {
     subtitle: string;
     empty: string;
     viewAll: string;
-    recalculatePriority: string;
-    recalculating: string;
     completedToday: string;
     completedCount: string;
     filteredEmpty: string;
@@ -55,12 +52,9 @@ export type Messages = {
   tasks: {
     title: string;
     placeholder: string;
-    hint: string;
     categorized: string;
     categoryOnCreate: string;
     autoCategory: string;
-    recalculatePriority: string;
-    recalculating: string;
     autoDetected: string;
     classifying: string;
     classifySourceAi: string;
