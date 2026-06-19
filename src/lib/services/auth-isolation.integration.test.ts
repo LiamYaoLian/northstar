@@ -82,10 +82,13 @@ describe("auth-plan user isolation", () => {
       userB,
     );
 
-    expect((await listTasks(undefined, "manual", undefined, userA)).map((t) => t.id))
-      .toContain(taskA?.id);
-    expect((await listTasks(undefined, "manual", undefined, userA)).map((t) => t.id))
-      .not.toContain(taskB?.id);
+    const tz = "America/New_York";
+    expect((await listTasks(undefined, tz, userA)).map((t) => t.id)).toContain(
+      taskA?.id,
+    );
+    expect((await listTasks(undefined, tz, userA)).map((t) => t.id)).not.toContain(
+      taskB?.id,
+    );
   });
 
   it("requires task ownership when writing time entries", async () => {

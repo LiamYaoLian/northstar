@@ -3,6 +3,14 @@
  */
 import React from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ data: { user: { id: "u1" } }, status: "authenticated" }),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/tasks",
+}));
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TaskCard } from "./index";

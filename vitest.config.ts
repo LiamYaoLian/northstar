@@ -9,6 +9,9 @@ export default defineConfig({
       ["src/components/**/*.test.ts", "happy-dom"],
     ],
     setupFiles: ["./src/test/setup.ts"],
+    // libSQL file DB locks under parallel integration tests
+    fileParallelism: false,
+    maxWorkers: 1,
   },
   resolve: {
     alias: {
