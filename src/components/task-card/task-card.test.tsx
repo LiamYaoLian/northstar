@@ -128,4 +128,20 @@ describe("TaskCard", () => {
     renderTaskCard({ onUpdateRecurrence: vi.fn() });
     expect(screen.getByText("不重复")).toBeTruthy();
   });
+
+  it("saves recurrence immediately when editing without clicking add", async () => {
+    const onUpdateRecurrence = vi.fn();
+    const user = userEvent.setup();
+    renderTaskCard({ onUpdateRecurrence });
+
+    await user.click(screen.getByRole("button", { name: "重复" }));
+    await user.click(screen.getByRole("button", { name: "每天" }));
+
+    expect(onUpdateRecurrence).toHaveBeenCalledWith("t1", {
+      recurrenceType: "daily",
+      recurrenceDays: [],
+      recurrenceCarryOver: false,
+    });
+    expect(screen.queryByRole("button", { name: "添加" })).toBeNull();
+  });
 });

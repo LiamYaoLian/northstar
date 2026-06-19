@@ -1,10 +1,12 @@
 "use client";
 
+import { createTaskRecurrenceSchema } from "@/lib/api/tasks/schemas";
 import type { QuarterMonthSlot, RecurrenceType } from "@/lib/tasks/recurrence-types";
 import {
   defaultQuarterMonthSlot,
   defaultYearlyRecurrence,
   parseQuarterlyRecurrence,
+  parseRecurrenceDays,
   parseYearlyRecurrence,
   serializeQuarterlyRecurrence,
   serializeYearlyRecurrence,
@@ -291,3 +293,28 @@ export const defaultRecurrenceFormValue: RecurrenceFormValue = {
   recurrenceDays: [],
   recurrenceCarryOver: false,
 };
+
+function sortedRecurrenceDays(days: number[]): number[] {
+  return [...days].sort((a, b) => a - b);
+}
+
+export function isRecurrenceFormSavable(value: RecurrenceFormValue): boolean {
+  return createTaskRecurrenceSchema.safeParse(value).success;
+}
+
+export function recurrenceFormMatchesTask(
+  value: RecurrenceFormValue,
+  task: {
+    recurrenceType: string;
+    recurrenceDays: string | null;
+    recurrenceCarryOver: boolean;
+  },
+): boolean {
+  const taskDays = parseRecurrenceDays(task.recurrenceDays) ?? [];
+  return (
+    value.recurrenceType === task.recurrenceType &&
+    value.recurrenceCarryOver === task.recurrenceCarryOver &&
+    JSON.stringify(sortedRecurrenceDays(value.recurrenceDays)) ===
+      JSON.stringify(sortedRecurrenceDays(taskDays))
+  );
+}

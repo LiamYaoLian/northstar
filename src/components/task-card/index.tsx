@@ -8,6 +8,8 @@ import { TaskRecurrenceBadge } from "@/components/task-recurrence-badge";
 import {
   TaskRecurrenceForm,
   type RecurrenceFormValue,
+  isRecurrenceFormSavable,
+  recurrenceFormMatchesTask,
 } from "@/components/task-recurrence-form";
 import { useLocale } from "@/lib/i18n/context";
 import { parseJson, cn } from "@/lib/utils";
@@ -98,6 +100,18 @@ export function TaskCard({
     }
   }
 
+  function handleRecurrenceChange(value: RecurrenceFormValue) {
+    setRecurrenceDraft(value);
+    if (
+      !onUpdateRecurrence ||
+      !isRecurrenceFormSavable(value) ||
+      recurrenceFormMatchesTask(value, task)
+    ) {
+      return;
+    }
+    onUpdateRecurrence(task.id, value);
+  }
+
   return (
     <Card
       className={cn(
@@ -176,17 +190,8 @@ export function TaskCard({
               <TaskRecurrenceForm
                 compact
                 value={recurrenceDraft}
-                onChange={setRecurrenceDraft}
+                onChange={handleRecurrenceChange}
               />
-              <button
-                type="button"
-                className="rounded-md border border-border px-2 py-1 text-xs hover:bg-neutral-50"
-                onClick={() =>
-                  onUpdateRecurrence(task.id, recurrenceDraft)
-                }
-              >
-                {t.common.add}
-              </button>
               {task.recurrenceType !== "none" && (
                 <p className="text-xs text-muted">{t.recurrence.subtaskResetHint}</p>
               )}
