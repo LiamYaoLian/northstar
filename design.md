@@ -698,3 +698,6 @@ src/components/
 1. Tasks 页拖拽任务 A 到顶部 → `POST /api/tasks/reorder`
 2. `manualSortOrder` 与 `priorityScore` 同步更新
 3. 下次 list 时 `syncActivePriorityFromManualOrder` 保持一致
+
+## todo
+* 在添加新任务时AI 能自动决定是否重复

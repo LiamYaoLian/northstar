@@ -49,7 +49,7 @@ export const zh: Messages = {
     recalculating: "重算中...",
     completedToday: "今日已完成",
     completedCount: "已完成 {count} 项",
-    filteredEmpty: "该分类下今日无待办。可清除筛选，或查看下方任务板。",
+    filteredEmpty: "该分类下今日无待办。可清除筛选或取消「今日」。",
   },
   tasks: {
     title: "任务",

@@ -2,6 +2,7 @@
 
 import type { RecurrenceType } from "@/lib/tasks/recurrence-types";
 import { useLocale } from "@/lib/i18n/context";
+import type { ReactNode } from "react";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -15,12 +16,14 @@ type TaskRecurrenceFormProps = {
   value: RecurrenceFormValue;
   onChange: (value: RecurrenceFormValue) => void;
   compact?: boolean;
+  leadingButton?: ReactNode;
 };
 
 export function TaskRecurrenceForm({
   value,
   onChange,
   compact = false,
+  leadingButton,
 }: TaskRecurrenceFormProps) {
   const { t } = useLocale();
 
@@ -43,6 +46,7 @@ export function TaskRecurrenceForm({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <div className="flex flex-wrap gap-2">
+        {leadingButton}
         {(["none", "daily", "weekly"] as const).map((type) => (
           <button
             key={type}

@@ -49,7 +49,7 @@ export const en: Messages = {
     recalculating: "Recalculating...",
     completedToday: "Completed today",
     completedCount: "{count} completed",
-    filteredEmpty: "Nothing due in this category today. Clear the filter or use the task board below.",
+    filteredEmpty: "Nothing due in this category today. Clear the filter or turn off Today.",
   },
   tasks: {
     title: "Tasks",
