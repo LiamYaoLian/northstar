@@ -28,6 +28,7 @@ import { sumSubtaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
 import {
   isValidTaskDateRange,
   normalizeTaskDate,
+  normalizeTaskStartAt,
   resolveTaskStartAt,
 } from "@/lib/tasks/task-dates";
 import type { RecurrenceInference } from "@/lib/tasks/infer-recurrence";
@@ -262,7 +263,7 @@ export async function createTask(input: {
   const normalizedStart = resolveTaskStartAt(input.startAt, resolvedTz);
   const normalizedDue =
     recurrenceType !== "none" ? null : normalizeTaskDate(input.dueAt);
-  if (!isValidTaskDateRange(normalizedStart, normalizedDue)) {
+  if (!isValidTaskDateRange(normalizedStart, normalizedDue, resolvedTz)) {
     throw new Error("Start date must be on or before due date");
   }
 
@@ -623,7 +624,7 @@ export async function updateTask(
   const existing = await fetchTaskById(taskId, options?.userId);
   if (!existing) return null;
 
-  const safePatch = await buildTaskPatch(db, existing, patch, options?.userId);
+  const safePatch = await buildTaskPatch(db, existing, patch, options?.userId, options?.tz);
   if (safePatch === null) return null;
 
   let completedAt = existing.completedAt;
@@ -690,6 +691,7 @@ async function buildTaskPatch(
   existing: Task,
   patch: Parameters<typeof updateTask>[1],
   userId?: string,
+  tz?: string,
 ) {
   const {
     intimidationScore,
@@ -720,7 +722,7 @@ async function buildTaskPatch(
   }
 
   if (startAt !== undefined) {
-    safePatch.startAt = normalizeTaskDate(startAt);
+    safePatch.startAt = normalizeTaskStartAt(startAt, tz);
   }
 
   const nextRecurrenceType =
@@ -731,13 +733,14 @@ async function buildTaskPatch(
       nextRecurrenceType !== "none" ? null : normalizeTaskDate(dueAt);
   }
 
-  const effectiveStart = normalizeTaskDate(
+  const effectiveStart = normalizeTaskStartAt(
     (safePatch.startAt as string | null | undefined) ?? existing.startAt,
+    tz,
   );
   const effectiveDue = normalizeTaskDate(
     (safePatch.dueAt as string | null | undefined) ?? existing.dueAt,
   );
-  if (!isValidTaskDateRange(effectiveStart, effectiveDue)) {
+  if (!isValidTaskDateRange(effectiveStart, effectiveDue, tz)) {
     return null;
   }
 

@@ -180,3 +180,39 @@ export function daysInLocalMonth(instant: Date, tz: string): number {
 export function dayOfMonthInTz(instant: Date, tz: string): number {
   return getLocalParts(instant, tz).day;
 }
+
+/** Format instant as `YYYY-MM-DDTHH:mm` for `<input type="datetime-local">`. */
+export function localDateTimeInputString(instant: Date, tz: string): string {
+  const { year, month, day, hour, minute } = getLocalParts(instant, tz);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** Parse `YYYY-MM-DDTHH:mm` (datetime-local) in tz to ISO UTC. */
+export function localDateTimeInputToIso(value: string, tz: string): string | null {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, y, m, d, h, min] = match;
+  const year = Number(y);
+  const month = Number(m);
+  const day = Number(d);
+  const hour = Number(h);
+  const minute = Number(min);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+  return zonedTimeToUtc(year, month, day, hour, minute, 0, tz).toISOString();
+}

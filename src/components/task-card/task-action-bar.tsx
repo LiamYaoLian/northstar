@@ -22,7 +22,6 @@ type TaskActionBarProps = {
   onLogTime?: (id: string, minutes: number) => void;
   onComplete?: (id: string) => void;
   onReopen?: (id: string) => void;
-  onDelete?: (id: string) => void;
   onTimerError?: (message: string) => void;
   hasAddSubtask?: boolean;
   hasBreakdown?: boolean;
@@ -40,7 +39,6 @@ export function TaskActionBar({
   onLogTime,
   onComplete,
   onReopen,
-  onDelete,
   onTimerError,
   hasAddSubtask,
   hasBreakdown,
@@ -69,18 +67,6 @@ export function TaskActionBar({
       await action();
     } catch (err) {
       onTimerError?.(err instanceof Error ? err.message : t.errors.startTimerFailed);
-    }
-  }
-
-  async function handleDelete() {
-    if (!onDelete) return;
-    try {
-      if (runningHere) {
-        await cancel();
-      }
-      onDelete(task.id);
-    } catch (err) {
-      onTimerError?.(err instanceof Error ? err.message : t.errors.cancelTimerFailed);
     }
   }
 
@@ -116,119 +102,122 @@ export function TaskActionBar({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {hasAddSubtask && (
-          <ActionButton onClick={onToggleManual}>
-            {showManual ? t.taskCard.collapseBreakdown : t.taskCard.manualBreakdown}
-          </ActionButton>
-        )}
-        {hasBreakdown && (
-          <ActionButton onClick={onToggleAiBreakdown}>
-            {showAiBreakdown
-              ? t.taskCard.collapseAiBreakdown
-              : t.taskCard.aiBreakdown}
-          </ActionButton>
-        )}
-        <ActionButton onClick={onToggleWhy}>{t.taskCard.whyRanked}</ActionButton>
-        {onToggleIntimidating && (
-          <button
-            type="button"
-            onClick={() => onToggleIntimidating(task.id, !intimidating)}
-            className={`rounded-md border px-2 py-1 text-xs hover:bg-neutral-50 ${
-              intimidating
-                ? "border-amber-300 bg-amber-50 text-amber-800"
-                : "border-border"
-            }`}
-          >
-            {intimidating
-              ? t.taskCard.unmarkIntimidating
-              : t.taskCard.markIntimidating}
-          </button>
-        )}
-
-        {!runningHere && (
-          <>
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {hasAddSubtask && (
+            <ActionButton onClick={onToggleManual}>
+              {showManual ? t.taskCard.collapseBreakdown : t.taskCard.manualBreakdown}
+            </ActionButton>
+          )}
+          {hasBreakdown && (
+            <ActionButton onClick={onToggleAiBreakdown}>
+              {showAiBreakdown
+                ? t.taskCard.collapseAiBreakdown
+                : t.taskCard.aiBreakdown}
+            </ActionButton>
+          )}
+          {onToggleIntimidating && (
             <button
               type="button"
-              disabled={timerDisabled}
-              aria-label={t.timer.start}
-              title={
-                runningElsewhere && otherRunningTaskTitle
-                  ? t.timer.runningOnOtherTask.replace("{title}", otherRunningTaskTitle)
-                  : t.timer.start
+              onClick={() => onToggleIntimidating(task.id, !intimidating)}
+              aria-label={
+                intimidating
+                  ? t.taskCard.unmarkIntimidating
+                  : t.taskCard.markIntimidating
               }
-              onClick={() => void runTimerAction(() => startStopwatch(task.id))}
-              className="rounded-md border border-border p-1 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                intimidating
+                  ? t.taskCard.unmarkIntimidating
+                  : t.taskCard.markIntimidating
+              }
+              className={cn(
+                "rounded-md border p-1 text-sm leading-none hover:bg-neutral-50",
+                intimidating
+                  ? "border-amber-300 bg-amber-50"
+                  : "border-border",
+              )}
             >
-              <Timer className="h-4 w-4" aria-hidden />
+              😨
             </button>
-            <div className="flex items-center gap-1">
-              <select
-                value={pomodoroMin}
-                disabled={timerDisabled}
-                onChange={(e) => setPomodoroMin(Number(e.target.value))}
-                className="rounded-md border border-border px-1 py-1 text-xs disabled:opacity-50"
-                aria-label={t.timer.pomodoro}
-              >
-                {POMODORO_PRESETS.map((minutes) => (
-                  <option key={minutes} value={minutes}>
-                    {minutes}m
-                  </option>
-                ))}
-              </select>
+          )}
+          <ActionButton onClick={onToggleWhy}>{t.taskCard.whyRanked}</ActionButton>
+          {onComplete && task.status !== "done" && (
+            <ActionButton onClick={() => onComplete(task.id)}>
+              {t.taskCard.complete}
+            </ActionButton>
+          )}
+          {onReopen && task.status === "done" && (
+            <ActionButton onClick={() => onReopen(task.id)}>
+              {t.taskCard.reopen}
+            </ActionButton>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {!runningHere && (
+            <>
               <button
                 type="button"
                 disabled={timerDisabled}
-                aria-label={t.timer.pomodoro}
+                aria-label={t.timer.start}
                 title={
                   runningElsewhere && otherRunningTaskTitle
                     ? t.timer.runningOnOtherTask.replace("{title}", otherRunningTaskTitle)
-                    : t.timer.pomodoro
+                    : t.timer.start
                 }
-                onClick={() =>
-                  void runTimerAction(() => startPomodoro(task.id, pomodoroMin))
-                }
+                onClick={() => void runTimerAction(() => startStopwatch(task.id))}
                 className="rounded-md border border-border p-1 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <TomatoIcon className="h-4 w-4" />
+                <Timer className="h-4 w-4" aria-hidden />
               </button>
-            </div>
-          </>
-        )}
-
-        {onLogTime && (
-          <button
-            type="button"
-            onClick={() =>
-              onLogTime(
-                task.id,
-                getDefaultLogMinutes(effectiveEstimatedMin ?? task.estimatedMin),
-              )
-            }
-            className="rounded-md bg-accent px-2 py-1 text-xs text-white hover:opacity-90"
-          >
-            {t.taskCard.logTime}
-          </button>
-        )}
-        {onComplete && task.status !== "done" && (
-          <ActionButton onClick={() => onComplete(task.id)}>
-            {t.taskCard.complete}
-          </ActionButton>
-        )}
-        {onReopen && task.status === "done" && (
-          <ActionButton onClick={() => onReopen(task.id)}>
-            {t.taskCard.reopen}
-          </ActionButton>
-        )}
-        {onDelete && (
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            className="rounded-md border border-border px-2 py-1 text-xs text-muted hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-          >
-            {t.taskCard.deleteTask}
-          </button>
-        )}
+              <div className="flex items-center gap-1">
+                <select
+                  value={pomodoroMin}
+                  disabled={timerDisabled}
+                  onChange={(e) => setPomodoroMin(Number(e.target.value))}
+                  className="rounded-md border border-border px-1 py-1 text-xs disabled:opacity-50"
+                  aria-label={t.timer.pomodoro}
+                >
+                  {POMODORO_PRESETS.map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {minutes}m
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={timerDisabled}
+                  aria-label={t.timer.pomodoro}
+                  title={
+                    runningElsewhere && otherRunningTaskTitle
+                      ? t.timer.runningOnOtherTask.replace("{title}", otherRunningTaskTitle)
+                      : t.timer.pomodoro
+                  }
+                  onClick={() =>
+                    void runTimerAction(() => startPomodoro(task.id, pomodoroMin))
+                  }
+                  className="rounded-md border border-border p-1 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <TomatoIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </>
+          )}
+          {onLogTime && (
+            <button
+              type="button"
+              onClick={() =>
+                onLogTime(
+                  task.id,
+                  getDefaultLogMinutes(effectiveEstimatedMin ?? task.estimatedMin),
+                )
+              }
+              className="rounded-md bg-accent px-2 py-1 text-xs text-white hover:opacity-90"
+            >
+              {t.taskCard.logTime}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

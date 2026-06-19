@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
@@ -52,7 +53,7 @@ export function TaskCard({
   onUpdateRecurrence,
 }: TaskCardProps) {
   const { t } = useLocale();
-  const { isRunningOnTask, overtime } = useTimer();
+  const { isRunningOnTask, overtime, cancel } = useTimer();
   const runningHere = isRunningOnTask(task.id);
   const [showWhy, setShowWhy] = useState(false);
   const [showRecurrence, setShowRecurrence] = useState(false);
@@ -83,10 +84,25 @@ export function TaskCard({
     onAddSubtask,
   });
 
+  async function handleDelete() {
+    if (!onDelete) return;
+    try {
+      if (runningHere) {
+        await cancel();
+      }
+      onDelete(task.id);
+    } catch (err) {
+      onTimerError?.(
+        err instanceof Error ? err.message : t.errors.cancelTimerFailed,
+      );
+    }
+  }
+
   return (
     <Card
       className={cn(
-        "space-y-3",
+        "relative space-y-3",
+        onDelete && "pr-10",
         task.status === "done" && "border-neutral-200 bg-neutral-50/80 opacity-90",
         runningHere &&
           (overtime
@@ -94,6 +110,17 @@ export function TaskCard({
             : "ring-2 ring-accent/40"),
       )}
     >
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => void handleDelete()}
+          aria-label={t.taskCard.deleteTask}
+          title={t.taskCard.deleteTask}
+          className="absolute right-3 top-3 rounded-md p-1 text-muted hover:bg-red-50 hover:text-red-600"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden />
+        </button>
+      )}
       <TaskCardHeader
         task={task}
         rank={rank}
@@ -223,7 +250,6 @@ export function TaskCard({
         onTimerError={onTimerError}
         onComplete={onComplete}
         onReopen={onReopen}
-        onDelete={onDelete}
         hasAddSubtask={Boolean(onAddSubtask)}
         hasBreakdown={Boolean(onBreakdown)}
       />

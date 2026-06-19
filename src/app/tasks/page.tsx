@@ -31,10 +31,10 @@ import {
 } from "@/lib/tasks/enrich-tasks";
 import { recurrenceTypeUsesDays } from "@/lib/tasks/recurrence-types";
 import {
+  defaultTaskStartAtInputValue,
   isValidTaskDateRange,
   normalizeTaskDate,
   resolveTaskStartAt,
-  todayTaskDate,
 } from "@/lib/tasks/task-dates";
 import { clientTimezone } from "@/lib/tasks/timezone";
 
@@ -69,7 +69,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [todayOnly, setTodayOnly] = useState(false);
   const [newTaskStartAt, setNewTaskStartAt] = useState(() =>
-    todayTaskDate(clientTimezone()),
+    defaultTaskStartAtInputValue(clientTimezone()),
   );
   const [newTaskDueAt, setNewTaskDueAt] = useState("");
   const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
@@ -324,7 +324,7 @@ export default function TasksPage() {
       recurrence.recurrenceType === "none"
         ? normalizeTaskDate(newTaskDueAt || null)
         : null;
-    if (!isValidTaskDateRange(startAt, dueAt)) {
+    if (!isValidTaskDateRange(startAt, dueAt, clientTimezone())) {
       setError(t.errors.invalidTaskDateRange);
       return;
     }
@@ -354,7 +354,7 @@ export default function TasksPage() {
       });
       setTitle("");
       setNewTaskPillarId("");
-      setNewTaskStartAt(todayTaskDate(clientTimezone()));
+      setNewTaskStartAt(defaultTaskStartAtInputValue(clientTimezone()));
       setNewTaskDueAt("");
       setRecurrence(defaultRecurrenceFormValue);
       setRecurrenceTouched(false);
@@ -538,9 +538,9 @@ export default function TasksPage() {
           <label className="inline-flex items-center gap-1.5">
             <span>{t.taskCard.start}</span>
             <input
-              type="date"
+              type="datetime-local"
               value={newTaskStartAt}
-              max={newTaskDueAt || undefined}
+              max={newTaskDueAt ? `${newTaskDueAt}T23:59` : undefined}
               onChange={(e) => setNewTaskStartAt(e.target.value)}
               className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
             />
@@ -551,7 +551,7 @@ export default function TasksPage() {
               <input
                 type="date"
                 value={newTaskDueAt}
-                min={newTaskStartAt || undefined}
+                min={newTaskStartAt.slice(0, 10) || undefined}
                 onChange={(e) => setNewTaskDueAt(e.target.value)}
                 className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
               />

@@ -6,9 +6,14 @@ import { localeTag } from "@/lib/i18n/entities";
 import type { Subtask } from "@/lib/db/schema";
 import {
   formatTaskDate,
+  formatTaskStartAt,
   normalizeTaskDate,
+  normalizeTaskStartAt,
   taskDateToInputValue,
+  taskStartAtToDateInputValue,
+  taskStartAtToInputValue,
 } from "@/lib/tasks/task-dates";
+import { clientTimezone } from "@/lib/tasks/timezone";
 import { getSubtaskProgress, isTaskIntimidating } from "./utils";
 
 type TaskMetadataBadgesProps = {
@@ -107,13 +112,88 @@ function EditableEstimatedMin({
   );
 }
 
+function EditableTaskStartAt({
+  label,
+  value,
+  addLabel,
+  editLabel,
+  max,
+  onUpdate,
+}: {
+  label: string;
+  value: string | null;
+  addLabel: string;
+  editLabel: string;
+  max?: string;
+  onUpdate: (value: string | null) => void;
+}) {
+  const { locale } = useLocale();
+  const tag = localeTag(locale);
+  const tz = clientTimezone();
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const formatted = formatTaskStartAt(value, tag, tz);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+    }
+  }, [editing]);
+
+  function commit(nextValue: string) {
+    const normalized = normalizeTaskStartAt(nextValue || null, tz);
+    const current = normalizeTaskStartAt(value, tz);
+    if (normalized !== current) {
+      onUpdate(normalized);
+    }
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <label className="inline-flex items-center gap-1">
+        <span>{label}</span>
+        <input
+          ref={inputRef}
+          type="datetime-local"
+          defaultValue={taskStartAtToInputValue(value, tz)}
+          max={max}
+          aria-label={editLabel}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit(e.currentTarget.value);
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setEditing(false);
+            }
+          }}
+          className="rounded border border-border bg-background px-1 py-0 text-xs text-foreground"
+        />
+      </label>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="rounded hover:bg-neutral-100 hover:text-foreground"
+      aria-label={editLabel}
+    >
+      {formatted ? `${label} ${formatted}` : addLabel}
+    </button>
+  );
+}
+
 function EditableTaskDate({
   label,
   value,
   addLabel,
   editLabel,
   min,
-  max,
   disabled,
   disabledHint,
   onUpdate,
@@ -123,7 +203,6 @@ function EditableTaskDate({
   addLabel: string;
   editLabel: string;
   min?: string;
-  max?: string;
   disabled?: boolean;
   disabledHint?: string;
   onUpdate: (value: string | null) => void;
@@ -166,7 +245,6 @@ function EditableTaskDate({
           type="date"
           defaultValue={taskDateToInputValue(value)}
           min={min}
-          max={max}
           aria-label={editLabel}
           onBlur={(e) => commit(e.target.value)}
           onKeyDown={(e) => {
@@ -209,10 +287,12 @@ export function TaskMetadataBadges({
   onUpdateTaskDates,
 }: TaskMetadataBadgesProps) {
   const { localeTag: tag, t } = useLocale();
+  const tz = clientTimezone();
   const { done, total } = getSubtaskProgress(subtasks);
   const intimidating = isTaskIntimidating(intimidationScore);
-  const startInput = taskDateToInputValue(startAt);
+  const startDateInput = taskStartAtToDateInputValue(startAt, tz);
   const dueInput = taskDateToInputValue(dueAt);
+  const startMax = dueInput ? `${dueInput}T23:59` : undefined;
 
   return (
     <>
@@ -231,12 +311,12 @@ export function TaskMetadataBadges({
       )}
       {onUpdateTaskDates ? (
         <>
-          <EditableTaskDate
+          <EditableTaskStartAt
             label={t.taskCard.start}
             value={startAt}
             addLabel={t.taskCard.addStartDate}
             editLabel={t.taskCard.editStartDate}
-            max={dueInput || undefined}
+            max={startMax}
             onUpdate={(next) => onUpdateTaskDates({ startAt: next })}
           />
           <EditableTaskDate
@@ -244,7 +324,7 @@ export function TaskMetadataBadges({
             value={dueAt}
             addLabel={t.taskCard.addDueDate}
             editLabel={t.taskCard.editDueDate}
-            min={startInput || undefined}
+            min={startDateInput || undefined}
             disabled={!canEditDue}
             disabledHint={t.taskCard.dueDisabledForRecurrence}
             onUpdate={(next) => onUpdateTaskDates({ dueAt: next })}
@@ -255,7 +335,7 @@ export function TaskMetadataBadges({
           {startAt && (
             <span>
               {t.taskCard.start}{" "}
-              {formatTaskDate(startAt, tag)}
+              {formatTaskStartAt(startAt, tag, tz)}
             </span>
           )}
           {dueAt && (
