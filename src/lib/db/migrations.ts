@@ -11,13 +11,29 @@ import {
 import { DEFAULT_TIMEZONE } from "@/lib/tasks/timezone";
 import { id, nowIso } from "@/lib/utils";
 
-const { tasks, taskCompletionEvents, strategicPillars, users } = schema;
+const { tasks, taskCompletionEvents, strategicPillars, northStars, strategyRevisions, users } =
+  schema;
 
 type Db = LibSQLDatabase<typeof schema>;
 
 const migrationsFolder = path.join(process.cwd(), "drizzle");
-const LEGACY_USER_EMAIL =
-  process.env.NORTHSTAR_DEFAULT_USER_EMAIL ?? "local@northstar.dev";
+function legacyUserEmail(): string {
+  return process.env.NORTHSTAR_DEFAULT_USER_EMAIL ?? "local@northstar.dev";
+}
+/** Pre-auth default owner emails that should be promoted to legacyUserEmail(). */
+const LEGACY_EMAIL_ALIASES = ["local@northstar.dev"] as const;
+
+const BUSINESS_USER_TABLES = [
+  "north_stars",
+  "strategic_pillars",
+  "strategy_revisions",
+  "tasks",
+  "subtasks",
+  "time_entries",
+  "task_completion_events",
+  "review_snapshots",
+  "projects",
+] as const;
 
 async function tableColumnNames(client: Client, table: string): Promise<Set<string>> {
   const cols = await client.execute(`PRAGMA table_info(${table})`);
@@ -86,17 +102,7 @@ export async function addAuthTablesIfMissing(client: Client): Promise<void> {
 export async function addBusinessUserColumnsIfMissing(
   client: Client,
 ): Promise<void> {
-  const tables = [
-    "north_stars",
-    "strategic_pillars",
-    "strategy_revisions",
-    "tasks",
-    "subtasks",
-    "time_entries",
-    "task_completion_events",
-    "review_snapshots",
-  ];
-  for (const table of tables) {
+  for (const table of BUSINESS_USER_TABLES) {
     await addColumnIfMissing(client, table, "user_id", "TEXT");
   }
 }
@@ -105,16 +111,26 @@ export async function createOrGetLegacyUser(db: Db): Promise<string> {
   const existing = await db
     .select()
     .from(users)
-    .where(eq(users.email, LEGACY_USER_EMAIL))
+    .where(eq(users.email, legacyUserEmail()))
     .limit(1);
   if (existing[0]) return existing[0].id;
+
+  for (const alias of LEGACY_EMAIL_ALIASES) {
+    if (alias === legacyUserEmail()) continue;
+    const aliasUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, alias))
+      .limit(1);
+    if (aliasUser[0]) return aliasUser[0].id;
+  }
 
   const ts = nowIso();
   const userId = id();
   await db.insert(users).values({
     id: userId,
     name: "Local Northstar User",
-    email: LEGACY_USER_EMAIL,
+    email: legacyUserEmail(),
     emailVerified: null,
     image: null,
     createdAt: ts,
@@ -128,21 +144,121 @@ export async function backfillLegacyUserIds(
   db: Db,
 ): Promise<void> {
   const userId = await createOrGetLegacyUser(db);
-  const tables = [
-    "north_stars",
-    "strategic_pillars",
-    "strategy_revisions",
-    "tasks",
-    "subtasks",
-    "time_entries",
-    "task_completion_events",
-    "review_snapshots",
-  ];
-  for (const table of tables) {
+  for (const table of BUSINESS_USER_TABLES) {
     await client.execute({
       sql: `UPDATE ${table} SET user_id = ? WHERE user_id IS NULL`,
       args: [userId],
     });
+  }
+}
+
+export async function backfillProjectsUserIds(
+  client: Client,
+  db: Db,
+): Promise<void> {
+  await client.execute(`
+    UPDATE projects
+    SET user_id = (
+      SELECT tasks.user_id FROM tasks
+      WHERE tasks.project_id = projects.id AND tasks.user_id IS NOT NULL
+      LIMIT 1
+    )
+    WHERE user_id IS NULL
+  `);
+  const userId = await createOrGetLegacyUser(db);
+  await client.execute({
+    sql: "UPDATE projects SET user_id = ? WHERE user_id IS NULL",
+    args: [userId],
+  });
+}
+
+async function reassignAllUserData(
+  client: Client,
+  fromUserId: string,
+  toUserId: string,
+): Promise<void> {
+  for (const table of BUSINESS_USER_TABLES) {
+    await client.execute({
+      sql: `UPDATE ${table} SET user_id = ? WHERE user_id = ?`,
+      args: [toUserId, fromUserId],
+    });
+  }
+  await client.execute({
+    sql: "UPDATE active_time_sessions SET user_id = ? WHERE user_id = ?",
+    args: [toUserId, fromUserId],
+  });
+}
+
+async function mergeLegacyUserInto(
+  db: Db,
+  client: Client,
+  fromUserId: string,
+  toUserId: string,
+): Promise<void> {
+  const [targetStar] = await db
+    .select()
+    .from(northStars)
+    .where(eq(northStars.userId, toUserId))
+    .limit(1);
+  const [sourceStar] = await db
+    .select()
+    .from(northStars)
+    .where(eq(northStars.userId, fromUserId))
+    .limit(1);
+
+  if (targetStar && sourceStar) {
+    await db.delete(strategicPillars).where(eq(strategicPillars.userId, toUserId));
+    await db
+      .delete(strategyRevisions)
+      .where(eq(strategyRevisions.userId, toUserId));
+    await db.delete(northStars).where(eq(northStars.userId, toUserId));
+  }
+
+  await reassignAllUserData(client, fromUserId, toUserId);
+  await client.execute({
+    sql: "DELETE FROM sessions WHERE user_id = ?",
+    args: [fromUserId],
+  });
+  await client.execute({
+    sql: "DELETE FROM accounts WHERE user_id = ?",
+    args: [fromUserId],
+  });
+  await db.delete(users).where(eq(users.id, fromUserId));
+}
+
+/** Promote pre-auth owner aliases (e.g. local@northstar.dev) to LEGACY_USER_EMAIL. */
+export async function promoteLegacyOwnerEmail(
+  db: Db,
+  client: Client,
+): Promise<void> {
+  const targetEmail = legacyUserEmail().trim().toLowerCase();
+  if (!targetEmail) return;
+
+  const [targetUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, targetEmail))
+    .limit(1);
+
+  for (const alias of LEGACY_EMAIL_ALIASES) {
+    if (alias === targetEmail) continue;
+
+    const [aliasUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, alias))
+      .limit(1);
+    if (!aliasUser) continue;
+
+    if (targetUser && targetUser.id !== aliasUser.id) {
+      await mergeLegacyUserInto(db, client, aliasUser.id, targetUser.id);
+    } else if (!targetUser) {
+      await db
+        .update(users)
+        .set({ email: targetEmail, updatedAt: nowIso() })
+        .where(eq(users.id, aliasUser.id));
+    }
+    return;
   }
 }
 
@@ -418,6 +534,8 @@ export async function applyMigrations(client: Client, db: Db) {
   await migrate(db, { migrationsFolder });
   await addBusinessUserColumnsIfMissing(client);
   await backfillLegacyUserIds(client, db);
+  await backfillProjectsUserIds(client, db);
+  await promoteLegacyOwnerEmail(db, client);
   await addRecurrenceColumnsIfMissing(client);
   await addSubtaskEstimatedMinColumnIfMissing(client);
   await addTaskStartAtColumnIfMissing(client);

@@ -17,11 +17,26 @@ AI-driven todo app focused on **strategic alignment** and **automatic prioritiza
 
 ```bash
 npm install
-cp .env.example .env.local   # add Turso + optional OpenAI keys
+cp .env.example .env.local   # add Turso + auth + optional OpenAI keys
+npm run db:migrate           # backfill legacy data to your email (see Auth below)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — you'll be guided through onboarding.
+Open [http://localhost:3000](http://localhost:3000) — sign in, then you'll be guided through onboarding if needed.
+
+## Auth (multi-user)
+
+Northstar uses **Auth.js** with email magic links. Each signed-in user only sees their own strategy, tasks, and reviews.
+
+1. Set in `.env.local`:
+   ```
+   AUTH_SECRET=your-random-secret
+   NORTHSTAR_DEFAULT_USER_EMAIL=you@example.com
+   ```
+2. Run `npm run db:migrate` once — existing rows without an owner are assigned to that email (and `local@northstar.dev` is renamed to match).
+3. Start the app and open `/login`. Enter the same email. In dev without SMTP, the sign-in link is printed in the terminal.
+
+Legacy single-user data is **not deleted**; it is linked to the user row for `NORTHSTAR_DEFAULT_USER_EMAIL`.
 
 ## Turso (cloud database)
 
