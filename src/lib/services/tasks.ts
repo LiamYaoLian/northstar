@@ -260,7 +260,10 @@ export async function createTask(input: {
       ? Boolean(resolvedRecurrence.recurrenceCarryOver)
       : false;
 
-  const normalizedStart = resolveTaskStartAt(input.startAt, resolvedTz);
+  const normalizedStart =
+    input.startAt === null
+      ? null
+      : resolveTaskStartAt(input.startAt, resolvedTz);
   const normalizedDue =
     recurrenceType !== "none" ? null : normalizeTaskDate(input.dueAt);
   if (!isValidTaskDateRange(normalizedStart, normalizedDue, resolvedTz)) {

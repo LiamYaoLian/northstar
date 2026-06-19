@@ -117,6 +117,7 @@ function EditableTaskStartAt({
   value,
   addLabel,
   editLabel,
+  clearLabel,
   max,
   onUpdate,
 }: {
@@ -124,6 +125,7 @@ function EditableTaskStartAt({
   value: string | null;
   addLabel: string;
   editLabel: string;
+  clearLabel: string;
   max?: string;
   onUpdate: (value: string | null) => void;
 }) {
@@ -151,28 +153,43 @@ function EditableTaskStartAt({
 
   if (editing) {
     return (
-      <label className="inline-flex items-center gap-1">
-        <span>{label}</span>
-        <input
-          ref={inputRef}
-          type="datetime-local"
-          defaultValue={taskStartAtToInputValue(value, tz)}
-          max={max}
-          aria-label={editLabel}
-          onBlur={(e) => commit(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commit(e.currentTarget.value);
-            }
-            if (e.key === "Escape") {
-              e.preventDefault();
+      <span className="inline-flex items-center gap-1">
+        <label className="inline-flex items-center gap-1">
+          <span>{label}</span>
+          <input
+            ref={inputRef}
+            type="datetime-local"
+            defaultValue={taskStartAtToInputValue(value, tz)}
+            max={max}
+            aria-label={editLabel}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commit(e.currentTarget.value);
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setEditing(false);
+              }
+            }}
+            className="rounded border border-border bg-background px-1 py-0 text-xs text-foreground"
+          />
+        </label>
+        {value ? (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onUpdate(null);
               setEditing(false);
-            }
-          }}
-          className="rounded border border-border bg-background px-1 py-0 text-xs text-foreground"
-        />
-      </label>
+            }}
+            className="rounded px-1 text-xs text-muted hover:bg-neutral-100 hover:text-foreground"
+          >
+            {clearLabel}
+          </button>
+        ) : null}
+      </span>
     );
   }
 
@@ -316,6 +333,7 @@ export function TaskMetadataBadges({
             value={startAt}
             addLabel={t.taskCard.addStartDate}
             editLabel={t.taskCard.editStartDate}
+            clearLabel={t.taskCard.clearStartDate}
             max={startMax}
             onUpdate={(next) => onUpdateTaskDates({ startAt: next })}
           />

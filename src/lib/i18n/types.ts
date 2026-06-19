@@ -2,7 +2,7 @@ export type Locale = "zh" | "en";
 
 export type Messages = {
   header: { tagline: string };
-  nav: { today: string; alignment: string; tasks: string; strategy: string };
+  nav: { today: string; alignment: string; tasks: string; strategy: string; calendar: string };
   common: {
     loading: string;
     retry: string;
@@ -139,6 +139,7 @@ export type Messages = {
     addDueDate: string;
     editStartDate: string;
     editDueDate: string;
+    clearStartDate: string;
     dueDisabledForRecurrence: string;
     intimidating: string;
     priority: string;
@@ -239,4 +240,21 @@ export type Messages = {
     carryOverShort: string;
   };
   weekday: Record<1 | 2 | 3 | 4 | 5 | 6 | 7, string>;
+  calendar: {
+    title: string;
+    subtitle: string;
+    unscheduledTitle: string;
+    unscheduledEmpty: string;
+    quickAddPlaceholder: string;
+    viewWeek: string;
+    viewMonth: string;
+    today: string;
+    prev: string;
+    next: string;
+    dragTask: string;
+    moreTasks: (count: number) => string;
+    weekRange: (start: string, end: string) => string;
+    calendarMonthTitle: (year: number, month: number) => string;
+    recurringNoUnscheduled: string;
+  };
 };

@@ -12,6 +12,7 @@ export function AppNav() {
   const links = [
     { href: "/alignment", label: t.nav.alignment },
     { href: "/tasks", label: t.nav.tasks },
+    { href: "/calendar", label: t.nav.calendar },
     { href: "/strategy", label: t.nav.strategy },
   ];
 

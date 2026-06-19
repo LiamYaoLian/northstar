@@ -373,6 +373,18 @@ Tasks 板**不做日历过滤**；**进行中** tab 排除 `done`；**已完成*
 
 `api-client.ts` 对 `/api/tasks`、`/api/subtasks`、`/api/completions` 前缀 **自动 append `?tz=`**。`PATCH /api/tasks/[id]` 与 `PATCH /api/subtasks/[id]` 解析 `tz` 用于 `occurrence_date` 计算。
 
+### 7.7 Calendar（排期日历）
+
+| 页面 | 数据源 | 客户端行为 |
+|------|--------|------------|
+| **Calendar** | `GET /api/tasks?sort=manual&tz=` | 过滤 `status !== done` + pillar filter；**未安排区** = `recurrence=none && startAt null`；日历格按 `taskAppearsOnDay()`（one-off 看 `startAt` 本地日，recurring 对齐 `shouldShowOnToday`） |
+
+- 路由 `/calendar`；URL `?view=week|month&date=YYYY-MM-DD`
+- 拖拽：`@dnd-kit` + `resolveDragDrop()` → `PATCH { startAt }`（周视图精确到 **15 分钟**；月视图仍为日期格）或拖回未安排 `{ startAt: null }`（仅 one-off）
+- 重复任务可拖到其它日期（更新 anchor `startAt`），**不可** drop 到未安排区
+- 快速添加：`POST /api/tasks` with `startAt: null`
+- Tasks 板仍**不做日历过滤**（Calendar 为独立页）
+
 ---
 
 ## 8. 周期性任务（Recurring）

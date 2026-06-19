@@ -7,6 +7,7 @@ export const en: Messages = {
     alignment: "Alignment",
     tasks: "Tasks",
     strategy: "Strategy",
+    calendar: "Calendar",
   },
   common: {
     loading: "Loading...",
@@ -143,6 +144,7 @@ export const en: Messages = {
     addStartDate: "Add start",
     addDueDate: "Add due",
     editStartDate: "Edit planned start date",
+    clearStartDate: "Clear start date",
     editDueDate: "Edit due date",
     dueDisabledForRecurrence: "Due dates don't apply to recurring tasks",
     intimidating: "Intimidating",
@@ -296,5 +298,26 @@ export const en: Messages = {
     5: "Fri",
     6: "Sat",
     7: "Sun",
+  },
+  calendar: {
+    title: "Calendar",
+    subtitle: "Drag tasks into 15-minute slots · Unscheduled tasks stay in the sidebar",
+    unscheduledTitle: "Unscheduled",
+    unscheduledEmpty: "No tasks without a start date.",
+    quickAddPlaceholder: "Add unscheduled task…",
+    viewWeek: "Week",
+    viewMonth: "Month",
+    today: "Today",
+    prev: "Previous",
+    next: "Next",
+    dragTask: "Drag to schedule task",
+    moreTasks: (count) => `+${count} more`,
+    weekRange: (start, end) => `${start} – ${end}`,
+    calendarMonthTitle: (year, month) =>
+      new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+    recurringNoUnscheduled: "Recurring tasks cannot be moved to unscheduled",
   },
 };
