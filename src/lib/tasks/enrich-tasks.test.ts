@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   enrichTasksWithPillars,
+  enrichTasksWithProjects,
   filterTasksByPillar,
+  filterTasksByPillarAndProject,
+  filterTasksByProject,
   mergeFilteredTaskReorder,
   parseStrategyPillars,
 } from "./enrich-tasks";
@@ -61,5 +64,54 @@ describe("mergeFilteredTaskReorder", () => {
       ["d", "b"],
     );
     expect(merged).toEqual(["a", "d", "c", "b"]);
+  });
+});
+
+describe("enrichTasksWithProjects", () => {
+  const projects = [
+    { id: "proj-job", name: "找工作", pillarId: "p-work", focusTrack: "进大厂" },
+  ];
+
+  it("attaches projectName when task has projectId", () => {
+    const [task] = enrichTasksWithProjects(
+      [makeTask({ id: "t1", projectId: "proj-job" })],
+      projects,
+    );
+    expect(task.projectName).toBe("找工作");
+  });
+
+  it("leaves projectName undefined when task has no project", () => {
+    const [task] = enrichTasksWithProjects(
+      [makeTask({ id: "t1", projectId: null })],
+      projects,
+    );
+    expect(task.projectName).toBeUndefined();
+  });
+});
+
+describe("filterTasksByProject", () => {
+  it("returns only tasks in the selected project", () => {
+    const tasks = [
+      makeTask({ id: "t1", projectId: "proj-job" }),
+      makeTask({ id: "t2", projectId: null }),
+      makeTask({ id: "t3", projectId: "proj-other" }),
+    ];
+    expect(filterTasksByProject(tasks, "proj-job").map((task) => task.id)).toEqual([
+      "t1",
+    ]);
+    expect(filterTasksByProject(tasks, null)).toHaveLength(3);
+  });
+});
+
+describe("filterTasksByPillarAndProject", () => {
+  it("applies pillar filter before project filter", () => {
+    const tasks = [
+      makeTask({ id: "t1", pillarId: "p-work", projectId: "proj-job" }),
+      makeTask({ id: "t2", pillarId: "p-work", projectId: "proj-other" }),
+      makeTask({ id: "t3", pillarId: "p-health", projectId: "proj-job" }),
+    ];
+    expect(
+      filterTasksByPillarAndProject(tasks, "p-work", "proj-job").map((task) => task.id),
+    ).toEqual(["t1"]);
   });
 });

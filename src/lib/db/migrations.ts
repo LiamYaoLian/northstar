@@ -216,6 +216,32 @@ export async function addRecurrenceColumnsIfMissing(
   }
 }
 
+export async function addProjectsTableIfMissing(client: Client): Promise<void> {
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      pillar_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      focus_track TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_projects_user_pillar_status
+    ON projects (user_id, pillar_id, status)
+  `);
+}
+
+export async function addTaskProjectIdColumnIfMissing(
+  client: Client,
+): Promise<void> {
+  await addColumnIfMissing(client, "tasks", "project_id", "TEXT");
+}
+
 export async function addCompletionEventsTableIfMissing(
   client: Client,
 ): Promise<void> {
@@ -373,6 +399,8 @@ export async function applyMigrations(client: Client, db: Db) {
   await addSubtaskEstimatedMinColumnIfMissing(client);
   await addTaskStartAtColumnIfMissing(client);
   await backfillTaskStartAt(client);
+  await addProjectsTableIfMissing(client);
+  await addTaskProjectIdColumnIfMissing(client);
   await addCompletionEventsTableIfMissing(client);
   await addActiveTimeSessionsTableIfMissing(client);
   await dedupeCompletionEvents(client);

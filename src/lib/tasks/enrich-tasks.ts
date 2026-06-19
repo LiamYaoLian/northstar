@@ -15,9 +15,17 @@ export type PillarOption = {
   focusTracks: FocusTrack[];
 };
 
+export type ProjectOption = {
+  id: string;
+  name: string;
+  pillarId: string;
+  focusTrack: string | null;
+};
+
 export type TaskRow = Task & {
   pillarName?: string;
   pillarColor?: string;
+  projectName?: string;
   subtasks?: Subtask[];
 };
 
@@ -53,6 +61,37 @@ export function filterTasksByPillar<T extends Task>(
 ): T[] {
   if (!pillarId) return taskList;
   return taskList.filter((task) => task.pillarId === pillarId);
+}
+
+export function enrichTasksWithProjects<T extends Task>(
+  taskList: T[],
+  projectList: ProjectOption[],
+): (T & { projectName?: string })[] {
+  const projectMap = new Map(projectList.map((project) => [project.id, project]));
+  return taskList.map((task) => {
+    const project = task.projectId ? projectMap.get(task.projectId) : null;
+    return {
+      ...task,
+      projectName: project?.name,
+    };
+  });
+}
+
+export function filterTasksByProject<T extends Task>(
+  taskList: T[],
+  projectId: string | null,
+): T[] {
+  if (!projectId) return taskList;
+  return taskList.filter((task) => task.projectId === projectId);
+}
+
+/** Plan filter chain: pillar then project. */
+export function filterTasksByPillarAndProject<T extends Task>(
+  taskList: T[],
+  pillarId: string | null,
+  projectId: string | null,
+): T[] {
+  return filterTasksByProject(filterTasksByPillar(taskList, pillarId), projectId);
 }
 
 export function mergeFilteredTaskReorder(

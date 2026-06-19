@@ -10,6 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { useLocale } from "@/lib/i18n/context";
 import type { ActiveTimerPayload } from "@/lib/services/timer-types";
@@ -36,6 +38,8 @@ const TimerContext = createContext<TimerContextValue | null>(null);
 
 export function TimerProvider({ children }: { children: ReactNode }) {
   const { t } = useLocale();
+  const pathname = usePathname();
+  const { status: sessionStatus } = useSession();
   const [active, setActive] = useState<ActiveTimerPayload | null>(null);
   const [serverSkewMs, setServerSkewMs] = useState(0);
   const [tick, setTick] = useState(0);
@@ -67,18 +71,24 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (pathname.startsWith("/login") || sessionStatus === "unauthenticated") {
+      setActive(null);
+      setServerSkewMs(0);
+      return;
+    }
+    if (sessionStatus === "loading") return;
     void refresh().catch(() => {});
-  }, [refresh]);
+  }, [refresh, pathname, sessionStatus]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        void refresh().catch(() => {});
-      }
+      if (document.visibilityState !== "visible") return;
+      if (pathname.startsWith("/login") || sessionStatus !== "authenticated") return;
+      void refresh().catch(() => {});
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refresh]);
+  }, [refresh, pathname, sessionStatus]);
 
   useEffect(() => {
     if (!active) return;

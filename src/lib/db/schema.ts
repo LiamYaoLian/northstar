@@ -115,6 +115,28 @@ export const strategyRevisions = sqliteTable(
   (table) => [index("idx_strategy_revisions_user_created").on(table.userId, table.createdAt)],
 );
 
+export const projects = sqliteTable(
+  "projects",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    pillarId: text("pillar_id").notNull(),
+    name: text("name").notNull(),
+    focusTrack: text("focus_track"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    status: text("status").notNull().default("active"), // active | archived
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_projects_user_pillar_status").on(
+      table.userId,
+      table.pillarId,
+      table.status,
+    ),
+  ],
+);
+
 export const tasks = sqliteTable(
   "tasks",
   {
@@ -124,6 +146,7 @@ export const tasks = sqliteTable(
     description: text("description"),
     pillarId: text("pillar_id"),
     focusTrack: text("focus_track"),
+    projectId: text("project_id"),
     status: text("status").notNull().default("todo"), // todo | in_progress | done
     intimidationScore: integer("intimidation_score").notNull().default(1),
     priorityScore: real("priority_score").notNull().default(0),
@@ -251,6 +274,7 @@ export const reviewSnapshots = sqliteTable(
 export type NorthStar = typeof northStars.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type StrategicPillar = typeof strategicPillars.$inferSelect;
+export type Project = typeof projects.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type ActiveTimeSession = typeof activeTimeSessions.$inferSelect;

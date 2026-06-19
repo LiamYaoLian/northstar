@@ -45,6 +45,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     description: null,
     pillarId: "p-work",
     focusTrack: "进大厂",
+    projectId: null,
     status: "todo",
     intimidationScore: 2,
     priorityScore: 0.5,

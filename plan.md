@@ -1,306 +1,242 @@
-# Calendar 拖拽排期功能
+# 引入 Project 概念 — 与 Label 冗余性分析
 
-新增 `/calendar` 页面，支持周/月视图切换；左侧「未安排」区域展示无 `startAt` 的一次性任务，用户可通过 @dnd-kit 拖拽到日历日期格（或拖回未安排区），通过现有 PATCH API 更新 `startAt`。
+> 在 Northstar 中引入 Work 交付物级别的 **Project** 概念，用于在 Pillar（Category）之下分组具体任务（如「找工作」下的 behavior question）。你描述的「label」与 Project 是同一层语义，不应再单独建 Label 实体；Project 与现有 focusTrack 也不重复，二者分属战略层与执行层。
 
-> **Plan 成熟度**：v3 ✅ — 可开工。阻塞项已关闭；剩余风险见「开放风险」。
+## Plan Critique Log
 
-## 实现清单
+| 轮次 | 发现的主要问题 | 处理 |
+|------|----------------|------|
+| R1 | 未指定 `buildTaskPatch` 中 pillar 变更时清空 `projectId`（与 focusTrack 清空同级） | 已补充 service 约束节 |
+| R1 | 缺少 `enrichTasksWithProjects`、`TaskRow.projectName`、乐观更新 hook | 已补充数据流节 |
+| R1 | 有 project filter 时拖拽排序未说明 `mergeFilteredTaskReorder` | 已补充 UI/reorder 节 |
+| R1 | 迁移仅写 Drizzle，未覆盖 `init-sql.ts` + `migrations.ts` 增量模式 | 已补充迁移节 |
+| R1 | Work pillar 检测写死「工作」字符串，与代码库 `findWorkPillar` 不一致 | 已改为 helper 约定 |
+| R1 | `project.focusTrack` 语义未定（约束 vs 提示） | 已决策：仅创建时默认提示 |
+| R1 | 项目名唯一性未定 | 已决策：同 user + Work pillar 下 active 名称唯一 |
+| R1 | Today 页已 redirect 到 `/tasks`，Phase 1 范围需对齐现状 | 已修正 |
+| R1 | v1 范围过大（color、DELETE、server filter 同时出现） | 已收窄 v1 |
+| R2 | （复查）上述缺口已闭合；剩余为 Phase 2 增强项，非阻塞 | 无 major problems |
 
-- [x] **backend-null-start** — `createTask`: 显式 `startAt: null` 时存 null；`undefined` 仍默认 now；补 integration test
-- [x] **calendar-utils** — `src/lib/tasks/calendar.ts` + 单元测试（分区、周/月 grid、appearsOnDay、carry-over）
-- [x] **calendar-dnd-helpers** — droppable/draggable id 解析与 `resolveDragDrop()` 纯函数 + 测试
-- [x] **calendar-components** — board / week / month / day-cell / unscheduled-panel / task-chip + DnD
-- [x] **calendar-page** — `/calendar`：加载、optimistic patch、`?view=&date=`、快速添加、strategy gate
-- [x] **nav-middleware-i18n** — app-nav、middleware matcher、en/zh i18n
-- [x] **task-card-clear-start** — TaskCard 开始日期支持「清除」（与拖回未安排一致）
-- [x] **design-doc** — `design.md` 新增 §7.x Calendar 页面说明
-
-## 目标行为
-
-```mermaid
-flowchart LR
-  subgraph backlog [UnscheduledPanel]
-    U["one-off, startAt null"]
-  end
-  subgraph calendar [WeekOrMonthGrid]
-    D1[DayCell]
-    D2[DayCell]
-  end
-  U -->|"drop → startAt = YYYY-MM-DD"| D1
-  D1 -->|"one-off: move startAt"| D2
-  D1 -->|"one-off only → startAt null"| U
-  D1 -->|"recurring: update startAt anchor"| D2
-```
-
-### 规则表
-
-| 场景 | 规则 |
-|------|------|
-| 未安排区 | `recurrenceType === "none"` 且 `startAt == null` 且 `status !== "done"` |
-| 日历 · 一次性 | 本地 `startAt` 日期 === 该格日期 |
-| 日历 · 重复 | `matchesRecurrenceDay()` **或** weekly carry-over 逾期（对齐 `shouldShowOnToday` 的 overdue 分支，仅 `todo`/`in_progress`） |
-| 拖拽 → 日期格 | `PATCH { startAt: "YYYY-MM-DD" }` → `normalizeTaskStartAt` → 本地 00:00 ISO |
-| 拖拽 → 未安排 | 仅 **一次性** 任务；`PATCH { startAt: null }` |
-| 重复任务拖拽 | 允许；只改 `startAt`（作为 anchor，**不改** recurrence）；**不可** drop 到未安排区 |
-| 已完成 | 未安排区与日历均不展示 |
-| 仅有 `dueAt`、无 `startAt` | 不进日历格；若需排期，从未安排区或 Tasks 页设 `startAt` |
-
-### 重复任务 + `startAt` 的产品语义（已确认）
-
-用户选择「重复任务可拖拽，只改 startAt」。实现语义：
-
-- 日历上仍按 **recurrence 规则** 出现在多个日期（daily 几乎每天可见）。
-- 拖拽到某日 = 更新 `startAt` anchor；**不会** 改变 recurrence 或「只出现在该日」。
-- UI：重复任务 chip 带 recurrence 小标识（复用 `TaskRecurrenceBadge` 样式或简化版）。
-- 拖向未安排区时：对 recurring **禁用 drop**（或 drag 结束后 noop + 无视觉反馈）。
-
-### 现有数据 UX 说明
-
-历史任务创建时 `startAt` 默认为 now，**未安排区初始为空**。用户可通过：(1) Calendar 快速添加（`startAt: null`）；(2) TaskCard 清除开始日期；(3) 从日历拖回未安排区 — 逐步积累 backlog。
+**R2 结论：plan 可进入实现阶段。**
 
 ---
 
-## 批判性审查（v1 → v2 已修复项）
+## 结论：不冗余，但「label」应统一为 Project
 
-| 问题 | 严重度 | 处理 |
-|------|--------|------|
-| 同一 `taskId` 在月视图出现 30+ 次，@dnd-kit 要求 draggable id 唯一 | **阻塞** | 改用 `occurrence:${taskId}:${YYYY-MM-DD}`；drop 时解析 taskId |
-| `closestCenter` 来自 sortable 列表，不适合网格 | 高 | Calendar 使用 `pointerWithin` 或 `rectIntersection` |
-| 未安排区规则与 recurring 拖拽冲突 | 高 | recurring 禁止 drop 到 unscheduled |
-| weekly carry-over 在 Today 可见但计划只用 `matchesRecurrenceDay` | 中 | `taskAppearsOnDay` 纳入 carry-over 逻辑 |
-| 刷新丢失当前周/月 | 中 | URL `?date=YYYY-MM-DD&view=week\|month` |
-| 无 strategy 时行为未定义 | 中 | 与 Tasks 页一致 → `/onboarding` |
-| TaskCard 难以清空 `startAt` | 中 | 纳入 `task-card-clear-start` |
-| `resolveTaskStartAt(null)` 测试与 create 行为不一致 | 低 | create 层分支；**不**改 `resolveTaskStartAt` 本身 |
-| 改 `startAt` 不影响 priority（仅用 `dueAt`） | 信息 | 无需 recalculate；文档注明 |
-| 无验收标准 | 低 | 见下文 Acceptance Criteria |
-| 月视图单日任务过多撑破布局 | 低 | 每格最多 3 chip + `+N`；周视图不截断 |
-| `useSearchParams` 需 Suspense | 低 | 对齐 `alignment/page.tsx` 拆分 Content |
+根据你的澄清（*behavior question 属于「找工作」*），当前产品缺的是 **Category 下的执行层分组**，而不是 free-form 标签。
 
-### 开放风险（接受或后续迭代）
+| 概念 | 现状 | 层级 | 职责 | 与 Project 关系 |
+|------|------|------|------|----------------|
+| **Pillar / Category** | 已实现 [`tasks.pillarId`](src/lib/db/schema.ts) | 战略层 | 人生平衡归属，驱动 Alignment 时间占比 | **正交**：Project 挂在 Work pillar 下，不替代 Category |
+| **Focus Track** | 已实现 [`tasks.focusTrack`](src/lib/db/schema.ts) | 战略子层（仅 Work） | 进大厂 / 探索方向 / 投资，带 `shareOfParent` 目标占比 | **不重复**：战略赛道 vs 具体交付物；一个 track 可有多个 project |
+| **你所说的 Label** | 不存在 | 执行层 | Category 下的具体项目（找工作） | **= Project**，用 Project 命名，不另建 `labels` 表 |
+| **Subtask** | 已实现 | 任务内 | 单任务拆解 | **不重复**：Project 跨多任务分组 |
 
-| 风险 | 说明 |
-|------|------|
-| daily recurring + 改 startAt | 用户可见「仍在每天出现」；靠 recurrence 标记与 tooltip 说明 |
-| 日历与 Tasks 双端改日期 | 各页 optimistic 独立；以 PATCH 为准，切换 Tab 时 `load()` 即可 |
-| 首版无 chip 内 complete | 有意 defer；避免 DnD 与按钮手势冲突 |
-
----
-
-## 后端改动
-
-### `createTask`（`src/lib/services/tasks.ts`）
-
-```ts
-// 现在
-const normalizedStart = resolveTaskStartAt(input.startAt, resolvedTz);
-
-// 改为
-const normalizedStart =
-  input.startAt === null
-    ? null
-    : resolveTaskStartAt(input.startAt, resolvedTz);
-```
-
-- `input.startAt === undefined` → 行为不变（Tasks 页 `resolveTaskStartAt` 后 POST）
-- `updateTask` / `isValidTaskDateRange` 已支持 `startAt: null`
-
-### 测试
-
-- 新增 `createTask` integration test：`startAt: null` 入库为 null
-- 现有 `task-dates.test.ts` 中 `resolveTaskStartAt(null)` **保持不变**
-
----
-
-## 日历工具层
-
-### `src/lib/tasks/calendar.ts`
-
-| 函数 | 说明 |
-|------|------|
-| `isUnscheduledTask(task, tz?)` | 未安排判定 |
-| `taskAppearsOnDay(task, dayInstant, tz, now?)` | one-off + recurring + weekly carry-over |
-| `buildWeekDays(anchor, tz)` | 7 天，`startOfLocalWeek` 起 |
-| `buildMonthGrid(anchor, tz)` | 5–6 行 × 7 列；`{ date, inMonth }` |
-| `startAtForCalendarDay(dateStr, tz)` | PATCH 用 `YYYY-MM-DD` |
-| `parseCalendarUrlState(searchParams, tz)` | 解析/默认 `view` + `date` |
-| `stepCalendarAnchor(anchor, view, direction, tz)` | prev/next 步进 |
-
-复用 `timezone.ts`；不引入新日期库。
-
-### `src/lib/tasks/calendar-dnd.ts`
-
-| 函数 | 说明 |
-|------|------|
-| `occurrenceDraggableId(taskId, dateStr)` | `occurrence:${taskId}:${dateStr}` |
-| `unscheduledDraggableId(taskId)` | `unscheduled:${taskId}` |
-| `dayDroppableId(dateStr)` | `day:YYYY-MM-DD` |
-| `UNscheduled_DROPPABLE_ID` | `drop:unscheduled` |
-| `resolveDragDrop(activeId, overId, task)` | 返回 `{ taskId, nextStartAt: string \| null } \| null` |
-
-单元测试覆盖：跨日移动、拖回未安排、recurring 拒绝 unscheduled、非法 over id。
-
----
-
-## UI 结构
-
-### 路由与导航
-
-- `src/app/calendar/page.tsx` — 薄壳 + `Suspense` 包裹 `CalendarPageContent`（对齐 `alignment/page.tsx`）
-- `src/components/app-nav.tsx` — Calendar 链接
-- `middleware.ts` matcher — `/calendar/:path*`
-
-### URL 状态
-
-| Query | 默认 | 说明 |
-|-------|------|------|
-| `view` | `week` | `week` \| `month` |
-| `date` | 今天（本地） | anchor 日期 `YYYY-MM-DD`；prev/next 更新此值 |
-
-模式参考 `alignment/page.tsx` 的 `?period=`。
-
-### 布局
-
-桌面：左未安排 + 右日历；移动端：未安排在上。顶栏：视图切换、prev/next、Today、可选 `CategoryFilter`（与 Tasks 一致，客户端 filter）。
-
-### 组件
-
-| 文件 | 职责 |
-|------|------|
-| `calendar-unscheduled-panel.tsx` | 未安排列表 + 快速添加（`POST { title, startAt: null, autoBreakdown: false }`） |
-| `calendar-task-chip.tsx` | 紧凑 chip；`useDraggable`；pillar 色点 + recurrence 标记 |
-| `calendar-day-cell.tsx` | `useDroppable`；当日 occurrences；月视图 `maxVisible=3` + overflow `+N` |
-| `calendar-week-view.tsx` | 7 列 |
-| `calendar-month-view.tsx` | 月网格；`inMonth=false` 日期 muted |
-| `calendar-board.tsx` | 单一 `DndContext`、`DragOverlay`、导航、drop 处理 |
-
-### 拖拽（@dnd-kit）
-
-**Sensors**（与 `sortable-task-list.tsx` 一致）：
-
-```ts
-useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-```
-
-**Collision**：`pointerWithin`（网格优先命中日期格）
-
-**Draggable 来源**：
-
-- 未安排区：`unscheduled:${taskId}`
-- 日历格：`occurrence:${taskId}:${dateStr}`（每格独立 id）
-
-**Droppable**：
-
-- `day:YYYY-MM-DD`
-- `drop:unscheduled`
-
-**onDragEnd**：
-
-1. `resolveDragDrop()` → `{ taskId, nextStartAt }`
-2. optimistic 更新 page `tasks` state
-3. `updateTaskDates(taskId, { startAt: nextStartAt })` via `useTaskActions`
-4. 失败 revert + `t.errors.updateTaskFailed` toast/inline（与 Tasks 页 `setError` 一致）
-
-**DragOverlay**：渲染被拖 chip 副本（从 activeId 解析 task + 源日期）
-
-**Drop 无效**：over 为 null 或 recurring → unscheduled → 静默取消，不 PATCH
-
-### 数据加载
-
-```ts
-GET /api/tasks?sort=manual  // tz 自动 append
-```
-
-客户端：
-
-- `enrichTasksWithPillars`
-- filter `status !== "done"`
-- optional pillar filter
-- partition：`isUnscheduledTask` vs calendar `taskAppearsOnDay`
-
-无需新 API。
-
----
-
-## i18n
-
-`src/lib/i18n/types.ts` 新增 `calendar` namespace + `nav.calendar`；同步 `en.ts` / `zh.ts`：
-
-- 标题、未安排区标题/空态/快速添加
-- `viewWeek` / `viewMonth` / `today` / `prev` / `next`
-- 拖拽 aria-label；recurring 不可拖至未安排的提示（tooltip 可选）
-- 月份标题 formatter：`calendarMonthTitle(year, month)`
-
----
-
-## TaskCard 小改动
-
-`task-metadata-badges.tsx` · `EditableTaskStartAt`：编辑态增加「清除」按钮 → `onUpdate(null)`。使 Tasks 页与 Calendar 未安排区行为一致。
-
----
-
-## 测试
-
-| 文件 | 覆盖 |
-|------|------|
-| `calendar.test.ts` | grid 边界、appearsOnDay、carry-over、DST |
-| `calendar-dnd.test.ts` | id 解析、drop 规则、recurring → unscheduled 拒绝 |
-| `tasks.integration.test.ts`（或现有） | create with `startAt: null` |
-| `calendar-board.test.tsx`（可选） | mock `resolveDragDrop` + optimistic |
-
----
-
-## 验收标准（Acceptance Criteria）
-
-1. 未安排区仅显示 `recurrence=none && !startAt && active` 任务。
-2. 从未安排拖到某日 → 任务出现在该日，从未安排区消失；刷新后仍正确。
-3. 一次性任务在日格间拖拽 → `startAt` 更新；拖回未安排 → `startAt` null。
-4. daily/weekly 重复任务在对应日期可见；可拖到另一日（更新 startAt），仍按 recurrence 多格显示。
-5. 重复任务无法 drop 到未安排区。
-6. 周/月切换、prev/next、Today 正确；URL `?view=&date=` 可分享/刷新保持。
-7. 无 strategy 跳转 onboarding；middleware 保护 `/calendar`。
-8. en/zh 文案完整；移动端布局可用。
-9. 单元测试通过；无 duplicate draggable id 控制台警告。
-
----
-
-## 不在首版范围
-
-- Tasks 页创建默认改为未安排
-- 时分粒度 / 时间块高度
-- 新 API endpoint
-- 日历上 complete/reopen/timer（点 chip 跳转 Tasks 或后续迭代）
-- 修改「Tasks 板不做日历过滤」原则（Calendar 为独立页）
-
----
-
-## 建议实现顺序
-
-```mermaid
-flowchart TD
-  A[backend-null-start + test] --> B[calendar.ts + calendar-dnd.ts]
-  B --> C[calendar-board + views]
-  C --> D[calendar/page + URL state]
-  D --> E[nav + middleware + i18n]
-  E --> F[task-card clear start]
-  F --> G[design.md + manual QA]
-```
-
----
-
-## 关键依赖
+推荐层级模型：
 
 ```mermaid
 flowchart TB
-  Page[calendar/page.tsx]
-  Board[calendar-board.tsx]
-  Utils[calendar.ts]
-  Dnd[calendar-dnd.ts]
-  Actions[use-task-actions.ts]
-  API["PATCH /api/tasks/id"]
-  Page --> Board
-  Board --> Utils
-  Board --> Dnd
-  Board --> Actions
-  Actions --> API
+  subgraph strategy [战略层 — 已有]
+    Pillar["Pillar / Category\n工作 / 健康 / …"]
+    FocusTrack["Focus Track\n进大厂 / 探索方向 / 投资"]
+    Pillar --> FocusTrack
+  end
+
+  subgraph execution [执行层 — 新增]
+    Project["Project\n找工作 / Northstar MVP"]
+    Task["Task\nPrepare behavior questions"]
+    Subtask["Subtask\nSTAR story draft"]
+    Project --> Task --> Subtask
+  end
+
+  FocusTrack -.->|"创建任务时默认提示"| Project
+  Pillar --> Project
 ```
+
+**典型映射示例**：
+
+- Pillar: 工作
+- Focus Track: 进大厂（战略：这类工作应占 Work 时间 50%）
+- Project: 找工作（执行：当前求职 initiative）
+- Task: 准备 behavior questions
+
+若同时引入 Label 实体，用户会在 UI 上看到「Category · Sub-track · Label/Project」三层命名，且 找工作 既可当 label 又可当 project — **语义重复、维护成本高**。建议：**只引入 Project，UI 文案用「项目」/「Project」，废弃 label 作为产品术语**。
+
+---
+
+## 与 focusTrack 的边界（避免误用）
+
+| 维度 | Focus Track | Project |
+|------|-------------|---------|
+| 谁定义 | Strategy / Onboarding 模板 | 用户随时创建 |
+| 数量 | 固定 3 条（Work preset） | 无上限 |
+| 驱动指标 | Alignment Work sub-tracks drift | 不进入 alignment / priority 公式（v1） |
+| 生命周期 | 随季度战略调整 | 随交付物启停（archive） |
+| 例子 | 进大厂 | 找工作、刷 Leetcode 300、Northstar MVP |
+
+**不要**用 Project 替代 focusTrack：后者是 [`computeWorkFocusTracks`](design.md) 的输入，改动会破坏战略对齐闭环。
+
+### `project.focusTrack` 决策（R1 闭合）
+
+- 字段为**可选默认提示**，不是硬约束。
+- **创建任务**时：若 `task.focusTrack` 未指定且选了 `projectId`，从 `project.focusTrack` 填入（与 classify 结果 merge：显式输入 > classify > project 默认）。
+- **已有任务**：不因 project 的 focusTrack 变化而强制改写 task.focusTrack。
+- **校验**：`project.focusTrack` 若存在，必须是当前 Work pillar 的 `focusTracks` 之一（与 task focusTrack 校验共用 helper）。
+
+---
+
+## 数据模型
+
+在 [`src/lib/db/schema.ts`](src/lib/db/schema.ts) 新增：
+
+```ts
+// projects — Work 交付物容器（v1 限定 Work pillar）
+projects: {
+  id, userId,
+  pillarId,          // FK → strategic_pillars；v1 校验必须为 Work pillar
+  name,              // 用户输入，如 "找工作"
+  focusTrack?,       // 可选，创建任务时的默认子赛道
+  sortOrder,
+  status: "active" | "archived",
+  createdAt, updatedAt,
+}
+
+// tasks 扩展
+tasks.projectId?     // nullable FK → projects
+```
+
+**v1 刻意不做**：`color` 字段、跨 pillar project、一任务多 project。
+
+**唯一性**：`(userId, pillarId, name)` 在 `status = 'active'` 时唯一（应用层校验 + unique index 可选；archive 后可复用同名）。
+
+### Service 约束（必须在 `buildTaskPatch` / `createTask` 实现）
+
+沿用 [`src/lib/services/tasks.ts`](src/lib/services/tasks.ts) 中 pillar/focusTrack 模式：
+
+1. `task.projectId` 非空 → `task.pillarId` 必须等于 `project.pillarId`。
+2. `pillarId` 变更且新 pillar **不是** Work（用 [`findWorkPillar`](src/lib/pillars.ts) / [`isWorkPillar`](src/lib/pillars.ts)，**禁止**硬编码 `"工作"`）→ 自动 `projectId = null`（与 focusTrack 清空同级，写在 `buildTaskPatch`）。
+3. `projectId` 变更 → 校验 project 存在、属于当前 user、且 `project.status === 'active'`。
+4. v1 创建 project 时校验 `pillarId === findWorkPillar(pillars)?.id`。
+5. **不改动**：`task_completion_events` 快照、alignment 聚合、priority 引擎 — 时间仍按 `pillarId` / `focusTrack` 入账。
+
+### 数据流 / 类型扩展
+
+| 位置 | 变更 |
+|------|------|
+| [`src/lib/tasks/enrich-tasks.ts`](src/lib/tasks/enrich-tasks.ts) | 新增 `ProjectOption`、`enrichTasksWithProjects()`、`filterTasksByProject()` |
+| `TaskRow` | 扩展 `projectName?: string` |
+| [`src/lib/hooks/use-task-actions.ts`](src/lib/hooks/use-task-actions.ts) | 新增 `changeProject(taskId, projectId)` + `buildProjectOptimisticPatch()` |
+| [`src/components/task-card/types.ts`](src/components/task-card/types.ts) | `onChangeProject` callback |
+| UI Work 检测 | 使用 [`isWorkPillarOption`](src/components/task-card/utils.ts)，不用字面量比较 |
+
+---
+
+## API 与服务层
+
+所有路由 `requireUser()` + userId 作用域（与现有 tasks API 一致）。
+
+### v1 端点
+
+| 端点 | 行为 |
+|------|------|
+| `GET /api/projects` | 列出当前用户 active projects（默认仅 Work pillar；`?includeArchived=1` 可选） |
+| `POST /api/projects` | 创建（name, pillarId, focusTrack?） |
+| `PATCH /api/projects/[id]` | 改名 / archive / unarchive / sortOrder |
+| 扩展 `POST/PATCH /api/tasks` | 接受 `projectId`；create 时应用 focusTrack 默认逻辑 |
+
+### v1 不做
+
+- `DELETE /api/projects/[id]` — 用 archive 代替；避免误删历史分组。
+- `GET /api/tasks?projectId=` — Tasks 页与 pillar 一样**客户端过滤**即可；server filter 留 Phase 2。
+
+核心逻辑：[`src/lib/services/projects.ts`](src/lib/services/projects.ts)（新建）+ 扩展 [`tasks.ts`](src/lib/services/tasks.ts) 的 `createTask` / `buildTaskPatch`。
+
+---
+
+## UI 改动（分阶段）
+
+> **现状**：`/today` 已 redirect 到 [`/tasks`](src/app/today/page.tsx)，Phase 1 以 Tasks 页为主入口。
+
+### Phase 1 — 最小可用
+
+1. **TaskCard** [`src/components/task-card/index.tsx`](src/components/task-card/index.tsx)
+   - `isWorkPillarOption(selectedPillar)` 时显示 `TaskProjectSelect`（仿 [`task-category-select.tsx`](src/components/task-card/task-category-select.tsx)）
+   - Badge：`工作 · 进大厂 · 找工作`（pillar · focusTrack · project）；无 project 时不显示第三段
+
+2. **Tasks 页** [`src/app/tasks/page.tsx`](src/app/tasks/page.tsx)
+   - 加载 `GET /api/projects`，创建表单在 Work pillar 下可选/新建 project
+   - **筛选链**：`filterTasksByStatus` → `filterTasksByPillar` → `filterTasksByProject`（仅当 categoryFilter 为 Work 时显示 `ProjectFilter`）
+   - 离开 Work category 时自动 `setProjectFilter(null)`
+   - **拖拽排序**：当 `categoryFilter || projectFilter` 活跃时，`handleReorder` 必须用 [`mergeFilteredTaskReorder`](src/lib/tasks/enrich-tasks.ts)（与现有 pillar filter 逻辑合并，不能漏 project filter）
+
+3. **i18n** [`src/lib/i18n/messages/en.ts`](src/lib/i18n/messages/zh.ts) + [`types.ts`](src/lib/i18n/types.ts)
+   - `project` / `projects` / `noProject` / `createProject` / `filterByProject` / `archiveProject`
+   - 不用 `label` 作产品名词（避免与 [`StrategyTemplate.label`](src/lib/strategy/templates.ts) 混淆）
+
+### Phase 2 — 增强（可选）
+
+- Tasks 页按 project 分组（section headers）
+- Calendar project filter（[`calendar-board.tsx`](src/components/calendar/calendar-board.tsx)）
+- Classify 关键词建议 project（规则 fallback）
+- `GET /api/tasks?projectId=` server-side filter
+- Project 完成率摘要（`done / total`）
+- Completions CSV 增加 `projectName` 列（需 completion 快照扩展）
+
+**不建议做**：独立 `/projects` 页、跨 pillar project、多 project per task。
+
+---
+
+## 测试与迁移
+
+本仓库迁移为 **双轨**：[`init-sql.ts`](src/lib/db/init-sql.ts)（新库 DDL）+ [`migrations.ts`](src/lib/db/migrations.ts) 中 `addXxxIfMissing`（存量库增量）。仅跑 Drizzle 不够。
+
+1. `schema.ts` 新增 `projects` 表 + `tasks.project_id`
+2. 同步 `init-sql.ts`
+3. 在 `applyMigrations()` 注册 `addProjectsTableIfMissing()` + `addTaskProjectIdColumnIfMissing()`（仿 `addCompletionEventsTableIfMissing`）
+4. 可选 Drizzle SQL migration 文件（`drizzle/` 目录）
+
+**集成测试**（仿 [`tasks-create.integration.test.ts`](src/lib/services/tasks-create.integration.test.ts)）：
+
+- create project → assign task → 读回 `projectName`
+- create task with project → 继承 `project.focusTrack` 当 task 未指定
+- update pillar 到非 Work → `projectId` 清空
+- archive project → 不可再 assign；已有 task 保留 `projectId` 但 picker 不展示（或展示为只读 stale）
+- 同名 active project 拒绝创建
+
+---
+
+## 决策摘要
+
+```mermaid
+flowchart LR
+  Q["引入 label 还是 project?"]
+  Q --> A["只引入 Project"]
+  A --> B["你描述的 label = Project"]
+  A --> C["不建 labels 表"]
+  A --> D["保留 pillar + focusTrack"]
+```
+
+**推荐路径**：引入 **Project**（Work 交付物分组），**不引入 Label**；保留 Category（pillar）与 Sub-track（focusTrack）作为战略层，三者各司其职。
+
+---
+
+## 实现清单
+
+- [x] Schema：`projects` 表 + `tasks.projectId`；`init-sql.ts` + `migrations.ts` 增量函数
+- [x] Service：`projects.ts` CRUD；扩展 `createTask` / `buildTaskPatch` 的 project 校验与 focusTrack 默认
+- [x] 数据流：`enrichTasksWithProjects`、`filterTasksByProject`、`filterTasksByPillarAndProject`；`buildProjectOptimisticPatch`
+- [x] 单元/集成测试（39 passing + 12 UI todos）— 见下方测试清单
+- [ ] API routes：`/api/projects`、tasks 扩展
+- [ ] UI：TaskCard `TaskProjectSelect` + badge；Tasks 页 project 创建/筛选/reorder 合并逻辑
+- [ ] i18n
+
+## 测试清单（TDD — 已完成）
+
+| 文件 | 覆盖 |
+|------|------|
+| `src/lib/tasks/project-domain.test.ts` | focusTrack 优先级、pillar 变更清空 project、focusTrack 校验 |
+| `src/lib/tasks/project-optimistic.test.ts` | 乐观更新 patch |
+| `src/lib/tasks/enrich-tasks.test.ts` | enrich/filter/组合筛选链 |
+| `src/lib/services/projects.integration.test.ts` | CRUD、唯一性、archive、Work pillar 约束 |
+| `src/lib/services/projects-tasks.integration.test.ts` | create/patch task + project 联动 |
+| `src/lib/plan.tdd.test.ts` | UI/API 待实现 todo 契约（12 skipped） |

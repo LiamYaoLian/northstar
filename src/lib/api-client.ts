@@ -38,9 +38,13 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
-      const loginUrl = new URL("/login", window.location.origin);
-      loginUrl.searchParams.set("callbackUrl", window.location.pathname);
-      window.location.assign(loginUrl.toString());
+      const pathname = window.location.pathname;
+      // Already on a public auth page — avoid redirect loop (e.g. TimerProvider on /login).
+      if (!pathname.startsWith("/login")) {
+        const loginUrl = new URL("/login", window.location.origin);
+        loginUrl.searchParams.set("callbackUrl", pathname);
+        window.location.assign(loginUrl.toString());
+      }
     }
     const base =
       data &&

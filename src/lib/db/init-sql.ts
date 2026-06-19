@@ -75,6 +75,18 @@ CREATE TABLE IF NOT EXISTS strategy_revisions (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  pillar_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  focus_track TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
   user_id TEXT,
@@ -82,6 +94,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   pillar_id TEXT,
   focus_track TEXT,
+  project_id TEXT,
   status TEXT NOT NULL DEFAULT 'todo',
   intimidation_score INTEGER NOT NULL DEFAULT 1,
   priority_score REAL NOT NULL DEFAULT 0,

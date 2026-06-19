@@ -22,6 +22,15 @@ import {
   type BreakdownPreviewResult,
   type ProposedSubtask,
 } from "@/lib/tasks/subtask-diff";
+import {
+  resolveCreateFocusTrack,
+  shouldClearProjectIdOnPillarChange,
+} from "@/lib/tasks/project-domain";
+import {
+  assertAssignableProject,
+  getProjectById,
+  ProjectValidationError,
+} from "@/lib/services/projects";
 import { analyzeTaskTitle } from "@/lib/tasks/analyze";
 import { estimateTaskMinutes } from "@/lib/tasks/estimate-time";
 import { sumSubtaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
@@ -214,6 +223,7 @@ export async function createTask(input: {
   description?: string;
   pillarId?: string;
   focusTrack?: string;
+  projectId?: string;
   estimatedMin?: number;
   startAt?: string | null;
   dueAt?: string | null;
@@ -233,10 +243,24 @@ export async function createTask(input: {
     : await pillarRows;
   const { classification: classified, estimate, recurrence: inferredRecurrence } =
     await analyzeTaskTitle(input.title, pillars);
-  const { pillarId, focusTrack } = resolveCreateClassification(
+  let pillarId = input.pillarId ?? classified.pillarId ?? null;
+  let project = null as Awaited<ReturnType<typeof getProjectById>>;
+  if (input.projectId) {
+    project = await getProjectById(input.projectId, userId);
+    if (!project || project.status !== "active") {
+      throw new ProjectValidationError("Archived projects cannot be assigned");
+    }
+    if (pillarId && pillarId !== project.pillarId) {
+      throw new ProjectValidationError("Task pillar must match project pillar");
+    }
+    pillarId = pillarId ?? project.pillarId;
+  }
+  const { focusTrack } = resolveCreateClassification(
     input,
     pillars,
     classified,
+    project?.focusTrack ?? null,
+    pillarId,
   );
   const resolvedRecurrence = resolveCreateRecurrence(input, inferredRecurrence);
 
@@ -277,6 +301,7 @@ export async function createTask(input: {
     description: input.description ?? null,
     pillarId,
     focusTrack,
+    projectId: project?.id ?? null,
     status: "todo",
     intimidationScore: input.intimidationScore ?? 2,
     priorityScore: 0,
@@ -302,26 +327,23 @@ export async function createTask(input: {
 }
 
 function resolveCreateClassification(
-  input: { pillarId?: string; focusTrack?: string },
+  input: { pillarId?: string; focusTrack?: string; projectId?: string },
   pillars: StrategicPillar[],
   classified: ClassifyResult,
+  projectFocusTrack: string | null,
+  resolvedPillarId: string | null,
 ) {
-  const pillarId = input.pillarId ?? classified.pillarId ?? null;
-  let focusTrack: string | null | undefined = input.focusTrack;
   const workPillar = findWorkPillar(pillars);
-
-  if (focusTrack === undefined) {
-    if (input.pillarId) {
-      focusTrack =
-        input.pillarId === workPillar?.id ? classified.focusTrack : null;
-    } else {
-      focusTrack = classified.focusTrack;
-    }
-  }
+  const focusTrack = resolveCreateFocusTrack({
+    explicitFocusTrack: input.focusTrack,
+    classifiedFocusTrack: classified.focusTrack,
+    projectFocusTrack,
+    pillarId: resolvedPillarId,
+    workPillarId: workPillar?.id,
+  });
 
   return {
-    pillarId,
-    focusTrack: focusTrack ?? null,
+    focusTrack,
   };
 }
 
@@ -609,6 +631,7 @@ export async function updateTask(
     status: string;
     pillarId: string | null;
     focusTrack: string | null;
+    projectId: string | null;
     intimidationScore: number;
     estimatedMin: number | null;
     startAt: string | null;
@@ -703,6 +726,7 @@ async function buildTaskPatch(
     dueAt,
     pillarId,
     focusTrack,
+    projectId,
     recurrenceType,
     recurrenceDays,
     recurrenceCarryOver,
@@ -772,10 +796,25 @@ async function buildTaskPatch(
     }
   }
 
+  const needsWorkPillarContext =
+    pillarId !== undefined || projectId !== undefined;
+  let workPillar:
+    | Awaited<ReturnType<typeof findWorkPillar>>
+    | undefined;
+
+  if (needsWorkPillarContext) {
+    const pillarRows = db.select().from(strategicPillars);
+    const pillars = userId
+      ? await pillarRows.where(eq(strategicPillars.userId, userId))
+      : await pillarRows;
+    workPillar = findWorkPillar(pillars);
+  }
+
   if (pillarId !== undefined) {
     if (pillarId === null) {
       safePatch.pillarId = null;
       if (focusTrack === undefined) safePatch.focusTrack = null;
+      safePatch.projectId = null;
     } else {
       const pillar = (
         await db
@@ -785,19 +824,33 @@ async function buildTaskPatch(
       )[0];
       if (!pillar) return null;
       safePatch.pillarId = pillarId;
-      const pillarRows = db.select().from(strategicPillars);
-      const pillars = userId
-        ? await pillarRows.where(eq(strategicPillars.userId, userId))
-        : await pillarRows;
-      const workPillar = findWorkPillar(pillars);
       if (!isWorkPillar(pillar, workPillar) && focusTrack === undefined) {
         safePatch.focusTrack = null;
+      }
+      if (shouldClearProjectIdOnPillarChange(pillarId, workPillar?.id)) {
+        safePatch.projectId = null;
       }
     }
   }
 
   if (focusTrack !== undefined) {
     safePatch.focusTrack = focusTrack;
+  }
+
+  if (projectId !== undefined) {
+    if (projectId === null) {
+      safePatch.projectId = null;
+    } else {
+      const effectivePillarId =
+        (safePatch.pillarId as string | null | undefined) ?? existing.pillarId;
+      await assertAssignableProject(
+        projectId,
+        effectivePillarId,
+        userId,
+        db,
+      );
+      safePatch.projectId = projectId;
+    }
   }
 
   return safePatch;
