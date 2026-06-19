@@ -7,6 +7,7 @@ import { TaskCard } from "@/components/task-card";
 import { SortableTaskList } from "@/components/sortable-task-list";
 import { TaskStatusFilterBar } from "@/components/task-status-filter";
 import { apiFetch } from "@/lib/api-client";
+import { useTimer } from "@/components/timer-provider";
 import { useTaskActions } from "@/lib/hooks/use-task-actions";
 import { useLocale } from "@/lib/i18n/context";
 import { translateFocusTrack, translatePillar } from "@/lib/i18n/entities";
@@ -40,6 +41,13 @@ type EstimatePreview = {
   source: "openai" | "rules";
 };
 
+type RecurrencePreview = {
+  recurrenceType: "none" | "daily" | "weekly";
+  recurrenceDays: number[];
+  recurrenceCarryOver: boolean;
+  source: "openai" | "rules";
+};
+
 export default function TasksPage() {
   const router = useRouter();
   const { locale, t } = useLocale();
@@ -53,9 +61,14 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("active");
   const [todayOnly, setTodayOnly] = useState(false);
   const [recurrence, setRecurrence] = useState(defaultRecurrenceFormValue);
+  const [recurrenceTouched, setRecurrenceTouched] = useState(false);
   const [autoClassify, setAutoClassify] = useState<ClassifyPreview | null>(null);
   const [autoEstimate, setAutoEstimate] = useState<EstimatePreview | null>(null);
+  const [autoRecurrence, setAutoRecurrence] = useState<RecurrencePreview | null>(
+    null,
+  );
   const [analyzing, setAnalyzing] = useState(false);
+  const { registerOnStop } = useTimer();
 
   const load = useCallback(async () => {
     try {
@@ -98,6 +111,12 @@ export default function TasksPage() {
   }, [load]);
 
   useEffect(() => {
+    return registerOnStop(() => {
+      void load();
+    });
+  }, [load, registerOnStop]);
+
+  useEffect(() => {
     if (newTaskPillarId) setAutoClassify(null);
   }, [newTaskPillarId]);
 
@@ -106,6 +125,7 @@ export default function TasksPage() {
     if (!trimmed || pillars.length === 0) {
       setAutoClassify(null);
       setAutoEstimate(null);
+      setAutoRecurrence(null);
       setAnalyzing(false);
       return;
     }
@@ -118,6 +138,7 @@ export default function TasksPage() {
           const data = await apiFetch<{
             classification: ClassifyPreview;
             estimate: EstimatePreview;
+            recurrence: RecurrencePreview;
           }>("/api/tasks/classify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -125,12 +146,21 @@ export default function TasksPage() {
           });
           if (!cancelled) {
             setAutoEstimate(data.estimate);
+            setAutoRecurrence(data.recurrence);
             if (!newTaskPillarId) setAutoClassify(data.classification);
+            if (!recurrenceTouched) {
+              setRecurrence({
+                recurrenceType: data.recurrence.recurrenceType,
+                recurrenceDays: data.recurrence.recurrenceDays,
+                recurrenceCarryOver: data.recurrence.recurrenceCarryOver,
+              });
+            }
           }
         } catch {
           if (!cancelled) {
             setAutoClassify(null);
             setAutoEstimate(null);
+            setAutoRecurrence(null);
           }
         } finally {
           if (!cancelled) setAnalyzing(false);
@@ -142,7 +172,7 @@ export default function TasksPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [title, pillars, newTaskPillarId]);
+  }, [title, pillars, newTaskPillarId, recurrenceTouched]);
 
   const autoLabel = useMemo(() => {
     if (!autoClassify?.pillarName) return null;
@@ -152,6 +182,22 @@ export default function TasksPage() {
     }
     return pillar;
   }, [autoClassify, locale]);
+
+  const recurrenceLabel = useMemo(() => {
+    if (!autoRecurrence || recurrenceTouched) return null;
+    const typeLabel = t.recurrence[autoRecurrence.recurrenceType];
+    const source =
+      autoRecurrence.source === "openai"
+        ? t.tasks.classifySourceAi
+        : t.tasks.classifySourceRules;
+    return `${typeLabel} · ${source}`;
+  }, [
+    autoRecurrence,
+    recurrenceTouched,
+    t.recurrence,
+    t.tasks.classifySourceAi,
+    t.tasks.classifySourceRules,
+  ]);
 
   const estimateLabel = useMemo(() => {
     if (autoEstimate?.estimatedMin == null) return null;
@@ -171,6 +217,32 @@ export default function TasksPage() {
     t.tasks.classifySourceRules,
   ]);
 
+  const applyOptimisticTaskPatch = useCallback(
+    (id: string, patch: Record<string, unknown>) => {
+      let snapshotTasks: TaskRow[] | null = null;
+      let snapshotToday: TaskRow[] | null = null;
+
+      setTasks((current) => {
+        snapshotTasks = current;
+        return current.map((task) =>
+          task.id === id ? { ...task, ...patch } : task,
+        );
+      });
+      setTodayTasks((current) => {
+        snapshotToday = current;
+        return current.map((task) =>
+          task.id === id ? { ...task, ...patch } : task,
+        );
+      });
+
+      return () => {
+        if (snapshotTasks) setTasks(snapshotTasks);
+        if (snapshotToday) setTodayTasks(snapshotToday);
+      };
+    },
+    [],
+  );
+
   const {
     recalculating,
     patchTask,
@@ -179,6 +251,8 @@ export default function TasksPage() {
     breakdownTask,
     applyBreakdown,
     toggleSubtask,
+    updateTaskTitle,
+    updateEstimatedMin,
     updateSubtaskTitle,
     addSubtask,
     deleteSubtask,
@@ -189,6 +263,7 @@ export default function TasksPage() {
     reload: load,
     errors: t.errors,
     onError: setError,
+    applyOptimisticTaskPatch,
   });
 
   async function addTask(e: React.FormEvent) {
@@ -203,21 +278,25 @@ export default function TasksPage() {
           title: title.trim(),
           autoBreakdown: true,
           ...(newTaskPillarId ? { pillarId: newTaskPillarId } : {}),
-          ...(recurrence.recurrenceType !== "none"
-            ? {
-                recurrenceType: recurrence.recurrenceType,
-                recurrenceDays:
-                  recurrence.recurrenceType === "weekly"
-                    ? recurrence.recurrenceDays
-                    : null,
-                recurrenceCarryOver: recurrence.recurrenceCarryOver,
-              }
+          ...(recurrenceTouched
+            ? recurrence.recurrenceType !== "none"
+              ? {
+                  recurrenceType: recurrence.recurrenceType,
+                  recurrenceDays:
+                    recurrence.recurrenceType === "weekly"
+                      ? recurrence.recurrenceDays
+                      : null,
+                  recurrenceCarryOver: recurrence.recurrenceCarryOver,
+                }
+              : { recurrenceType: "none" }
             : {}),
         }),
       });
       setTitle("");
       setNewTaskPillarId("");
       setRecurrence(defaultRecurrenceFormValue);
+      setRecurrenceTouched(false);
+      setAutoRecurrence(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errors.addTaskFailed);
@@ -275,10 +354,9 @@ export default function TasksPage() {
       onDeleteSubtask={(id) => void deleteSubtask(id)}
       onReorderSubtasks={reorderSubtasks}
       onToggleSubtask={toggleSubtask}
+      onUpdateTitle={updateTaskTitle}
       onUpdateSubtaskTitle={updateSubtaskTitle}
-      onUpdateEstimatedMin={(id, minutes) =>
-        void patchTask(id, { estimatedMin: minutes })
-      }
+      onUpdateEstimatedMin={updateEstimatedMin}
       onToggleIntimidating={(id, intimidating) =>
         void patchTask(id, { intimidationScore: intimidating ? 4 : 2 })
       }
@@ -293,6 +371,7 @@ export default function TasksPage() {
           : undefined
       }
       onLogTime={(id, minutes) => void logTime(id, minutes)}
+      onTimerError={setError}
       onUpdateRecurrence={(id, value) =>
         void patchTask(id, {
           recurrenceType: value.recurrenceType,
@@ -391,7 +470,10 @@ export default function TasksPage() {
         </div>
         <TaskRecurrenceForm
           value={recurrence}
-          onChange={setRecurrence}
+          onChange={(value) => {
+            setRecurrenceTouched(true);
+            setRecurrence(value);
+          }}
           leadingButton={
             <button
               type="button"
@@ -432,6 +514,7 @@ export default function TasksPage() {
                 ) : (
                   t.taskCard.uncategorized
                 )}
+                {recurrenceLabel && <> · {recurrenceLabel}</>}
                 {estimateLabel && <> · {estimateLabel}</>}
               </>
             )}

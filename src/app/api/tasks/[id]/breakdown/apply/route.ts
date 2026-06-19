@@ -30,6 +30,9 @@ export async function POST(
       .map((item) => ({
         title: item.title.trim(),
         ...(item.existingId ? { existingId: item.existingId } : {}),
+        ...(item.estimatedMin != null && item.estimatedMin > 0
+          ? { estimatedMin: Math.round(item.estimatedMin) }
+          : {}),
       }));
 
     if (safeProposed.length === 0) {

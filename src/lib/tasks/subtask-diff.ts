@@ -4,6 +4,7 @@ import type { BreakdownItem } from "@/lib/ai/breakdown";
 export type ProposedSubtask = {
   title: string;
   existingId?: string;
+  estimatedMin?: number;
 };
 
 export type BreakdownPreviewResult = {
@@ -13,13 +14,14 @@ export type BreakdownPreviewResult = {
   summary?: string;
   source: "openai" | "rules";
   noChanges?: boolean;
+  estimatedMinTotal?: number;
 };
 
 export type SubtaskDiffLine =
-  | { type: "unchanged"; id: string; title: string; isDone: boolean }
-  | { type: "removed"; id: string; title: string; isDone: boolean }
-  | { type: "added"; title: string }
-  | { type: "renamed"; id: string; from: string; to: string; isDone: boolean };
+  | { type: "unchanged"; id: string; title: string; isDone: boolean; estimatedMin?: number }
+  | { type: "removed"; id: string; title: string; isDone: boolean; estimatedMin?: number }
+  | { type: "added"; title: string; estimatedMin?: number }
+  | { type: "renamed"; id: string; from: string; to: string; isDone: boolean; estimatedMin?: number };
 
 export function resolveProposedSubtasks(
   existing: Pick<Subtask, "id" | "title">[],
@@ -34,9 +36,9 @@ export function resolveProposedSubtasks(
     );
     if (match) {
       usedIds.add(match.id);
-      return { title, existingId: match.id };
+      return { title, existingId: match.id, estimatedMin: item.estimatedMin };
     }
-    return { title };
+    return { title, estimatedMin: item.estimatedMin };
   });
 }
 
@@ -45,7 +47,7 @@ export function hasSubtaskDiffChanges(diff: SubtaskDiffLine[]): boolean {
 }
 
 export function computeSubtaskDiff(
-  existing: Pick<Subtask, "id" | "title" | "isDone" | "sortOrder">[],
+  existing: Pick<Subtask, "id" | "title" | "isDone" | "sortOrder" | "estimatedMin">[],
   proposed: ProposedSubtask[],
 ): SubtaskDiffLine[] {
   const sortedExisting = [...existing].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -65,6 +67,7 @@ export function computeSubtaskDiff(
         id: current.id,
         title: current.title,
         isDone: current.isDone,
+        estimatedMin: proposed[proposedIndex]?.estimatedMin ?? current.estimatedMin ?? undefined,
       });
       existingIndex += 1;
       proposedIndex += 1;
@@ -78,12 +81,17 @@ export function computeSubtaskDiff(
         id: current.id,
         title: current.title,
         isDone: current.isDone,
+        estimatedMin: current.estimatedMin ?? undefined,
       });
       existingIndex += 1;
       continue;
     }
 
-    lines.push({ type: "added", title: proposed[proposedIndex].title });
+    lines.push({
+      type: "added",
+      title: proposed[proposedIndex].title,
+      estimatedMin: proposed[proposedIndex].estimatedMin,
+    });
     proposedIndex += 1;
   }
 

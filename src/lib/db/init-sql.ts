@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS subtasks (
   title TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
   is_done INTEGER NOT NULL DEFAULT 0,
+  estimated_min INTEGER,
   created_at TEXT NOT NULL
 );
 

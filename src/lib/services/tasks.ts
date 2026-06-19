@@ -21,6 +21,9 @@ import {
   type ProposedSubtask,
 } from "@/lib/tasks/subtask-diff";
 import { analyzeTaskTitle } from "@/lib/tasks/analyze";
+import { estimateTaskMinutes } from "@/lib/tasks/estimate-time";
+import { sumSubtaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
+import type { RecurrenceInference } from "@/lib/tasks/infer-recurrence";
 import type { ClassifyResult } from "@/lib/tasks/classify";
 import {
   applyManualReorderScores,
@@ -214,15 +217,14 @@ export async function createTask(input: {
   const pillars = userId
     ? await pillarRows.where(eq(strategicPillars.userId, userId))
     : await pillarRows;
-  const { classification: classified, estimate } = await analyzeTaskTitle(
-    input.title,
-    pillars,
-  );
+  const { classification: classified, estimate, recurrence: inferredRecurrence } =
+    await analyzeTaskTitle(input.title, pillars);
   const { pillarId, focusTrack } = resolveCreateClassification(
     input,
     pillars,
     classified,
   );
+  const resolvedRecurrence = resolveCreateRecurrence(input, inferredRecurrence);
 
   const taskId = id();
   const taskRows = db.select().from(tasks);
@@ -234,13 +236,15 @@ export async function createTask(input: {
     0,
   );
 
-  const recurrenceType = input.recurrenceType ?? "none";
+  const recurrenceType = resolvedRecurrence.recurrenceType;
   const recurrenceDays =
-    recurrenceType === "weekly" && input.recurrenceDays?.length
-      ? JSON.stringify(input.recurrenceDays)
+    recurrenceType === "weekly" && resolvedRecurrence.recurrenceDays?.length
+      ? JSON.stringify(resolvedRecurrence.recurrenceDays)
       : null;
   const recurrenceCarryOver =
-    recurrenceType === "weekly" ? Boolean(input.recurrenceCarryOver) : false;
+    recurrenceType === "weekly"
+      ? Boolean(resolvedRecurrence.recurrenceCarryOver)
+      : false;
 
   await db.insert(tasks).values({
     id: taskId,
@@ -293,6 +297,46 @@ function resolveCreateClassification(
   return {
     pillarId,
     focusTrack: focusTrack ?? null,
+  };
+}
+
+function resolveCreateRecurrence(
+  input: {
+    recurrenceType?: RecurrenceType;
+    recurrenceDays?: number[] | null;
+    recurrenceCarryOver?: boolean;
+  },
+  inferred: RecurrenceInference,
+): {
+  recurrenceType: RecurrenceType;
+  recurrenceDays: number[] | null;
+  recurrenceCarryOver: boolean;
+} {
+  if (input.recurrenceType === undefined) {
+    return {
+      recurrenceType: inferred.recurrenceType,
+      recurrenceDays:
+        inferred.recurrenceType === "weekly" && inferred.recurrenceDays.length
+          ? inferred.recurrenceDays
+          : null,
+      recurrenceCarryOver:
+        inferred.recurrenceType === "weekly"
+          ? inferred.recurrenceCarryOver
+          : false,
+    };
+  }
+
+  const recurrenceType = input.recurrenceType;
+  return {
+    recurrenceType,
+    recurrenceDays:
+      recurrenceType === "weekly" && input.recurrenceDays?.length
+        ? input.recurrenceDays
+        : null,
+    recurrenceCarryOver:
+      recurrenceType === "weekly"
+        ? Boolean(input.recurrenceCarryOver)
+        : false,
   };
 }
 
@@ -362,6 +406,7 @@ export async function previewBreakdownTask(
     summary: breakdown.summary,
     source: breakdown.source,
     noChanges: !hasSubtaskDiffChanges(diff),
+    estimatedMinTotal: breakdown.estimatedMinTotal,
   };
 }
 
@@ -404,6 +449,12 @@ export async function applyBreakdownPreview(
       if (current.title !== title) {
         patch.title = title;
       }
+      if (
+        item.estimatedMin !== undefined &&
+        current.estimatedMin !== item.estimatedMin
+      ) {
+        patch.estimatedMin = item.estimatedMin;
+      }
       if (Object.keys(patch).length > 0) {
         updates.push({ id: item.existingId, patch });
       }
@@ -417,6 +468,7 @@ export async function applyBreakdownPreview(
       title,
       sortOrder,
       isDone: false,
+      estimatedMin: item.estimatedMin ?? null,
       createdAt: ts,
     });
   }
@@ -439,7 +491,6 @@ export async function applyBreakdownPreview(
         .update(tasks)
         .set({
           intimidationScore: breakdown.intimidationScore ?? task.intimidationScore,
-          estimatedMin: task.estimatedMin ?? breakdown.estimatedMinTotal ?? null,
           updatedAt: ts,
         })
         .where(scopedTaskId(taskId, userId));
@@ -447,6 +498,15 @@ export async function applyBreakdownPreview(
       await tx.update(tasks).set({ updatedAt: ts }).where(scopedTaskId(taskId, userId));
     }
   });
+
+  const syncedSubtasks = await listSubtasks(taskId, userId);
+  const estimatedMin = sumSubtaskEstimatedMin(syncedSubtasks);
+  if (syncedSubtasks.length > 0) {
+    await db
+      .update(tasks)
+      .set({ estimatedMin, updatedAt: nowIso() })
+      .where(scopedTaskId(taskId, userId));
+  }
 
   return {
     preview: false,
@@ -734,6 +794,7 @@ export async function createSubtask(
   const existing = await listSubtasks(taskId, userId);
   const ts = nowIso();
   const subtaskId = id();
+  const estimate = await estimateTaskMinutes(input.title.trim());
 
   await db.insert(subtasks).values({
     id: subtaskId,
@@ -742,10 +803,19 @@ export async function createSubtask(
     title: input.title.trim(),
     sortOrder: existing.length,
     isDone: false,
+    estimatedMin: estimate.estimatedMin,
     createdAt: ts,
   });
 
-  await db.update(tasks).set({ updatedAt: ts }).where(scopedTaskId(taskId, userId));
+  const syncedSubtasks = await listSubtasks(taskId, userId);
+  await db
+    .update(tasks)
+    .set({
+      estimatedMin: sumSubtaskEstimatedMin(syncedSubtasks),
+      updatedAt: ts,
+    })
+    .where(scopedTaskId(taskId, userId));
+
   return fetchSubtaskById(subtaskId, userId);
 }
 
@@ -757,6 +827,18 @@ export async function deleteSubtask(subtaskId: string, userId?: string) {
 
   await db.delete(subtasks).where(scopedSubtaskId(subtaskId, userId));
   await reindexSubtasks(sub.parentTaskId, userId);
+
+  const syncedSubtasks = await listSubtasks(sub.parentTaskId, userId);
+  const ts = nowIso();
+  await db
+    .update(tasks)
+    .set({
+      estimatedMin:
+        syncedSubtasks.length > 0 ? sumSubtaskEstimatedMin(syncedSubtasks) : null,
+      updatedAt: ts,
+    })
+    .where(scopedTaskId(sub.parentTaskId, userId));
+
   return true;
 }
 

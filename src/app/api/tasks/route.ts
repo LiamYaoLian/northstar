@@ -7,9 +7,7 @@ import {
 import { requireUser } from "@/lib/auth/require-user";
 import { parseTzFromSearchParams } from "@/lib/api/tasks/parse-tz-query";
 import { tzErrorResponse } from "@/lib/api/tasks/tz-error";
-import {
-  createTaskRecurrenceSchema,
-} from "@/lib/api/tasks/schemas";
+import { parseCreateTaskRecurrenceFromBody } from "@/lib/api/tasks/schemas";
 import { toApiError } from "@/lib/auth/errors";
 
 export async function GET(request: Request) {
@@ -34,12 +32,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const user = await requireUser();
-    const recurrence = createTaskRecurrenceSchema.parse({
-      recurrenceType: body.recurrenceType,
-      recurrenceDays: body.recurrenceDays,
-      recurrenceCarryOver: body.recurrenceCarryOver,
-    });
-    const task = await createTask({ ...body, ...recurrence }, user.id);
+    const recurrence = parseCreateTaskRecurrenceFromBody(body);
+    const task = await createTask(
+      recurrence ? { ...body, ...recurrence } : body,
+      user.id,
+    );
     const subtasks = task ? await listSubtasks(task.id, user.id) : [];
     return NextResponse.json({ task, subtasks });
   } catch (err) {

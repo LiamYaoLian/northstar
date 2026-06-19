@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ruleBasedEstimateTime } from "@/lib/tasks/estimate-time";
 
 export const BreakdownItemSchema = z.object({
   title: z.string(),
@@ -111,18 +112,41 @@ function estimateIntimidation(title: string, itemCount: number): number {
   return Math.min(5, score);
 }
 
+function withEstimatedMinutes(subtasks: BreakdownItem[]): BreakdownItem[] {
+  return subtasks.map((item) => ({
+    ...item,
+    estimatedMin:
+      item.estimatedMin != null && item.estimatedMin > 0
+        ? Math.round(item.estimatedMin)
+        : ruleBasedEstimateTime(item.title).estimatedMin ?? 15,
+  }));
+}
+
+function totalEstimatedMinutes(subtasks: BreakdownItem[]): number {
+  return subtasks.reduce((sum, item) => sum + (item.estimatedMin ?? 0), 0);
+}
+
+function finalizeBreakdownResult(
+  result: Omit<BreakdownResult, "estimatedMinTotal"> & { estimatedMinTotal?: number },
+): BreakdownResult {
+  const subtasks = withEstimatedMinutes(result.subtasks);
+  return {
+    ...result,
+    subtasks,
+    estimatedMinTotal: totalEstimatedMinutes(subtasks),
+  };
+}
+
 export function amazonPrinciplesBreakdown(title: string): BreakdownResult {
   const subtasks = AMAZON_LEADERSHIP_PRINCIPLES.map((principle) => ({
     title: principle,
     estimatedMin: 30,
   }));
-  const estimatedMinTotal = subtasks.reduce((s, t) => s + (t.estimatedMin ?? 0), 0);
-  return {
+  return finalizeBreakdownResult({
     subtasks: [...subtasks],
     intimidationScore: estimateIntimidation(title, subtasks.length),
-    estimatedMinTotal,
     summary: `已按 Amazon 16 条 Leadership Principles 生成 ${subtasks.length} 个子任务。`,
-  };
+  });
 }
 
 function wantsAmazonPrinciples(text: string): boolean {
@@ -162,27 +186,20 @@ export function ruleBasedBreakdown(
   for (const tpl of TEMPLATES) {
     if (tpl.pattern.test(text)) {
       const subtasks = tpl.build(title);
-      const estimatedMinTotal = subtasks.reduce(
-        (s, t) => s + (t.estimatedMin ?? 0),
-        0,
-      );
-      return {
+      return finalizeBreakdownResult({
         subtasks,
         intimidationScore: estimateIntimidation(title, subtasks.length),
-        estimatedMinTotal,
         summary: `已按「${title}」类型模板拆解为 ${subtasks.length} 步。`,
-      };
+      });
     }
   }
 
   const subtasks = genericBreakdown(title);
-  const estimatedMinTotal = subtasks.reduce((s, t) => s + (t.estimatedMin ?? 0), 0);
-  return {
+  return finalizeBreakdownResult({
     subtasks,
     intimidationScore: estimateIntimidation(title, subtasks.length),
-    estimatedMinTotal,
     summary: `已将任务拆解为 ${subtasks.length} 步。`,
-  };
+  });
 }
 
 async function openAiBreakdown(
@@ -206,7 +223,8 @@ async function openAiBreakdown(
 3. 若用户要求「每个 X 一个子任务」、列出 N 项、或给出枚举/清单，逐项生成对应子任务（2-${MAX_BREAKDOWN_SUBTASKS} 步均可）。
 4. 仅当用户没有特殊要求时，才拆成 3-6 步。
 5. 子任务标题用中文；专有名词（如 Amazon Leadership Principles 名称）可保留英文。
-6. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
+6. 每个子任务必须包含 estimatedMin（正整数分钟）；estimatedMinTotal 为所有子任务 estimatedMin 之和。
+7. 只返回 JSON：{"subtasks":[{"title":"...","estimatedMin":10}],"intimidationScore":1-5,"estimatedMinTotal":N,"summary":"一句话"}`;
 
   const user = JSON.stringify({
     title,
@@ -243,7 +261,8 @@ async function openAiBreakdown(
   if (!content) return null;
 
   try {
-    return BreakdownResultSchema.parse(JSON.parse(content));
+    const parsed = BreakdownResultSchema.parse(JSON.parse(content));
+    return finalizeBreakdownResult(parsed);
   } catch {
     return null;
   }

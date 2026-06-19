@@ -12,10 +12,17 @@ import {
   type EstimateResult,
 } from "@/lib/tasks/estimate-time";
 import { suggestFocusTrack } from "@/lib/priority";
+import {
+  normalizeRecurrenceInference,
+  ruleBasedInferRecurrence,
+  type RecurrenceInference,
+} from "@/lib/tasks/infer-recurrence";
+import { recurrenceTypeSchema } from "@/lib/api/tasks/schemas";
 
 export type TaskAnalyzeResult = {
   classification: ClassifyResult;
   estimate: EstimateResult;
+  recurrence: RecurrenceInference;
 };
 
 const AnalyzeResponseSchema = z.object({
@@ -23,6 +30,9 @@ const AnalyzeResponseSchema = z.object({
   focusTrack: z.string().nullable().optional(),
   confidence: z.number().min(0).max(1).optional(),
   estimatedMin: z.number().int().positive(),
+  recurrenceType: recurrenceTypeSchema.optional().default("none"),
+  recurrenceDays: z.array(z.number().int().min(1).max(7)).nullable().optional(),
+  recurrenceCarryOver: z.boolean().optional().default(false),
 });
 
 function findPillar(pillars: PillarRef[], name: string) {
@@ -85,7 +95,10 @@ ${JSON.stringify(pillarOptions, null, 2)}
 - 仅当 pillar 为「工作」时填写 focusTrack（进大厂 / 探索方向 / 投资 之一），否则 focusTrack 为 null
 - confidence 为 0-1，表示归类把握程度
 - estimatedMin 为完成整项任务的合理分钟数（正整数）；若标题已含时长（如「晨跑 30min」）应尊重该时长
-- 只返回 JSON：{"pillarName":"...","focusTrack":null,"confidence":0.9,"estimatedMin":45}`;
+- recurrenceType 为 none | daily | weekly：习惯/例行（晨跑、冥想、记账）倾向 daily；标题含具体周几用 weekly 并填 recurrenceDays（1=周一…7=周日）；一次性交付（交报告、买机票）为 none
+- recurrenceDays 仅 weekly 时填写整数数组，否则 null
+- recurrenceCarryOver 默认 false；仅 weekly 且语义含补做/顺延时为 true
+- 只返回 JSON：{"pillarName":"...","focusTrack":null,"confidence":0.9,"estimatedMin":45,"recurrenceType":"daily","recurrenceDays":null,"recurrenceCarryOver":false}`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -124,6 +137,12 @@ ${JSON.stringify(pillarOptions, null, 2)}
     return {
       classification,
       estimate: { estimatedMin: parsed.estimatedMin, source: "openai" },
+      recurrence: normalizeRecurrenceInference({
+        recurrenceType: parsed.recurrenceType,
+        recurrenceDays: parsed.recurrenceDays ?? undefined,
+        recurrenceCarryOver: parsed.recurrenceCarryOver,
+        source: "openai",
+      }),
     };
   } catch {
     return null;
@@ -140,6 +159,7 @@ export async function analyzeTaskTitle(
     return {
       classification: ruleBasedClassify(title, pillars),
       estimate: ruleBasedEstimateTime(title),
+      recurrence: ruleBasedInferRecurrence(title),
     };
   }
 
@@ -149,5 +169,6 @@ export async function analyzeTaskTitle(
   return {
     classification: ruleBasedClassify(trimmed, pillars),
     estimate: ruleBasedEstimateTime(trimmed),
+    recurrence: ruleBasedInferRecurrence(trimmed),
   };
 }

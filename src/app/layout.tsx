@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { AuthSessionProvider } from "@/components/auth-session-provider";
 import { LocaleProvider } from "@/lib/i18n/context";
 
@@ -20,8 +20,7 @@ export default function RootLayout({
         <AuthSessionProvider>
           <LocaleProvider>
             <div className="mx-auto max-w-3xl px-4 py-6">
-              <AppHeader />
-              {children}
+              <AppShell>{children}</AppShell>
             </div>
           </LocaleProvider>
         </AuthSessionProvider>

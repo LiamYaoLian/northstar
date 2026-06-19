@@ -16,8 +16,11 @@ export async function POST(request: Request) {
       .select()
       .from(strategicPillars)
       .where(eq(strategicPillars.userId, user.id));
-    const { classification, estimate } = await analyzeTaskTitle(title, pillars);
-    return NextResponse.json({ classification, estimate });
+    const { classification, estimate, recurrence } = await analyzeTaskTitle(
+      title,
+      pillars,
+    );
+    return NextResponse.json({ classification, estimate, recurrence });
   } catch (err) {
     console.error("POST /api/tasks/classify", err);
     return toApiError(err, "Classify failed");

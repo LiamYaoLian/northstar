@@ -22,6 +22,11 @@ import { useEffect, useState } from "react";
 import { useLocale } from "@/lib/i18n/context";
 import type { Subtask } from "@/lib/db/schema";
 
+function formatSubtaskEstimate(minutes: number | null | undefined, label: string) {
+  if (minutes == null || minutes <= 0) return null;
+  return `${minutes}${label}`;
+}
+
 function SortableSubtaskRow({
   subtask,
   onToggle,
@@ -30,6 +35,7 @@ function SortableSubtaskRow({
   dragLabel,
   deleteLabel,
   editLabel,
+  estimatedMinSuffix,
 }: {
   subtask: Subtask;
   onToggle?: (id: string, isDone: boolean) => void;
@@ -38,6 +44,7 @@ function SortableSubtaskRow({
   dragLabel: string;
   deleteLabel: string;
   editLabel: string;
+  estimatedMinSuffix: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: subtask.id });
@@ -56,6 +63,8 @@ function SortableSubtaskRow({
   const titleClassName = subtask.isDone
     ? "flex-1 text-muted line-through"
     : "flex-1";
+
+  const estimateLabel = formatSubtaskEstimate(subtask.estimatedMin, estimatedMinSuffix);
 
   function commitTitle() {
     const trimmed = title.trim();
@@ -91,25 +100,35 @@ function SortableSubtaskRow({
       />
       <div className={titleClassName}>
         {onUpdateTitle ? (
-          <input
-            type="text"
-            value={title}
-            aria-label={editLabel}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.currentTarget.blur();
-              }
-              if (e.key === "Escape") {
-                setTitle(subtask.title);
-                e.currentTarget.blur();
-              }
-            }}
-            className="w-full bg-transparent outline-none focus:rounded focus:ring-1 focus:ring-accent/40"
-          />
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <input
+              type="text"
+              value={title}
+              aria-label={editLabel}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+                if (e.key === "Escape") {
+                  setTitle(subtask.title);
+                  e.currentTarget.blur();
+                }
+              }}
+              className="min-w-0 flex-1 bg-transparent outline-none focus:rounded focus:ring-1 focus:ring-accent/40"
+            />
+            {estimateLabel && (
+              <span className="shrink-0 text-xs text-muted">{estimateLabel}</span>
+            )}
+          </div>
         ) : (
-          <span>{subtask.title}</span>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span>{subtask.title}</span>
+            {estimateLabel && (
+              <span className="text-xs text-muted">{estimateLabel}</span>
+            )}
+          </div>
         )}
       </div>
       {onDelete && (
@@ -196,6 +215,7 @@ export function SortableSubtasks({
               dragLabel={t.taskCard.dragSubtask}
               deleteLabel={t.taskCard.deleteSubtask}
               editLabel={t.taskCard.editSubtask}
+              estimatedMinSuffix={t.taskCard.estimatedMinSuffix}
             />
           ))}
         </ul>

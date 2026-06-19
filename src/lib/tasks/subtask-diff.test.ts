@@ -11,27 +11,29 @@ const existing = [
     title: "Draft outline",
     isDone: true,
     sortOrder: 0,
+    estimatedMin: 10,
   },
   {
     id: "s2",
     title: "Write slides",
     isDone: false,
     sortOrder: 1,
+    estimatedMin: 20,
   },
 ];
 
 describe("resolveProposedSubtasks", () => {
   it("reuses existing ids for unchanged titles", () => {
     const proposed = resolveProposedSubtasks(existing, [
-      { title: "Draft outline" },
-      { title: "Write slides" },
-      { title: "Practice pitch" },
+      { title: "Draft outline", estimatedMin: 10 },
+      { title: "Write slides", estimatedMin: 20 },
+      { title: "Practice pitch", estimatedMin: 15 },
     ]);
 
     expect(proposed).toEqual([
-      { title: "Draft outline", existingId: "s1" },
-      { title: "Write slides", existingId: "s2" },
-      { title: "Practice pitch" },
+      { title: "Draft outline", existingId: "s1", estimatedMin: 10 },
+      { title: "Write slides", existingId: "s2", estimatedMin: 20 },
+      { title: "Practice pitch", estimatedMin: 15 },
     ]);
   });
 });

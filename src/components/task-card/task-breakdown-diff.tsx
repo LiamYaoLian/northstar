@@ -4,17 +4,30 @@ import type { SubtaskDiffLine } from "@/lib/tasks/subtask-diff";
 type TaskBreakdownDiffProps = {
   diff: SubtaskDiffLine[];
   summary?: string;
+  estimatedMinTotal?: number;
   applying: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-function DiffLine({ line }: { line: SubtaskDiffLine }) {
+function formatEstimate(minutes: number | undefined, suffix: string) {
+  if (minutes == null || minutes <= 0) return "";
+  return ` · ${minutes}${suffix}`;
+}
+
+function DiffLine({
+  line,
+  estimatedMinSuffix,
+}: {
+  line: SubtaskDiffLine;
+  estimatedMinSuffix: string;
+}) {
   if (line.type === "unchanged") {
     return (
       <div className="px-2 py-0.5 text-muted">
         <span className="select-none pr-2 opacity-50"> </span>
         {line.title}
+        {formatEstimate(line.estimatedMin, estimatedMinSuffix)}
       </div>
     );
   }
@@ -24,6 +37,7 @@ function DiffLine({ line }: { line: SubtaskDiffLine }) {
       <div className="bg-red-50 px-2 py-0.5 text-red-700">
         <span className="select-none pr-2">-</span>
         {line.title}
+        {formatEstimate(line.estimatedMin, estimatedMinSuffix)}
       </div>
     );
   }
@@ -33,6 +47,7 @@ function DiffLine({ line }: { line: SubtaskDiffLine }) {
       <div className="bg-green-50 px-2 py-0.5 text-green-700">
         <span className="select-none pr-2">+</span>
         {line.title}
+        {formatEstimate(line.estimatedMin, estimatedMinSuffix)}
       </div>
     );
   }
@@ -46,6 +61,7 @@ function DiffLine({ line }: { line: SubtaskDiffLine }) {
       <div className="bg-green-50 px-2 py-0.5 text-green-700">
         <span className="select-none pr-2">+</span>
         {line.to}
+        {formatEstimate(line.estimatedMin, estimatedMinSuffix)}
       </div>
     </>
   );
@@ -54,6 +70,7 @@ function DiffLine({ line }: { line: SubtaskDiffLine }) {
 export function TaskBreakdownDiff({
   diff,
   summary,
+  estimatedMinTotal,
   applying,
   onConfirm,
   onCancel,
@@ -65,11 +82,21 @@ export function TaskBreakdownDiff({
       <div>
         <p className="text-sm font-medium">{t.taskCard.breakdownDiffTitle}</p>
         {summary && <p className="mt-1 text-xs text-muted">{summary}</p>}
+        {estimatedMinTotal != null && estimatedMinTotal > 0 && (
+          <p className="mt-1 text-xs text-muted">
+            {t.taskCard.estMin} {estimatedMinTotal}
+            {t.taskCard.estimatedMinSuffix}
+          </p>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-md border border-border bg-white font-mono text-sm">
         {diff.map((line, index) => (
-          <DiffLine key={`${line.type}-${index}`} line={line} />
+          <DiffLine
+            key={`${line.type}-${index}`}
+            line={line}
+            estimatedMinSuffix={t.taskCard.estimatedMinSuffix}
+          />
         ))}
       </div>
 

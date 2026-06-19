@@ -317,7 +317,7 @@ Alignment 的 `week` / `month` period 映射到 review period，可保存当前 
 4. `shouldAutoBreakdown(title)` 为 true 且 `autoBreakdown !== false` 时自动 AI/规则拆解子任务
 5. 创建后触发 `persistPriorities`
 
-Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce 400ms）、`TaskRecurrenceForm`。
+Tasks 页创建表单支持：手动选 pillar、live classify 预览（debounce 400ms，含 recurrence 推断）、`TaskRecurrenceForm`（手动覆盖 AI 建议）。
 
 ### 7.2 更新与完成
 
@@ -438,6 +438,7 @@ sequenceDiagram
 |------|------|----------|
 | 任务分类 | `POST /api/tasks/classify`、`createTask` 内嵌 | `ruleBasedClassify` 关键词 |
 | 时长估计 | classify 同 endpoint、`analyzeTaskTitle` | `estimate-time.ts` 规则 |
+| 重复规则推断 | classify 同 endpoint、`createTask` 内嵌 | `infer-recurrence.ts` 关键词 |
 | 子任务拆解 | `generateBreakdown`、`shouldAutoBreakdown` | `ai/breakdown.ts` 模板（LC、deck、投资等） |
 | 策略 critique | onboarding brain dump | 纯规则 `analyzeBrainDump` |
 
@@ -454,7 +455,7 @@ Classify 对 Work pillar 额外推断 `focusTrack`（`suggestFocusTrack` 规则 
 | PATCH | `/api/tasks/[id]` | ✓ body `tz` | 更新；done 时写 completion event |
 | POST | `/api/tasks/recalculate-priorities?tz=` | ✓ | 重算优先级 |
 | POST | `/api/tasks/reorder` | — | 手动排序 |
-| POST | `/api/tasks/classify` | — | 预览分类 + 估计 |
+| POST | `/api/tasks/classify` | — | 预览分类 + 估计 + 重复规则 |
 | POST | `/api/tasks/[id]/breakdown` | — | 拆解预览 |
 | POST | `/api/tasks/[id]/breakdown/apply` | — | 应用拆解 |
 | GET/POST | `/api/tasks/[id]/subtasks` | — | 子任务 CRUD |
@@ -698,6 +699,3 @@ src/components/
 1. Tasks 页拖拽任务 A 到顶部 → `POST /api/tasks/reorder`
 2. `manualSortOrder` 与 `priorityScore` 同步更新
 3. 下次 list 时 `syncActivePriorityFromManualOrder` 保持一致
-
-## todo
-* 在添加新任务时AI 能自动决定是否重复

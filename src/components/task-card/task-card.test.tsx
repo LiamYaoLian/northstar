@@ -2,11 +2,12 @@
  * @vitest-environment happy-dom
  */
 import React from "react";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TaskCard } from "./index";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { TimerProvider } from "@/components/timer-provider";
 import { makeTask } from "@/lib/test-fixtures";
 
 function renderTaskCard(
@@ -29,20 +30,33 @@ function renderTaskCard(
 
   return render(
     <LocaleProvider>
-      <TaskCard
-        task={task}
-        rank={1}
-        onComplete={vi.fn()}
-        onLogTime={vi.fn()}
-        {...props}
-      />
+      <TimerProvider>
+        <TaskCard
+          task={task}
+          rank={1}
+          onComplete={vi.fn()}
+          onLogTime={vi.fn()}
+          {...props}
+        />
+      </TimerProvider>
     </LocaleProvider>,
   );
 }
 
 describe("TaskCard", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ session: null }),
+      }),
+    );
+  });
+
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it("renders title, rank, and priority score", () => {
@@ -50,6 +64,19 @@ describe("TaskCard", () => {
     expect(screen.getByText("Prepare deck")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
     expect(screen.getByText(/82/)).toBeTruthy();
+  });
+
+  it("updates task title on blur when onUpdateTitle is provided", async () => {
+    const onUpdateTitle = vi.fn();
+    const user = userEvent.setup();
+    renderTaskCard({ onUpdateTitle });
+
+    const input = screen.getByRole("textbox", { name: "编辑任务" });
+    await user.clear(input);
+    await user.type(input, "Ship deck");
+    await user.tab();
+
+    expect(onUpdateTitle).toHaveBeenCalledWith("t1", "Ship deck");
   });
 
   it("shows priority factor panel when why button clicked", async () => {

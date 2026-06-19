@@ -34,6 +34,9 @@ export type Messages = {
     reorderSubtasksFailed: string;
     logTimeFailed: string;
     recalculateFailed: string;
+    startTimerFailed: string;
+    stopTimerFailed: string;
+    cancelTimerFailed: string;
   };
   today: {
     title: string;
@@ -156,7 +159,10 @@ export type Messages = {
     factorIntimidation: string;
     factorStaleness: string;
     deleteSubtask: string;
+    editTask: string;
     editSubtask: string;
+    estimatedMinSuffix: string;
+    estimatedFromSubtasks: string;
     editEstimatedMin: string;
     addEstimatedMin: string;
     dragTask: string;
@@ -185,6 +191,15 @@ export type Messages = {
     start: string;
   };
   language: { label: string; zh: string; en: string };
+  timer: {
+    start: string;
+    pomodoro: string;
+    stop: string;
+    cancel: string;
+    runningOnOtherTask: string;
+    overtime: string;
+    orphanTask: string;
+  };
   recurrence: {
     none: string;
     daily: string;

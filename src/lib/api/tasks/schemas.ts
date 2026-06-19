@@ -51,3 +51,19 @@ export const patchTaskRecurrenceSchema = recurrenceBaseSchema
 
 export type CreateTaskRecurrenceInput = z.infer<typeof createTaskRecurrenceSchema>;
 export type PatchTaskRecurrenceInput = z.infer<typeof patchTaskRecurrenceSchema>;
+
+export function parseCreateTaskRecurrenceFromBody(
+  body: Record<string, unknown>,
+): CreateTaskRecurrenceInput | undefined {
+  const hasRecurrenceField =
+    "recurrenceType" in body ||
+    "recurrenceDays" in body ||
+    "recurrenceCarryOver" in body;
+  if (!hasRecurrenceField) return undefined;
+
+  return createTaskRecurrenceSchema.parse({
+    recurrenceType: body.recurrenceType,
+    recurrenceDays: body.recurrenceDays,
+    recurrenceCarryOver: body.recurrenceCarryOver,
+  });
+}

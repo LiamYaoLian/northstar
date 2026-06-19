@@ -23,12 +23,14 @@ export type TaskCardProps = {
   onComplete?: (id: string) => void;
   onReopen?: (id: string) => void;
   onLogTime?: (id: string, minutes: number) => void;
+  onTimerError?: (message: string) => void;
   onBreakdown?: (id: string, userPrompt?: string) => Promise<BreakdownPreviewResult | null>;
   onApplyBreakdown?: (
     taskId: string,
     proposed: BreakdownPreviewResult["proposed"],
   ) => Promise<void>;
   onToggleSubtask?: (subtaskId: string, isDone: boolean) => void;
+  onUpdateTitle?: (taskId: string, title: string) => void;
   onUpdateSubtaskTitle?: (subtaskId: string, title: string) => void;
   onAddSubtask?: (taskId: string, title: string) => Promise<void>;
   onDeleteSubtask?: (subtaskId: string) => void;

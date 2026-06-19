@@ -12,12 +12,17 @@ type UseTaskActionsOptions = {
   reload: () => Promise<void>;
   errors: TaskActionErrors;
   onError: (message: string) => void;
+  applyOptimisticTaskPatch?: (
+    id: string,
+    patch: Record<string, unknown>,
+  ) => () => void;
 };
 
 export function useTaskActions({
   reload,
   errors,
   onError,
+  applyOptimisticTaskPatch,
 }: UseTaskActionsOptions) {
   const [recalculating, setRecalculating] = useState(false);
 
@@ -121,6 +126,32 @@ export function useTaskActions({
     [patchSubtask],
   );
 
+  const updateTaskTitle = useCallback(
+    (taskId: string, title: string) => {
+      void patchTask(taskId, { title });
+    },
+    [patchTask],
+  );
+
+  const updateEstimatedMin = useCallback(
+    (id: string, minutes: number | null) => {
+      const revert = applyOptimisticTaskPatch?.(id, { estimatedMin: minutes });
+      void (async () => {
+        try {
+          await apiFetch(`/api/tasks/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ estimatedMin: minutes }),
+          });
+        } catch (err) {
+          revert?.();
+          onError(err instanceof Error ? err.message : errors.updateTaskFailed);
+        }
+      })();
+    },
+    [applyOptimisticTaskPatch, errors.updateTaskFailed, onError],
+  );
+
   const updateSubtaskTitle = useCallback(
     (subtaskId: string, title: string) => {
       void patchSubtask(subtaskId, { title });
@@ -215,6 +246,8 @@ export function useTaskActions({
     breakdownTask,
     applyBreakdown,
     toggleSubtask,
+    updateTaskTitle,
+    updateEstimatedMin,
     updateSubtaskTitle,
     addSubtask,
     deleteSubtask,

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   createTaskRecurrenceSchema,
+  parseCreateTaskRecurrenceFromBody,
   patchTaskRecurrenceSchema,
 } from "./schemas";
 
@@ -43,6 +44,23 @@ describe("createTaskRecurrenceSchema", () => {
     expect(() =>
       createTaskRecurrenceSchema.parse({ recurrenceType: "monthly" }),
     ).toThrow();
+  });
+});
+
+describe("parseCreateTaskRecurrenceFromBody", () => {
+  it("returns undefined when body has no recurrence fields", () => {
+    expect(parseCreateTaskRecurrenceFromBody({ title: "test" })).toBeUndefined();
+  });
+
+  it("parses recurrence when any recurrence field is present", () => {
+    expect(
+      parseCreateTaskRecurrenceFromBody({ recurrenceType: "daily" }),
+    ).toMatchObject({ recurrenceType: "daily" });
+    expect(
+      parseCreateTaskRecurrenceFromBody({
+        recurrenceType: "none",
+      }),
+    ).toMatchObject({ recurrenceType: "none" });
   });
 });
 

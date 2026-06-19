@@ -175,6 +175,12 @@ export async function dropIsEntryPointIfExists(client: Client): Promise<void> {
   }
 }
 
+export async function addSubtaskEstimatedMinColumnIfMissing(
+  client: Client,
+): Promise<void> {
+  await addColumnIfMissing(client, "subtasks", "estimated_min", "INTEGER");
+}
+
 export async function addRecurrenceColumnsIfMissing(
   client: Client,
 ): Promise<void> {
@@ -350,6 +356,7 @@ export async function applyMigrations(client: Client, db: Db) {
   await addBusinessUserColumnsIfMissing(client);
   await backfillLegacyUserIds(client, db);
   await addRecurrenceColumnsIfMissing(client);
+  await addSubtaskEstimatedMinColumnIfMissing(client);
   await addCompletionEventsTableIfMissing(client);
   await addActiveTimeSessionsTableIfMissing(client);
   await dedupeCompletionEvents(client);

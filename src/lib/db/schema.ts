@@ -156,6 +156,7 @@ export const subtasks = sqliteTable(
     title: text("title").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
     isDone: integer("is_done", { mode: "boolean" }).notNull().default(false),
+    estimatedMin: integer("estimated_min"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("idx_subtasks_user_parent").on(table.userId, table.parentTaskId)],

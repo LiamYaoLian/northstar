@@ -9,9 +9,9 @@ import {
   type RecurrenceFormValue,
 } from "@/components/task-recurrence-form";
 import { useLocale } from "@/lib/i18n/context";
-import { parseJson } from "@/lib/utils";
+import { parseJson, cn } from "@/lib/utils";
 import { parseRecurrenceDays } from "@/lib/tasks/recurrence-types";
-import { cn } from "@/lib/utils";
+import { resolveTaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
 import { TaskBreakdownDiff } from "./task-breakdown-diff";
 import { TaskActionBar } from "./task-action-bar";
 import { TaskAiBreakdownForm } from "./task-ai-breakdown-form";
@@ -25,6 +25,7 @@ import { TaskMetadataBadges } from "./task-metadata-badges";
 import { TaskPriorityPanel } from "./task-priority-panel";
 import type { PriorityFactors, TaskCardProps } from "./types";
 import { useTaskCardForms } from "./use-task-card-forms";
+import { useTimer } from "@/components/timer-provider";
 
 export function TaskCard({
   task,
@@ -33,9 +34,11 @@ export function TaskCard({
   onComplete,
   onReopen,
   onLogTime,
+  onTimerError,
   onBreakdown,
   onApplyBreakdown,
   onToggleSubtask,
+  onUpdateTitle,
   onUpdateSubtaskTitle,
   onAddSubtask,
   onDeleteSubtask,
@@ -46,6 +49,8 @@ export function TaskCard({
   onUpdateRecurrence,
 }: TaskCardProps) {
   const { t } = useLocale();
+  const { isRunningOnTask, overtime } = useTimer();
+  const runningHere = isRunningOnTask(task.id);
   const [showWhy, setShowWhy] = useState(false);
   const [showRecurrence, setShowRecurrence] = useState(false);
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceFormValue>(() => ({
@@ -55,7 +60,9 @@ export function TaskCard({
   }));
   const factors = parseJson<PriorityFactors | null>(task.priorityFactors, null);
   const subtaskList = task.subtasks ?? [];
+  const displayEstimatedMin = resolveTaskEstimatedMin(task.estimatedMin, subtaskList);
   const canEditCategory = Boolean(pillars && onChangePillar);
+  const canEditEstimatedMin = Boolean(onUpdateEstimatedMin) && subtaskList.length === 0;
 
   const forms = useTaskCardForms({
     taskId: task.id,
@@ -69,12 +76,18 @@ export function TaskCard({
       className={cn(
         "space-y-3",
         task.status === "done" && "border-neutral-200 bg-neutral-50/80 opacity-90",
+        runningHere &&
+          (overtime
+            ? "ring-2 ring-amber-300"
+            : "ring-2 ring-accent/40"),
       )}
     >
       <TaskCardHeader
         task={task}
         rank={rank}
         priorityLabel={t.taskCard.priority}
+        editLabel={t.taskCard.editTask}
+        onUpdateTitle={onUpdateTitle}
       >
         {canEditCategory && pillars && onChangePillar ? (
           <TaskCategorySelect
@@ -86,12 +99,13 @@ export function TaskCard({
           <TaskCategoryBadge task={task} />
         )}
         <TaskMetadataBadges
-          estimatedMin={task.estimatedMin}
+          estimatedMin={displayEstimatedMin}
           dueAt={task.dueAt}
           intimidationScore={task.intimidationScore}
           subtasks={subtaskList}
+          derivedFromSubtasks={subtaskList.length > 0}
           onUpdateEstimatedMin={
-            onUpdateEstimatedMin
+            canEditEstimatedMin && onUpdateEstimatedMin
               ? (minutes) => onUpdateEstimatedMin(task.id, minutes)
               : undefined
           }
@@ -148,6 +162,7 @@ export function TaskCard({
         <TaskBreakdownDiff
           diff={forms.pendingPreview.diff}
           summary={forms.pendingPreview.summary}
+          estimatedMinTotal={forms.pendingPreview.estimatedMinTotal}
           applying={forms.applying}
           onConfirm={() => void forms.handleConfirmBreakdown()}
           onCancel={forms.handleCancelBreakdown}
@@ -175,6 +190,7 @@ export function TaskCard({
 
       <TaskActionBar
         task={task}
+        effectiveEstimatedMin={displayEstimatedMin}
         showManual={forms.showManual}
         showAiBreakdown={forms.showAiBreakdown}
         onToggleManual={forms.toggleManual}
@@ -182,6 +198,7 @@ export function TaskCard({
         onToggleWhy={() => setShowWhy((v) => !v)}
         onToggleIntimidating={onToggleIntimidating}
         onLogTime={onLogTime}
+        onTimerError={onTimerError}
         onComplete={onComplete}
         onReopen={onReopen}
         hasAddSubtask={Boolean(onAddSubtask)}

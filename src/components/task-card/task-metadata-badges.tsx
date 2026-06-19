@@ -10,6 +10,7 @@ type TaskMetadataBadgesProps = {
   dueAt: string | null;
   intimidationScore: number;
   subtasks: Subtask[];
+  derivedFromSubtasks?: boolean;
   onUpdateEstimatedMin?: (minutes: number | null) => void;
 };
 
@@ -99,6 +100,7 @@ export function TaskMetadataBadges({
   dueAt,
   intimidationScore,
   subtasks,
+  derivedFromSubtasks = false,
   onUpdateEstimatedMin,
 }: TaskMetadataBadgesProps) {
   const { localeTag, t } = useLocale();
@@ -114,8 +116,9 @@ export function TaskMetadataBadges({
         />
       ) : (
         estimatedMin != null && (
-          <span>
+          <span title={derivedFromSubtasks ? t.taskCard.estimatedFromSubtasks : undefined}>
             {t.taskCard.estMin} {estimatedMin}min
+            {derivedFromSubtasks ? ` (${t.taskCard.estimatedFromSubtasks})` : ""}
           </span>
         )
       )}
