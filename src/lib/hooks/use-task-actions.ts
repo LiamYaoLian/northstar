@@ -1,7 +1,7 @@
-import { useOptimisticTaskPatcher, useTaskPatchActions } from "./use-task-patch-actions";
-import { useSubtaskActions } from "./use-subtask-actions";
-import { useBreakdownActions } from "./use-breakdown-actions";
-import type { UseTaskActionsOptions } from "./types";
+import { useOptimisticTaskPatcher, useTaskPatchActions } from "./task-actions/use-task-patch-actions";
+import { useSubtaskActions } from "./task-actions/use-subtask-actions";
+import { useBreakdownActions } from "./task-actions/use-breakdown-actions";
+import type { UseTaskActionsOptions } from "./task-actions/types";
 
 export function useTaskActions(options: UseTaskActionsOptions) {
   const optimisticPatchTask = useOptimisticTaskPatcher(options);
@@ -19,4 +19,4 @@ export function useTaskActions(options: UseTaskActionsOptions) {
   };
 }
 
-export type { UseTaskActionsOptions } from "./types";
+export type { UseTaskActionsOptions } from "./task-actions/types";

@@ -1,19 +1,11 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { SortableSubtasks } from "@/components/sortable-subtasks";
 import { Card } from "@/components/ui/card";
 import { TaskRecurrenceBadge } from "@/components/task-recurrence-badge";
-import {
-  TaskRecurrenceForm,
-  type RecurrenceFormValue,
-  isRecurrenceFormSavable,
-  recurrenceFormMatchesTask,
-} from "@/components/task-recurrence-form";
 import { useLocale } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
-import { parseRecurrenceDays } from "@/lib/tasks/recurrence-types";
 import { resolveTaskEstimatedMin } from "@/lib/tasks/subtask-estimates";
 import { TaskBreakdownDiff } from "./task-breakdown-diff";
 import { TaskActionBar } from "./task-action-bar";
@@ -26,8 +18,10 @@ import { TaskProjectSelect } from "./task-project-select";
 import { TaskCardHeader } from "./task-card-header";
 import { TaskManualSubtaskForm } from "./task-manual-subtask-form";
 import { TaskMetadataBadges } from "./task-metadata-badges";
+import { TaskRecurrenceSection } from "./task-recurrence-section";
 import type { TaskCardProps } from "./types";
 import { useTaskCardForms } from "./use-task-card-forms";
+import { useTaskRecurrenceDraft } from "./use-task-recurrence-draft";
 import { useTimer } from "@/components/timer-provider";
 import { isWorkPillarOption, resolveSelectedPillar } from "./utils";
 
@@ -62,20 +56,6 @@ export function TaskCard({
   const { t } = useLocale();
   const { isRunningOnTask, overtime, cancel } = useTimer();
   const runningHere = isRunningOnTask(task.id);
-  const [showRecurrence, setShowRecurrence] = useState(false);
-  const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceFormValue>(() => ({
-    recurrenceType: task.recurrenceType as RecurrenceFormValue["recurrenceType"],
-    recurrenceDays: parseRecurrenceDays(task.recurrenceDays) ?? [],
-    recurrenceCarryOver: task.recurrenceCarryOver,
-  }));
-
-  useEffect(() => {
-    setRecurrenceDraft({
-      recurrenceType: task.recurrenceType as RecurrenceFormValue["recurrenceType"],
-      recurrenceDays: parseRecurrenceDays(task.recurrenceDays) ?? [],
-      recurrenceCarryOver: task.recurrenceCarryOver,
-    });
-  }, [task.recurrenceType, task.recurrenceDays, task.recurrenceCarryOver]);
   const subtaskList = task.subtasks ?? [];
   const displayEstimatedMin = resolveTaskEstimatedMin(task.estimatedMin, subtaskList);
   const canEditCategory = Boolean(pillars && onChangePillar);
@@ -84,6 +64,8 @@ export function TaskCard({
     Boolean(projects && onChangeProject) && isWorkPillarOption(selectedPillar);
   const canEditEstimatedMin = Boolean(onUpdateEstimatedMin) && subtaskList.length === 0;
   const canEditDueDate = task.recurrenceType === "none";
+
+  const recurrence = useTaskRecurrenceDraft(task, onUpdateRecurrence);
 
   const forms = useTaskCardForms({
     taskId: task.id,
@@ -104,18 +86,6 @@ export function TaskCard({
         err instanceof Error ? err.message : t.errors.cancelTimerFailed,
       );
     }
-  }
-
-  function handleRecurrenceChange(value: RecurrenceFormValue) {
-    setRecurrenceDraft(value);
-    if (
-      !onUpdateRecurrence ||
-      !isRecurrenceFormSavable(value) ||
-      recurrenceFormMatchesTask(value, task)
-    ) {
-      return;
-    }
-    onUpdateRecurrence(task.id, value);
   }
 
   return (
@@ -189,30 +159,13 @@ export function TaskCard({
       </TaskCardHeader>
 
       {onUpdateRecurrence && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <TaskRecurrenceBadge task={task} showWhenNone prominent />
-            <button
-              type="button"
-              onClick={() => setShowRecurrence((v) => !v)}
-              className="text-xs text-accent hover:underline"
-            >
-              {showRecurrence ? t.strategy.cancel : t.recurrence.editRecurrence}
-            </button>
-          </div>
-          {showRecurrence && (
-            <>
-              <TaskRecurrenceForm
-                compact
-                value={recurrenceDraft}
-                onChange={handleRecurrenceChange}
-              />
-              {task.recurrenceType !== "none" && (
-                <p className="text-xs text-muted">{t.recurrence.subtaskResetHint}</p>
-              )}
-            </>
-          )}
-        </div>
+        <TaskRecurrenceSection
+          task={task}
+          showRecurrence={recurrence.showRecurrence}
+          onToggleShow={() => recurrence.setShowRecurrence((v) => !v)}
+          recurrenceDraft={recurrence.recurrenceDraft}
+          onRecurrenceChange={recurrence.handleRecurrenceChange}
+        />
       )}
 
       {subtaskList.length > 0 && onReorderSubtasks && (

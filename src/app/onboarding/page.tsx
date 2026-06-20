@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
+import { useOnboardingFlow } from "@/lib/hooks/use-onboarding-flow";
 import { useLocale } from "@/lib/i18n/context";
 import {
   budgetTable,
@@ -11,83 +10,20 @@ import {
   translateWorkTrackKey,
 } from "@/lib/i18n/entities";
 import { WORK_TRACK_PRESETS } from "@/lib/strategy/templates";
-import type { StrategyCritique } from "@/lib/strategy/critique";
-
-type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const { locale, t } = useLocale();
-  const [step, setStep] = useState<Step>(1);
-  const [horizon, setHorizon] = useState("2026 Q2");
-  const [hoursPerWeek, setHoursPerWeek] = useState(40);
-  const [brainDump, setBrainDump] = useState("");
-  const [critique, setCritique] = useState<StrategyCritique | null>(null);
-  const [workTrack, setWorkTrack] = useState("big_tech");
-  const [northStar, setNorthStar] = useState(
-    "本季度在保持健康、关系的前提下，在工作主赛道上取得可验证进展。",
-  );
-  const [loading, setLoading] = useState(false);
-
-  async function runCritique() {
-    const res = await fetch("/api/critique", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brainDump }),
-    });
-    const data = await res.json();
-    setCritique(data.critique);
-    setStep(3);
-  }
-
-  async function finish() {
-    setLoading(true);
-    const res = await fetch("/api/strategy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "template",
-        workTrack,
-        statement: northStar,
-        horizon,
-        hoursPerWeek: Number(hoursPerWeek),
-      }),
-    });
-    await res.json();
-
-    const seedTasks = [
-      { title: "LeetCode 本周 3 题", focusTrack: "进大厂" },
-      { title: "周日投资复盘 1h", focusTrack: "投资" },
-      { title: "晨跑 30min", pillarName: "健康" },
-      { title: "周三家庭晚餐", pillarName: "关系" },
-    ];
-
-    const strategyRes = await fetch("/api/strategy");
-    const { strategy } = await strategyRes.json();
-    const pillarMap = new Map(
-      strategy.pillars.map((p: { name: string; id: string }) => [p.name, p.id]),
-    );
-
-    for (const task of seedTasks) {
-      const pillarId =
-        "pillarName" in task && task.pillarName
-          ? pillarMap.get(task.pillarName)
-          : pillarMap.get("工作");
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: task.title,
-          pillarId,
-          focusTrack: "focusTrack" in task ? task.focusTrack : undefined,
-          estimatedMin: 30,
-        }),
-      });
-    }
-
-    setLoading(false);
-    router.push("/tasks");
-  }
+  const {
+    step,
+    setStep,
+    critique,
+    setCritique,
+    loading,
+    form,
+    updateForm,
+    runCritique,
+    finish,
+  } = useOnboardingFlow();
 
   const budgetRows = budgetTable(locale);
 
@@ -106,8 +42,8 @@ export default function OnboardingPage() {
             {t.onboarding.horizon}
             <input
               className="mt-1 w-full rounded-md border border-border px-3 py-2"
-              value={horizon}
-              onChange={(e) => setHorizon(e.target.value)}
+              value={form.horizon}
+              onChange={(e) => updateForm({ horizon: e.target.value })}
             />
           </label>
           <label className="block text-sm">
@@ -115,8 +51,8 @@ export default function OnboardingPage() {
             <input
               type="number"
               className="mt-1 w-full rounded-md border border-border px-3 py-2"
-              value={hoursPerWeek}
-              onChange={(e) => setHoursPerWeek(Number(e.target.value))}
+              value={form.hoursPerWeek}
+              onChange={(e) => updateForm({ hoursPerWeek: Number(e.target.value) })}
             />
           </label>
           <button
@@ -135,8 +71,8 @@ export default function OnboardingPage() {
           <textarea
             className="min-h-40 w-full rounded-md border border-border px-3 py-2 text-sm"
             placeholder={t.onboarding.brainDumpPlaceholder}
-            value={brainDump}
-            onChange={(e) => setBrainDump(e.target.value)}
+            value={form.brainDump}
+            onChange={(e) => updateForm({ brainDump: e.target.value })}
           />
           <div className="flex gap-2">
             <button
@@ -184,10 +120,8 @@ export default function OnboardingPage() {
 
           {critique?.requiresWorkTrackChoice && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">
-                {t.onboarding.workPrimaryTrack}
-              </p>
-              {Object.entries(WORK_TRACK_PRESETS).map(([key]) => (
+              <p className="text-sm font-medium">{t.onboarding.workPrimaryTrack}</p>
+              {Object.keys(WORK_TRACK_PRESETS).map((key) => (
                 <label
                   key={key}
                   className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
@@ -195,8 +129,8 @@ export default function OnboardingPage() {
                   <input
                     type="radio"
                     name="workTrack"
-                    checked={workTrack === key}
-                    onChange={() => setWorkTrack(key)}
+                    checked={form.workTrack === key}
+                    onChange={() => updateForm({ workTrack: key })}
                   />
                   {translateWorkTrackKey(key, locale)}
                 </label>
@@ -208,8 +142,8 @@ export default function OnboardingPage() {
             {t.onboarding.northStar}
             <textarea
               className="mt-1 w-full rounded-md border border-border px-3 py-2"
-              value={northStar}
-              onChange={(e) => setNorthStar(e.target.value)}
+              value={form.northStar}
+              onChange={(e) => updateForm({ northStar: e.target.value })}
             />
           </label>
 
@@ -250,8 +184,8 @@ export default function OnboardingPage() {
           </div>
           <p className="text-xs text-muted">
             {t.onboarding.budgetNote}{" "}
-            {translateWorkTrackKey(workTrack, locale)}：
-            {WORK_TRACK_PRESETS[workTrack].focusTracks
+            {translateWorkTrackKey(form.workTrack, locale)}：
+            {WORK_TRACK_PRESETS[form.workTrack].focusTracks
               .map(
                 (tr) =>
                   `${translateFocusTrack(tr.name, locale)} ${tr.shareOfParent}%`,
