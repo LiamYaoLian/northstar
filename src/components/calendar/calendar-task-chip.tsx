@@ -10,6 +10,7 @@ import {
 } from "@/lib/tasks/calendar-time-grid";
 import type { CalendarTaskFields } from "@/lib/tasks/calendar-time-grid";
 import { cn } from "@/lib/utils";
+import { useHoverTooltip } from "@/components/ui/hover-tooltip";
 
 type CalendarTaskChipProps = {
   task: CalendarTaskFields;
@@ -65,29 +66,36 @@ export function CalendarTaskChip({
       };
 
   const durationColor = task.pillarColor ?? "var(--accent)";
+  const tooltipLabel = onEdit
+    ? `${task.title} · ${t.calendar.doubleClickEdit}`
+    : task.title;
+  const { bind: tooltipBind, tooltip } = useHoverTooltip(tooltipLabel, {
+    disabled: isOverlay || isDragging,
+  });
 
   return (
-    <div
-      ref={isOverlay ? undefined : setNodeRef}
-      style={style}
-      className={cn(
-        "relative box-border flex min-w-0 cursor-grab touch-none flex-col overflow-hidden rounded border border-border bg-card/95 px-1 py-0.5 text-xs shadow-sm active:cursor-grabbing",
-        isDragging && !isOverlay && "opacity-30",
-        isOverlay && "cursor-grabbing shadow-md ring-2 ring-accent/30",
-        !tall && "justify-center",
-      )}
-      {...(isOverlay ? {} : { ...attributes, ...listeners })}
-      onDoubleClick={
-        onEdit
-          ? (event) => {
-              event.stopPropagation();
-              onEdit();
-            }
-          : undefined
-      }
-      title={onEdit ? t.calendar.doubleClickEdit : undefined}
-      aria-label={dragLabel}
-    >
+    <>
+      <div
+        ref={isOverlay ? undefined : setNodeRef}
+        style={style}
+        className={cn(
+          "relative box-border flex h-full w-full min-w-0 cursor-grab touch-none flex-col overflow-hidden rounded border border-border bg-card/95 px-1 py-0.5 text-xs shadow-sm active:cursor-grabbing",
+          isDragging && !isOverlay && "opacity-30",
+          isOverlay && "cursor-grabbing shadow-md ring-2 ring-accent/30",
+          !tall && "justify-center",
+        )}
+        {...(isOverlay ? {} : { ...attributes, ...listeners })}
+        {...(isOverlay ? {} : tooltipBind)}
+        onDoubleClick={
+          onEdit
+            ? (event) => {
+                event.stopPropagation();
+                onEdit();
+              }
+            : undefined
+        }
+        aria-label={dragLabel}
+      >
       {isTimed && fillHeightPx != null ? (
         <>
           <div
@@ -133,7 +141,9 @@ export function CalendarTaskChip({
           {task.estimatedMin}m
         </span>
       ) : null}
-    </div>
+      </div>
+      {tooltip}
+    </>
   );
 }
 
