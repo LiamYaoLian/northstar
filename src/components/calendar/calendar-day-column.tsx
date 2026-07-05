@@ -47,7 +47,7 @@ export function CalendarDayColumn({
           style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
         />
       ))}
-      {placements.map(({ task, timeStr, topPx, heightPx }) => (
+      {placements.map(({ task, timeStr, topPx, heightPx, durationHeightPx }) => (
         <div
           key={`${task.id}-${timeStr}`}
           className="absolute left-0 right-0 z-[1] px-px"
@@ -58,6 +58,8 @@ export function CalendarDayColumn({
             draggableId={occurrenceDraggableId(task.id, day.dateStr, timeStr)}
             dragLabel={dragLabel}
             heightPx={heightPx}
+            durationHeightPx={durationHeightPx}
+            layout="timed"
             onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
           />
         </div>

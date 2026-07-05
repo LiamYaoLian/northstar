@@ -30,6 +30,7 @@ import {
   slotDroppableId,
   slotTimeFromDropPosition,
   taskBlockHeightPx,
+  CALENDAR_TASK_MIN_HEIGHT_PX,
 } from "@/lib/tasks/calendar-time-grid";
 import type { PillarOption, TaskRow } from "@/lib/tasks/enrich-tasks";
 import { normalizeTaskStartAt } from "@/lib/tasks/task-dates";
@@ -87,9 +88,13 @@ export function CalendarBoard({
     return tasks.find((task) => task.id === taskId) ?? null;
   }, [activeId, tasks]);
 
-  const activeTaskHeight = activeTask
+  const activeTaskDurationHeight = activeTask
     ? taskBlockHeightPx(activeTask.estimatedMin)
     : undefined;
+  const activeTaskHeight =
+    activeTaskDurationHeight != null
+      ? Math.max(CALENDAR_TASK_MIN_HEIGHT_PX, activeTaskDurationHeight)
+      : undefined;
 
   const headerTitle = useMemo(() => {
     if (view === "month") {
@@ -264,6 +269,7 @@ export function CalendarBoard({
             task={activeTask}
             dragLabel={t.calendar.dragTask}
             heightPx={activeTaskHeight}
+            durationHeightPx={activeTaskDurationHeight}
           />
         ) : null}
       </DragOverlay>

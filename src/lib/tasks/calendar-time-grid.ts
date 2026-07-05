@@ -5,6 +5,7 @@ import { localDateString } from "./timezone";
 
 export const CALENDAR_SLOT_MINUTES = 15;
 export const CALENDAR_SLOT_HEIGHT_PX = 16;
+export const CALENDAR_TASK_MIN_HEIGHT_PX = 12;
 export const CALENDAR_SLOTS_PER_DAY = (24 * 60) / CALENDAR_SLOT_MINUTES;
 
 function buildDayTimeSlotsInternal(): CalendarTimeSlotRow[] {
@@ -84,7 +85,10 @@ export type CalendarTaskPlacement = {
   task: CalendarTaskFields;
   timeStr: string;
   topPx: number;
+  /** Touch/drag target height (>= durationHeightPx). */
   heightPx: number;
+  /** Proportional height from estimatedMin on the time grid. */
+  durationHeightPx: number;
 };
 
 export function taskDurationMinutes(
@@ -117,7 +121,10 @@ export function clampTaskBlockHeight(
   heightPx: number,
   columnHeightPx: number,
 ): number {
-  return Math.max(CALENDAR_SLOT_HEIGHT_PX, Math.min(heightPx, columnHeightPx - topPx));
+  return Math.max(
+    CALENDAR_TASK_MIN_HEIGHT_PX,
+    Math.min(heightPx, columnHeightPx - topPx),
+  );
 }
 
 export function buildDayTaskPlacements(
@@ -133,13 +140,10 @@ export function buildDayTaskPlacements(
     if (!timeStr) continue;
 
     const topPx = slotIndexForTimeStr(timeStr) * CALENDAR_SLOT_HEIGHT_PX;
-    const heightPx = clampTaskBlockHeight(
-      topPx,
-      taskBlockHeightPx(task.estimatedMin),
-      columnHeight,
-    );
+    const durationHeightPx = taskBlockHeightPx(task.estimatedMin);
+    const heightPx = clampTaskBlockHeight(topPx, durationHeightPx, columnHeight);
 
-    placements.push({ task, timeStr, topPx, heightPx });
+    placements.push({ task, timeStr, topPx, heightPx, durationHeightPx });
   }
 
   return placements;

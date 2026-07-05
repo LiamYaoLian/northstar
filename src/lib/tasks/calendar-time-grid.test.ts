@@ -112,7 +112,21 @@ describe("calendar-time-grid", () => {
 
   it("scales block height with estimated minutes", () => {
     expect(taskBlockHeightPx(60)).toBe(CALENDAR_SLOT_HEIGHT_PX * 4);
+    expect(taskBlockHeightPx(20)).toBe((20 / 15) * CALENDAR_SLOT_HEIGHT_PX);
     expect(taskBlockHeightPx(null)).toBe(CALENDAR_SLOT_HEIGHT_PX);
+  });
+
+  it("keeps short tasks clickable without inflating visual duration", () => {
+    const task = makeTask({
+      id: "t1",
+      recurrenceType: "none",
+      estimatedMin: 5,
+      startAt: localDateTimeInputToIso("2025-01-06T10:00", TEST_TZ),
+      status: "todo",
+    });
+    const [placement] = buildDayTaskPlacements([task], "2025-01-06", TEST_TZ);
+    expect(placement?.durationHeightPx).toBe((5 / 15) * CALENDAR_SLOT_HEIGHT_PX);
+    expect(placement?.heightPx).toBeGreaterThan(placement!.durationHeightPx);
   });
 
   it("builds placements with proportional height", () => {
@@ -124,6 +138,7 @@ describe("calendar-time-grid", () => {
       status: "todo",
     });
     const [placement] = buildDayTaskPlacements([task], "2025-01-06", TEST_TZ);
+    expect(placement?.durationHeightPx).toBe(CALENDAR_SLOT_HEIGHT_PX * 3);
     expect(placement?.heightPx).toBe(CALENDAR_SLOT_HEIGHT_PX * 3);
     expect(placement?.topPx).toBe(slotIndexForTimeStr("10:00") * CALENDAR_SLOT_HEIGHT_PX);
   });
