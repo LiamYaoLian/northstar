@@ -108,7 +108,7 @@ frontend:
 1. 打开 Amplify 分配的 URL（形如 `https://main.xxxxx.amplifyapp.com`）
 2. 访问 `/login`，输入邮箱，确认收到 Magic Link 邮件（非仅 CloudWatch 日志）
 3. 登录后检查 `/today`、`/tasks` 数据是否与 Turso 一致
-4. 若 Auth 回调失败，在 Console 追加 `AUTH_URL=https://main.xxxxx.amplifyapp.com`（并加入 `amplify.yml` 的 grep 前缀），重新部署
+4. 若 Auth 回调失败，检查 `/api/auth/providers` 里的 `callbackUrl` 是否为 Amplify 域名（不是 `localhost`）。`amplify.yml` 会在构建时自动写入 `AUTH_URL`；自定义域名时在 Console 设 `CUSTOM_AUTH_URL=https://你的域名`
 
 **日志位置：** Amplify Console → 该 App → Monitoring → Hosting compute logs（CloudWatch）
 
@@ -116,7 +116,7 @@ frontend:
 
 ## 4. 可选后续
 
-- **自定义域名：** Amplify → Domain management → 添加域名，DNS CNAME 指向 Amplify；更新 `AUTH_URL` 为新域名
+- **自定义域名：** Amplify → Domain management → 添加域名，DNS CNAME 指向 Amplify；在 Console 设 `CUSTOM_AUTH_URL=https://你的域名` 后重新部署
 - **分支预览：** 每个 PR 分支可自动部署 preview URL（同一套 env vars 或分支级 override）
 - **CI 门禁：** 在 merge 前本地 `npm run build && npm run test`（Amplify 默认不跑 test，可在 `amplify.yml` preBuild 加 `npm run test`）
 

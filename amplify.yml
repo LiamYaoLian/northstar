@@ -7,7 +7,14 @@ frontend:
         - node --import tsx src/scripts/migrate.ts
     build:
       commands:
-        - env | grep -E '^(TURSO_|AUTH_|EMAIL_|OPENAI_|NORTHSTAR_)' >> .env.production
+        # Fresh .env.production each build; AUTH_URL derived from Amplify host (not dev localhost)
+        - env | grep -E '^(TURSO_|AUTH_SECRET|EMAIL_|OPENAI_|NORTHSTAR_)' > .env.production
+        - |
+          if [ -n "$CUSTOM_AUTH_URL" ]; then
+            echo "AUTH_URL=$CUSTOM_AUTH_URL" >> .env.production
+          else
+            echo "AUTH_URL=https://${AWS_BRANCH}.${AWS_APP_ID}.amplifyapp.com" >> .env.production
+          fi
         - npm run build
   artifacts:
     baseDirectory: .next
