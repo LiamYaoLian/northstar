@@ -47,23 +47,42 @@ export function CalendarDayColumn({
           style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
         />
       ))}
-      {placements.map(({ task, timeStr, topPx, heightPx, durationHeightPx }) => (
-        <div
-          key={`${task.id}-${timeStr}`}
-          className="absolute left-0 right-0 z-[1] px-px"
-          style={{ top: topPx, height: heightPx }}
-        >
-          <CalendarTaskChip
-            task={task}
-            draggableId={occurrenceDraggableId(task.id, day.dateStr, timeStr)}
-            dragLabel={dragLabel}
-            heightPx={heightPx}
-            durationHeightPx={durationHeightPx}
-            layout="timed"
-            onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
-          />
-        </div>
-      ))}
+      {placements.map(
+        ({
+          task,
+          timeStr,
+          topPx,
+          heightPx,
+          durationHeightPx,
+          columnIndex,
+          columnCount,
+        }) => {
+          const widthPct = 100 / columnCount;
+          return (
+            <div
+              key={`${task.id}-${timeStr}`}
+              className="absolute box-border px-px"
+              style={{
+                top: topPx,
+                height: heightPx,
+                left: `${columnIndex * widthPct}%`,
+                width: `${widthPct}%`,
+                zIndex: columnIndex + 1,
+              }}
+            >
+              <CalendarTaskChip
+                task={task}
+                draggableId={occurrenceDraggableId(task.id, day.dateStr, timeStr)}
+                dragLabel={dragLabel}
+                heightPx={heightPx}
+                durationHeightPx={durationHeightPx}
+                layout="timed"
+                onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
+              />
+            </div>
+          );
+        },
+      )}
     </div>
   );
 }

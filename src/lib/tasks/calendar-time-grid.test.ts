@@ -157,4 +157,59 @@ describe("calendar-time-grid", () => {
       DAY_TIME_SLOTS.length * CALENDAR_SLOT_HEIGHT_PX,
     );
   });
+
+  it("lays out overlapping tasks side by side", () => {
+    const first = makeTask({
+      id: "t1",
+      recurrenceType: "none",
+      estimatedMin: 60,
+      startAt: localDateTimeInputToIso("2025-01-06T10:00", TEST_TZ),
+      status: "todo",
+    });
+    const second = makeTask({
+      id: "t2",
+      recurrenceType: "none",
+      estimatedMin: 45,
+      startAt: localDateTimeInputToIso("2025-01-06T10:00", TEST_TZ),
+      status: "todo",
+    });
+    const third = makeTask({
+      id: "t3",
+      recurrenceType: "none",
+      estimatedMin: 30,
+      startAt: localDateTimeInputToIso("2025-01-06T10:30", TEST_TZ),
+      status: "todo",
+    });
+
+    const sameSlot = buildDayTaskPlacements([first, second], "2025-01-06", TEST_TZ);
+    expect(sameSlot).toHaveLength(2);
+    expect(sameSlot.every((item) => item.columnCount === 2)).toBe(true);
+    expect(new Set(sameSlot.map((item) => item.columnIndex))).toEqual(new Set([0, 1]));
+
+    const staggered = buildDayTaskPlacements([first, third], "2025-01-06", TEST_TZ);
+    expect(staggered).toHaveLength(2);
+    expect(staggered.every((item) => item.columnCount === 2)).toBe(true);
+    expect(new Set(staggered.map((item) => item.columnIndex))).toEqual(new Set([0, 1]));
+  });
+
+  it("keeps non-overlapping tasks full width", () => {
+    const first = makeTask({
+      id: "t1",
+      recurrenceType: "none",
+      estimatedMin: 30,
+      startAt: localDateTimeInputToIso("2025-01-06T10:00", TEST_TZ),
+      status: "todo",
+    });
+    const second = makeTask({
+      id: "t2",
+      recurrenceType: "none",
+      estimatedMin: 30,
+      startAt: localDateTimeInputToIso("2025-01-06T11:00", TEST_TZ),
+      status: "todo",
+    });
+
+    const placements = buildDayTaskPlacements([first, second], "2025-01-06", TEST_TZ);
+    expect(placements.every((item) => item.columnCount === 1)).toBe(true);
+    expect(placements.every((item) => item.columnIndex === 0)).toBe(true);
+  });
 });

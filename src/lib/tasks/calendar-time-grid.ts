@@ -89,6 +89,10 @@ export type CalendarTaskPlacement = {
   heightPx: number;
   /** Proportional height from estimatedMin on the time grid. */
   durationHeightPx: number;
+  /** Side-by-side column within an overlap cluster (0-based). */
+  columnIndex: number;
+  /** Number of columns in the overlap cluster. */
+  columnCount: number;
 };
 
 export function taskDurationMinutes(
@@ -127,6 +131,97 @@ export function clampTaskBlockHeight(
   );
 }
 
+type TimedBlock = { topPx: number; heightPx: number };
+
+export function timedBlocksOverlap(a: TimedBlock, b: TimedBlock): boolean {
+  return a.topPx < b.topPx + b.heightPx && b.topPx < a.topPx + a.heightPx;
+}
+
+function placementKey(placement: CalendarTaskPlacement): string {
+  return `${placement.task.id}:${placement.timeStr}`;
+}
+
+function mergeOverlapClusters(
+  placements: CalendarTaskPlacement[],
+): CalendarTaskPlacement[][] {
+  const clusters: CalendarTaskPlacement[][] = [];
+
+  for (const placement of placements) {
+    const touching = clusters.filter((cluster) =>
+      cluster.some((item) => timedBlocksOverlap(item, placement)),
+    );
+    if (touching.length === 0) {
+      clusters.push([placement]);
+      continue;
+    }
+
+    const merged = [placement];
+    for (const cluster of touching) {
+      merged.push(...cluster);
+    }
+    for (const cluster of touching) {
+      const index = clusters.indexOf(cluster);
+      if (index >= 0) clusters.splice(index, 1);
+    }
+    clusters.push(merged);
+  }
+
+  return clusters;
+}
+
+export function assignOverlapColumns(
+  placements: CalendarTaskPlacement[],
+): CalendarTaskPlacement[] {
+  if (placements.length === 0) return placements;
+
+  const next = placements.map((placement) => ({
+    ...placement,
+    columnIndex: 0,
+    columnCount: 1,
+  }));
+
+  for (const cluster of mergeOverlapClusters(next)) {
+    const sorted = [...cluster].sort((a, b) => {
+      if (a.topPx !== b.topPx) return a.topPx - b.topPx;
+      return b.heightPx - a.heightPx;
+    });
+    const columns: CalendarTaskPlacement[][] = [];
+
+    for (const placement of sorted) {
+      let columnIndex = 0;
+      while (true) {
+        const column = columns[columnIndex];
+        if (!column) {
+          columns[columnIndex] = [placement];
+          break;
+        }
+        const overlapsColumn = column.some((item) =>
+          timedBlocksOverlap(item, placement),
+        );
+        if (!overlapsColumn) {
+          column.push(placement);
+          break;
+        }
+        columnIndex += 1;
+      }
+    }
+
+    const columnCount = columns.length;
+    for (const [columnIndex, column] of columns.entries()) {
+      for (const placement of column) {
+        const target = next.find(
+          (item) => placementKey(item) === placementKey(placement),
+        );
+        if (!target) continue;
+        target.columnIndex = columnIndex;
+        target.columnCount = columnCount;
+      }
+    }
+  }
+
+  return next;
+}
+
 export function buildDayTaskPlacements(
   tasks: CalendarTaskFields[],
   dayDateStr: string,
@@ -143,10 +238,18 @@ export function buildDayTaskPlacements(
     const durationHeightPx = taskBlockHeightPx(task.estimatedMin);
     const heightPx = clampTaskBlockHeight(topPx, durationHeightPx, columnHeight);
 
-    placements.push({ task, timeStr, topPx, heightPx, durationHeightPx });
+    placements.push({
+      task,
+      timeStr,
+      topPx,
+      heightPx,
+      durationHeightPx,
+      columnIndex: 0,
+      columnCount: 1,
+    });
   }
 
-  return placements;
+  return assignOverlapColumns(placements);
 }
 
 export function buildWeekTaskPlacements(
