@@ -83,7 +83,7 @@ export async function previewBreakdownTask(
   const diff = computeSubtaskDiff(existing, proposed);
 
   if (existing.length === 0 || !hasSubtaskDiffChanges(diff)) {
-    return applyBreakdownPreview(taskId, proposed, breakdown, options.userId);
+    return applyBreakdownPreview(taskId, proposed, options.userId, breakdown);
   }
 
   return {
@@ -100,8 +100,8 @@ export async function previewBreakdownTask(
 export async function applyBreakdownPreview(
   taskId: string,
   proposed: ProposedSubtask[],
-  breakdown?: Awaited<ReturnType<typeof generateBreakdown>>,
   userId: string,
+  breakdown?: Awaited<ReturnType<typeof generateBreakdown>>,
 ): Promise<BreakdownAppliedResponse> {
   await ensureDbReady();
   const db = getDb();

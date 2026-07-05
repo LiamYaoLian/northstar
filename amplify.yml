@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+        - node --import tsx src/scripts/migrate.ts
+    build:
+      commands:
+        - env | grep -E '^(TURSO_|AUTH_|EMAIL_|OPENAI_|NORTHSTAR_)' >> .env.production
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*

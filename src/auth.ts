@@ -17,17 +17,22 @@ async function sendVerificationRequest({
 }: {
   identifier: string;
   url: string;
-  provider: { server: unknown; from: string };
+  provider: { server?: unknown; from?: string };
 }) {
   if (!process.env.EMAIL_SERVER) {
     console.info(`Northstar sign-in link for ${identifier}: ${url}`);
     return;
   }
 
-  const transport = createTransport(provider.server);
+  const transport = createTransport(
+    (provider.server ?? process.env.EMAIL_SERVER) as string,
+  );
   await transport.sendMail({
     to: identifier,
-    from: provider.from,
+    from:
+      provider.from ??
+      process.env.EMAIL_FROM ??
+      "Northstar <no-reply@northstar.local>",
     subject: "Sign in to Northstar",
     text: `Sign in to Northstar:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
     html: `<p>Sign in to Northstar:</p><p><a href="${url}">${url}</a></p>`,

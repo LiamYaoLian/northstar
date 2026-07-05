@@ -39,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid proposed subtasks" }, { status: 400 });
     }
 
-    const result = await applyBreakdownPreview(id, safeProposed, undefined, user.id);
+    const result = await applyBreakdownPreview(id, safeProposed, user.id);
     if (!result.task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }

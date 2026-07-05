@@ -72,11 +72,13 @@ export function occurrenceSlotKey(dateStr: string, timeStr: string): string {
   return `${dateStr}T${snapTimeStr(timeStr)}`;
 }
 
-type CalendarTaskFields = Pick<
+export type CalendarTaskFields = Pick<
   Task,
-  "recurrenceType" | "startAt" | "status" | "estimatedMin" | "id"
+  "recurrenceType" | "startAt" | "status" | "estimatedMin" | "id" | "title"
 > &
-  Parameters<typeof taskAppearsOnDay>[0];
+  Parameters<typeof taskAppearsOnDay>[0] & {
+    pillarColor?: string | null;
+  };
 
 export type CalendarTaskPlacement = {
   task: CalendarTaskFields;

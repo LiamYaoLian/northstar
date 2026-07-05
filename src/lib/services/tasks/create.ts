@@ -56,7 +56,7 @@ export async function createTask(
     recurrence: inferredRecurrence,
   } = await analyzeTaskTitle(input.title, pillars);
   let pillarId = input.pillarId ?? classified.pillarId ?? null;
-  let project = null as Awaited<ReturnType<typeof getProjectById>>;
+  let project: Awaited<ReturnType<typeof getProjectById>> | null = null;
   if (input.projectId) {
     project = await getProjectById(input.projectId, userId);
     if (!project || project.status !== "active") {

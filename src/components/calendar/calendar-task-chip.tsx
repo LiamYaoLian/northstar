@@ -5,11 +5,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { Repeat } from "lucide-react";
 import { useLocale } from "@/lib/i18n/context";
 import { CALENDAR_SLOT_HEIGHT_PX } from "@/lib/tasks/calendar-time-grid";
-import type { TaskRow } from "@/lib/tasks/enrich-tasks";
+import type { CalendarTaskFields } from "@/lib/tasks/calendar-time-grid";
 import { cn } from "@/lib/utils";
 
 type CalendarTaskChipProps = {
-  task: TaskRow;
+  task: CalendarTaskFields;
   draggableId: string;
   dragLabel: string;
   heightPx?: number;
@@ -92,7 +92,7 @@ export function CalendarTaskChipOverlay({
   dragLabel,
   heightPx,
 }: {
-  task: TaskRow;
+  task: CalendarTaskFields;
   dragLabel: string;
   heightPx?: number;
 }) {

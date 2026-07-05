@@ -143,7 +143,11 @@ export async function startTimer(
 
   await getDb().insert(activeTimeSessions).values(row);
   return toPayload(
-    { ...row, targetDurationMin: row.targetDurationMin ?? null },
+    {
+      ...row,
+      targetDurationMin: row.targetDurationMin ?? null,
+      note: row.note ?? null,
+    },
     task,
     ts,
   );
