@@ -102,14 +102,27 @@ describe("taskAppearsOnDay", () => {
     expect(taskAppearsOnDay(task, TUESDAY_10AM_NY, TEST_TZ)).toBe(true);
   });
 
-  it("hides done tasks", () => {
+  it("shows done one-off on its scheduled day", () => {
     expect(
       taskAppearsOnDay(
-        makeTask({ status: "done", startAt: localDateTimeInputToIso("2025-01-06T09:00", TEST_TZ) }),
+        makeTask({
+          status: "done",
+          startAt: localDateTimeInputToIso("2025-01-06T09:00", TEST_TZ),
+        }),
         MONDAY_10AM_NY,
         TEST_TZ,
       ),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("shows done daily recurring on matching days", () => {
+    const task = makeTask({
+      ...dailyTask(),
+      status: "done",
+      id: "daily-done",
+    });
+    expect(taskAppearsOnDay(task, MONDAY_10AM_NY, TEST_TZ)).toBe(true);
+    expect(taskAppearsOnDay(task, TUESDAY_10AM_NY, TEST_TZ)).toBe(true);
   });
 });
 

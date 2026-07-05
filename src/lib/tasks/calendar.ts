@@ -1,5 +1,5 @@
 import type { Task } from "@/lib/db/schema";
-import { shouldShowOnToday } from "./recurrence";
+import { isOccurrenceOverdue, matchesRecurrenceDay } from "./recurrence";
 import { toRecurrenceFields } from "./recurrence-types";
 import { normalizeTaskStartAt } from "./task-dates";
 import {
@@ -45,15 +45,25 @@ export function taskAppearsOnDay(
   dayInstant: Date,
   tz: string,
 ): boolean {
-  if (task.status === "done") return false;
-
   if (task.recurrenceType === "none") {
     const startIso = normalizeTaskStartAt(task.startAt, tz);
     if (!startIso) return false;
     return localDateString(new Date(startIso), tz) === localDateString(dayInstant, tz);
   }
 
-  return shouldShowOnToday(toRecurrenceFields(task), dayInstant, tz);
+  const fields = toRecurrenceFields(task);
+  if (matchesRecurrenceDay(fields, dayInstant, tz)) return true;
+
+  if (
+    task.recurrenceType === "weekly" &&
+    task.recurrenceCarryOver &&
+    task.status !== "done" &&
+    isOccurrenceOverdue(fields, dayInstant, tz)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function buildWeekDays(anchor: Date, tz: string): CalendarDay[] {

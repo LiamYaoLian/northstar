@@ -2,7 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Repeat } from "lucide-react";
+import { Check, Repeat } from "lucide-react";
 import { useLocale } from "@/lib/i18n/context";
 import {
   CALENDAR_SLOT_HEIGHT_PX,
@@ -56,6 +56,7 @@ export function CalendarTaskChip({
     (durationClamped || heightPx <= CALENDAR_SLOT_HEIGHT_PX * 1.75);
   const tall = heightPx > CALENDAR_SLOT_HEIGHT_PX * 1.75;
   const recurring = task.recurrenceType !== "none";
+  const isDone = task.status === "done";
 
   const style = isOverlay
     ? { height: heightPx, minHeight: CALENDAR_TASK_MIN_HEIGHT_PX }
@@ -66,9 +67,13 @@ export function CalendarTaskChip({
       };
 
   const durationColor = task.pillarColor ?? "var(--accent)";
-  const tooltipLabel = onEdit
-    ? `${task.title} · ${t.calendar.doubleClickEdit}`
-    : task.title;
+  const tooltipLabel = [
+    task.title,
+    isDone ? t.tasks.statusDone : null,
+    onEdit ? t.calendar.doubleClickEdit : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const { bind: tooltipBind, tooltip } = useHoverTooltip(tooltipLabel, {
     disabled: isOverlay || isDragging,
   });
@@ -80,6 +85,7 @@ export function CalendarTaskChip({
         style={style}
         className={cn(
           "relative box-border flex h-full w-full min-w-0 cursor-grab touch-none flex-col overflow-hidden rounded border border-border bg-card/95 px-1 py-0.5 text-xs shadow-sm active:cursor-grabbing",
+          isDone && "border-border/70 bg-neutral-50/95",
           isDragging && !isOverlay && "opacity-30",
           isOverlay && "cursor-grabbing shadow-md ring-2 ring-accent/30",
           !tall && "justify-center",
@@ -96,7 +102,7 @@ export function CalendarTaskChip({
         }
         aria-label={dragLabel}
       >
-      {isTimed && fillHeightPx != null ? (
+      {isTimed && fillHeightPx != null && !isDone ? (
         <>
           <div
             className="pointer-events-none absolute inset-x-0 top-0 opacity-20"
@@ -124,9 +130,18 @@ export function CalendarTaskChip({
             aria-hidden
           />
         ) : null}
-        <span className={cn("min-w-0 flex-1", tall ? "line-clamp-2" : "truncate")}>
+        <span
+          className={cn(
+            "min-w-0 flex-1",
+            tall ? "line-clamp-2" : "truncate",
+            isDone && "text-muted line-through",
+          )}
+        >
           {task.title}
         </span>
+        {isDone ? (
+          <Check className="h-3 w-3 shrink-0 text-muted" aria-hidden />
+        ) : null}
         {showDurationLabel ? (
           <span className="shrink-0 tabular-nums text-[10px] text-muted">
             {task.estimatedMin}m

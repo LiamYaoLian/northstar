@@ -81,10 +81,10 @@ function CalendarPageContent() {
     setProjects((current) => [...current, project]);
   }, [setProjects]);
 
-  const visibleTasks = useMemo(() => {
-    const active = tasks.filter((task) => task.status !== "done");
-    return filterTasksByPillar(active, categoryFilter);
-  }, [tasks, categoryFilter]);
+  const visibleTasks = useMemo(
+    () => filterTasksByPillar(tasks, categoryFilter),
+    [tasks, categoryFilter],
+  );
 
   const editingTask = useMemo(
     () =>
